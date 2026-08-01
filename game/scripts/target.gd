@@ -4,7 +4,7 @@ extends StaticBody3D
 
 @onready var collision: CollisionShape3D = $CollisionShape3D
 
-func hit() -> void:
+func hit(_damage: int = 1) -> void:
 	if not visible:
 		return
 	visible = false

@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
 
@@ -19,39 +19,40 @@ radius = 0.5
 height = 1.0
 
 [sub_resource type="StandardMaterial3D" id="StdMat_gunmetal"]
-albedo_color = Color(0.09, 0.09, 0.1, 1)
-metallic = 0.85
-roughness = 0.3
+albedo_color = Color(0.08, 0.08, 0.09, 1)
+metallic = 0.75
+roughness = 0.4
 
 [sub_resource type="StandardMaterial3D" id="StdMat_gunmetal_light"]
-albedo_color = Color(0.18, 0.18, 0.2, 1)
-metallic = 0.7
-roughness = 0.25
+albedo_color = Color(0.22, 0.22, 0.24, 1)
+metallic = 0.6
+roughness = 0.3
 
-[sub_resource type="StandardMaterial3D" id="StdMat_rubber"]
-albedo_color = Color(0.04, 0.04, 0.045, 1)
+[sub_resource type="StandardMaterial3D" id="StdMat_polymer_black"]
+albedo_color = Color(0.03, 0.03, 0.03, 1)
 metallic = 0.0
-roughness = 0.9
+roughness = 0.85
 
-[sub_resource type="StandardMaterial3D" id="StdMat_accent"]
-albedo_color = Color(0.1, 0.7, 0.85, 1)
-emission_enabled = true
-emission = Color(0.15, 0.9, 1.0, 1)
-emission_energy_multiplier = 5.0
+[sub_resource type="StandardMaterial3D" id="StdMat_tan"]
+albedo_color = Color(0.52, 0.44, 0.32, 1)
+metallic = 0.0
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StdMat_lens_flat"]
+albedo_color = Color(0.05, 0.08, 0.09, 1)
+metallic = 0.3
+roughness = 0.1
+
+[sub_resource type="StandardMaterial3D" id="StdMat_blade"]
+albedo_color = Color(0.75, 0.76, 0.78, 1)
+metallic = 0.9
+roughness = 0.15
 
 [sub_resource type="StandardMaterial3D" id="StdMat_muzzleflash"]
 albedo_color = Color(1, 0.85, 0.3, 1)
 emission_enabled = true
 emission = Color(1, 0.8, 0.2, 1)
 emission_energy_multiplier = 8.0
-
-[sub_resource type="StandardMaterial3D" id="StdMat_lens"]
-albedo_color = Color(0.05, 0.22, 0.32, 1)
-metallic = 0.9
-roughness = 0.08
-emission_enabled = true
-emission = Color(0.2, 0.6, 0.85, 1)
-emission_energy_multiplier = 3.0
 
 [node name="Player" type="CharacterBody3D"]
 script = ExtResource("1_player")
@@ -70,103 +71,179 @@ fov = 75.0
 [node name="RayCast3D" type="RayCast3D" parent="Head/Camera3D"]
 target_position = Vector3(0, 0, -100)
 
-[node name="Gun" type="Node3D" parent="Head/Camera3D"]
-position = Vector3(0.3, -0.35, -0.6)
+[node name="WeaponSniper" type="Node3D" parent="Head/Camera3D"]
+position = Vector3(0.28, -0.34, -0.55)
 
-[node name="Receiver" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0, 0)
-scale = Vector3(0.1, 0.1, 0.34)
+[node name="Receiver" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0, 0, 0.05)
+scale = Vector3(0.09, 0.09, 0.3)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_gunmetal")
 
-[node name="Stock" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0, 0.2)
-scale = Vector3(0.07, 0.09, 0.16)
+[node name="Stock" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0, -0.005, 0.28)
+scale = Vector3(0.06, 0.08, 0.22)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_gunmetal")
+surface_material_override/0 = SubResource("StdMat_tan")
 
-[node name="Grip" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, -0.13, 0.1)
-rotation_degrees = Vector3(-15, 0, 0)
-scale = Vector3(0.05, 0.16, 0.05)
+[node name="CheekRest" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0, 0.045, 0.22)
+scale = Vector3(0.04, 0.03, 0.1)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_rubber")
+surface_material_override/0 = SubResource("StdMat_tan")
 
-[node name="TopRail" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0.065, -0.02)
-scale = Vector3(0.03, 0.02, 0.3)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_gunmetal")
-
-[node name="FrontSight" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0.09, -0.15)
-scale = Vector3(0.015, 0.03, 0.015)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_gunmetal")
-
-[node name="ScopeMountFront" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0.083, -0.09)
-scale = Vector3(0.018, 0.026, 0.018)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_gunmetal")
-
-[node name="ScopeMountRear" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0.083, 0.03)
-scale = Vector3(0.018, 0.026, 0.018)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_gunmetal")
-
-[node name="ScopeTube" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0.1, -0.03)
+[node name="Barrel" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0, 0, -0.42)
 rotation_degrees = Vector3(-90, 0, 0)
-scale = Vector3(0.044, 0.16, 0.044)
+scale = Vector3(0.032, 0.55, 0.032)
 mesh = SubResource("CylinderMesh_unit")
 surface_material_override/0 = SubResource("StdMat_gunmetal_light")
 
-[node name="ScopeLensFront" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0.1, -0.112)
-rotation_degrees = Vector3(-90, 0, 0)
-scale = Vector3(0.046, 0.006, 0.046)
-mesh = SubResource("CylinderMesh_unit")
-surface_material_override/0 = SubResource("StdMat_lens")
-
-[node name="ScopeLensRear" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0.1, 0.052)
-rotation_degrees = Vector3(-90, 0, 0)
-scale = Vector3(0.046, 0.006, 0.046)
-mesh = SubResource("CylinderMesh_unit")
-surface_material_override/0 = SubResource("StdMat_lens")
-
-[node name="BarrelShroud" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0, -0.32)
-rotation_degrees = Vector3(-90, 0, 0)
-scale = Vector3(0.044, 0.3, 0.044)
-mesh = SubResource("CylinderMesh_unit")
+[node name="BipodLeft" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(-0.04, -0.06, -0.55)
+rotation_degrees = Vector3(20, 0, 15)
+scale = Vector3(0.015, 0.12, 0.015)
+mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_gunmetal")
 
-[node name="MuzzleTip" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0, -0.49)
+[node name="BipodRight" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0.04, -0.06, -0.55)
+rotation_degrees = Vector3(20, 0, -15)
+scale = Vector3(0.015, 0.12, 0.015)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal")
+
+[node name="ScopeMountFront" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0, 0.075, -0.16)
+scale = Vector3(0.02, 0.026, 0.02)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal")
+
+[node name="ScopeMountRear" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0, 0.075, 0.05)
+scale = Vector3(0.02, 0.026, 0.02)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal")
+
+[node name="ScopeTube" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0, 0.1, -0.05)
 rotation_degrees = Vector3(-90, 0, 0)
-scale = Vector3(0.052, 0.045, 0.052)
+scale = Vector3(0.06, 0.24, 0.06)
 mesh = SubResource("CylinderMesh_unit")
 surface_material_override/0 = SubResource("StdMat_gunmetal_light")
 
-[node name="Magazine" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, -0.16, -0.04)
-rotation_degrees = Vector3(8, 0, 0)
-scale = Vector3(0.045, 0.16, 0.07)
+[node name="ScopeLensFront" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0, 0.1, -0.17)
+rotation_degrees = Vector3(-90, 0, 0)
+scale = Vector3(0.062, 0.006, 0.062)
+mesh = SubResource("CylinderMesh_unit")
+surface_material_override/0 = SubResource("StdMat_lens_flat")
+
+[node name="ScopeLensRear" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0, 0.1, 0.07)
+rotation_degrees = Vector3(-90, 0, 0)
+scale = Vector3(0.062, 0.006, 0.062)
+mesh = SubResource("CylinderMesh_unit")
+surface_material_override/0 = SubResource("StdMat_lens_flat")
+
+[node name="Magazine" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0, -0.13, 0.02)
+scale = Vector3(0.04, 0.14, 0.06)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_gunmetal_light")
 
-[node name="AccentStripe" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0.053, 0, -0.02)
-scale = Vector3(0.006, 0.03, 0.28)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_accent")
-
-[node name="MuzzleFlash" type="MeshInstance3D" parent="Head/Camera3D/Gun"]
-position = Vector3(0, 0, -0.52)
+[node name="MuzzleFlash" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0, 0, -0.68)
 visible = false
-scale = Vector3(0.1, 0.1, 0.1)
+scale = Vector3(0.09, 0.09, 0.09)
 mesh = SubResource("SphereMesh_unit")
 surface_material_override/0 = SubResource("StdMat_muzzleflash")
+
+[node name="WeaponHandgun" type="Node3D" parent="Head/Camera3D"]
+position = Vector3(0.26, -0.3, -0.42)
+
+[node name="Slide" type="MeshInstance3D" parent="Head/Camera3D/WeaponHandgun"]
+position = Vector3(0, 0.02, -0.08)
+scale = Vector3(0.045, 0.05, 0.16)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal")
+
+[node name="Frame" type="MeshInstance3D" parent="Head/Camera3D/WeaponHandgun"]
+position = Vector3(0, -0.06, 0.03)
+rotation_degrees = Vector3(-8, 0, 0)
+scale = Vector3(0.04, 0.14, 0.05)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_polymer_black")
+
+[node name="BarrelTip" type="MeshInstance3D" parent="Head/Camera3D/WeaponHandgun"]
+position = Vector3(0, 0.03, -0.17)
+rotation_degrees = Vector3(-90, 0, 0)
+scale = Vector3(0.024, 0.04, 0.024)
+mesh = SubResource("CylinderMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal_light")
+
+[node name="TriggerGuard" type="MeshInstance3D" parent="Head/Camera3D/WeaponHandgun"]
+position = Vector3(0, -0.02, -0.02)
+scale = Vector3(0.03, 0.02, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal")
+
+[node name="FrontSight" type="MeshInstance3D" parent="Head/Camera3D/WeaponHandgun"]
+position = Vector3(0, 0.05, -0.15)
+scale = Vector3(0.008, 0.015, 0.008)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal")
+
+[node name="RearSight" type="MeshInstance3D" parent="Head/Camera3D/WeaponHandgun"]
+position = Vector3(0, 0.05, -0.02)
+scale = Vector3(0.022, 0.015, 0.008)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal")
+
+[node name="Hammer" type="MeshInstance3D" parent="Head/Camera3D/WeaponHandgun"]
+position = Vector3(0, 0.065, 0.065)
+rotation_degrees = Vector3(15, 0, 0)
+scale = Vector3(0.02, 0.025, 0.012)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal")
+
+[node name="Magazine" type="MeshInstance3D" parent="Head/Camera3D/WeaponHandgun"]
+position = Vector3(0, -0.11, 0.02)
+scale = Vector3(0.035, 0.1, 0.045)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_polymer_black")
+
+[node name="MuzzleFlash" type="MeshInstance3D" parent="Head/Camera3D/WeaponHandgun"]
+position = Vector3(0, 0.03, -0.19)
+visible = false
+scale = Vector3(0.08, 0.08, 0.08)
+mesh = SubResource("SphereMesh_unit")
+surface_material_override/0 = SubResource("StdMat_muzzleflash")
+
+[node name="WeaponKnife" type="Node3D" parent="Head/Camera3D"]
+position = Vector3(0.3, -0.26, -0.4)
+rotation_degrees = Vector3(10, 25, 15)
+
+[node name="Handle" type="MeshInstance3D" parent="Head/Camera3D/WeaponKnife"]
+position = Vector3(0, 0, 0.05)
+scale = Vector3(0.035, 0.035, 0.14)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_polymer_black")
+
+[node name="Guard" type="MeshInstance3D" parent="Head/Camera3D/WeaponKnife"]
+position = Vector3(0, 0, -0.03)
+scale = Vector3(0.07, 0.02, 0.02)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal")
+
+[node name="Blade" type="MeshInstance3D" parent="Head/Camera3D/WeaponKnife"]
+position = Vector3(0, 0, -0.16)
+scale = Vector3(0.03, 0.008, 0.22)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_blade")
+
+[node name="Pommel" type="MeshInstance3D" parent="Head/Camera3D/WeaponKnife"]
+position = Vector3(0, 0, 0.13)
+scale = Vector3(0.03, 0.03, 0.03)
+mesh = SubResource("SphereMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal")

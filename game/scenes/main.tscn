@@ -23,7 +23,7 @@ ambient_light_energy = 1.0
 tonemap_mode = 3
 ssao_enabled = true
 glow_enabled = true
-glow_intensity = 0.6
+glow_intensity = 0.25
 
 [sub_resource type="FastNoiseLite" id="FastNoiseLite_surface"]
 frequency = 0.05
@@ -46,10 +46,8 @@ noise = SubResource("FastNoiseLite_surface")
 size = Vector3(1, 1, 1)
 
 [sub_resource type="StandardMaterial3D" id="StdMat_trim_accent"]
-albedo_color = Color(0.1, 0.7, 0.85, 1)
-emission_enabled = true
-emission = Color(0.15, 0.9, 1.0, 1)
-emission_energy_multiplier = 4.0
+albedo_color = Color(0.72, 0.71, 0.66, 1)
+roughness = 0.6
 
 [sub_resource type="StandardMaterial3D" id="StdMat_trim_dark"]
 albedo_color = Color(0.08, 0.08, 0.09, 1)
@@ -62,10 +60,8 @@ metallic = 0.5
 roughness = 0.35
 
 [sub_resource type="StandardMaterial3D" id="StdMat_trim_amber"]
-albedo_color = Color(0.9, 0.55, 0.1, 1)
-emission_enabled = true
-emission = Color(1.0, 0.6, 0.1, 1)
-emission_energy_multiplier = 4.0
+albedo_color = Color(0.75, 0.58, 0.12, 1)
+roughness = 0.65
 
 [sub_resource type="BoxMesh" id="BoxMesh_floor"]
 size = Vector3(50, 0.5, 50)
@@ -650,7 +646,7 @@ offset_top = -60.0
 offset_right = 720.0
 offset_bottom = -20.0
 theme_override_font_sizes/font_size = 18
-text = "WASD move   Shift sprint   Space jump   Click shoot   Right-click aim   R reload   Esc release mouse"
+text = "WASD move   Shift sprint   Space jump   Click attack   Right-click aim   R reload   Scroll/1-2-3 switch   E weapons   Esc release mouse"
 
 [node name="DamageFlash" type="ColorRect" parent="HUD"]
 anchors_preset = 15
@@ -660,3 +656,65 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0.8, 0.05, 0.05, 0)
+
+[node name="WeaponPanelBG" type="ColorRect" parent="HUD"]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 132.0
+mouse_filter = 2
+color = Color(0.05, 0.05, 0.06, 0.8)
+visible = false
+
+[node name="WeaponPanelText" type="RichTextLabel" parent="HUD"]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -210.0
+offset_top = 30.0
+offset_right = -30.0
+offset_bottom = 122.0
+mouse_filter = 2
+bbcode_enabled = true
+theme_override_font_sizes/normal_font_size = 18
+scroll_active = false
+text = "1. Sniper
+2. Handgun
+3. Knife"
+visible = false
+
+[node name="ScopeOverlay" type="TextureRect" parent="HUD"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 0
+visible = false
+
+[node name="ScopeReticleH" type="ColorRect" parent="HUD"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -140.0
+offset_top = -1.0
+offset_right = 140.0
+offset_bottom = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.85)
+visible = false
+
+[node name="ScopeReticleV" type="ColorRect" parent="HUD"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -1.0
+offset_top = -140.0
+offset_right = 1.0
+offset_bottom = 140.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.85)
+visible = false

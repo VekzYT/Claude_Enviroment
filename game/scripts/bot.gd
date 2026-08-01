@@ -5,7 +5,7 @@ enum State { PATROL, CHASE, ATTACK, DEAD }
 const GRAVITY := 9.8
 const LOSE_SIGHT_DELAY := 1.5
 
-@export var max_health := 3
+@export var max_health := 100
 @export var move_speed := 3.0
 @export var chase_speed := 4.5
 @export var detection_radius := 16.0

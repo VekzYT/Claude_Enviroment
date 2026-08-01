@@ -1,6 +1,6 @@
-# Syfon v1.5
+# Syfon v1.6
 
-A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). A 50x50 arena with textured, trimmed walls and floor, pillars, cover walls and crates, real-time lighting and shadows, physics-based movement, a scoped weapon with reload/aim/recoil animation and visible tracer fire, a bottom-of-screen health bar, and detailed robotic enemies that patrol, chase, and shoot back with their own tracers.
+A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). A 50x50 arena with textured, trimmed walls and floor, pillars, cover walls and crates, real-time lighting and shadows, physics-based movement, three switchable weapons with their own animations, a bottom-of-screen health bar, and detailed robotic enemies that patrol, chase, and shoot back with their own tracers.
 
 ## Why Godot
 
@@ -21,16 +21,24 @@ Godot is free, open-source, and its projects are plain text files, which is what
 
 - Press **F5** (or the ▶ Play button, top-right) to run the game.
 - Click into the game window to capture the mouse, then:
-  - **WASD** — move (adds walk bob/sway to the camera and gun)
+  - **WASD** — move (adds walk bob/sway to the camera and weapon)
   - **Mouse** — look around
   - **Shift** — sprint
   - **Space** — jump
-  - **Left Click** — shoot (with recoil kick and a visible tracer streak)
-  - **Right Click (hold)** — aim down the scope (zooms FOV, centers the gun)
-  - **R** — reload (magazine drops out and slides back in, ~1.6s, can't fire mid-reload)
+  - **Left Click** — fire (guns) or slash (knife), with a visible tracer on gunfire
+  - **Right Click (hold)** — aim (guns only) — the sniper's aim covers the screen with a real scope overlay
+  - **R** — reload (guns only; magazine drops out and slides back in)
+  - **Mouse Wheel / 1, 2, 3** — switch weapons, with a draw/holster dip animation
+  - **E** — toggle the weapon list panel (top-right), highlighting your current weapon
   - **Esc** — release the mouse cursor
 
-Shoot the red cylinder targets for points. The robots (red-eyed, patrolling near their spawn point) will chase you down and shoot back once they spot you, firing their own red tracers — killing one also scores a point, and both targets and robots respawn after a delay. Getting shot costs health, shown as a bar at the bottom of the screen with a red screen flash; at 0 you respawn after a couple of seconds.
+Shoot or slash the red cylinder targets and robots for points — the robots (patrolling near their spawn point) will chase you down and shoot back once they spot you, firing their own red tracers. Getting shot costs health, shown as a bar at the bottom of the screen with a red flash; at 0 you respawn after a couple of seconds.
+
+## The three weapons
+
+1. **Sniper** — highest damage (one-shots a robot), slowest fire rate and reload. Aiming brings up a genuine full-screen scope: heavy zoom, the weapon model hides, and a black circular vignette with a crosshair reticle covers the screen exactly like looking through an optic — not just an FOV zoom.
+2. **Handgun** — the all-rounder: moderate damage, fast fire rate, quick reload, normal FOV-zoom aim (no screen overlay).
+3. **Knife** — melee only, no reload, no aim. Left-click plays a fast swipe animation (arcs the blade across your view) with a short-range hit-check timed to the swing, dealing solid damage for the risk of getting close.
 
 ## Project structure
 
@@ -39,25 +47,26 @@ game/
   project.godot          # engine/project settings, autoloads
   scenes/
     main.tscn             # the arena: lighting/sky, textured walls/floor, trim, pillars, cover walls, crates, targets, bots, HUD
-    player.tscn            # FPS controller: capsule body, camera, kitbashed scoped gun, hit-scan raycast
+    player.tscn            # FPS controller: capsule body, camera, three kitbashed weapons (sniper/handgun/knife), hit-scan raycast
     target.tscn             # shootable static target
     bot.tscn                 # robotic enemy: detailed kitbashed body + AI script
   scripts/
-    player.gd               # movement, mouse-look, shooting, health/death
+    player.gd               # movement, mouse-look, weapon switching/aim/reload/melee, health/death
     target.gd                # hit/respawn logic
-    bot.gd                    # patrol/chase/attack AI state machine (with obstacle avoidance + combat strafing), hitscan weapon, health/respawn
-    game_state.gd             # autoload singleton tracking score + player health
-    hud.gd                     # crosshair/score/health-bar UI binding, damage flash
-    effects.gd                 # autoload: spawns the bright tracer line for every shot fired
+    bot.gd                    # patrol/chase/attack AI state machine (obstacle avoidance + combat strafing), hitscan weapon, health/respawn
+    game_state.gd             # autoload singleton: score, player health, active weapon, weapon-panel/scope UI state
+    hud.gd                     # crosshair/score/health-bar/weapon-panel/scope-overlay UI binding, damage flash
+    effects.gd                 # autoload: spawns the tracer line for every gunshot fired
 ```
 
-## What's new in v1.5
+## What's new in v1.6
 
-- **Health bar**: replaced the old top-left health text with a proper bar centered at the bottom of the screen (color-shifts green→red as it drops), plus a numeric readout on top of it.
-- **Visible bullets**: every shot (yours and the bots') now draws a short, bright tracer streak from the muzzle to wherever it hit — cyan for you, red for bots — via a new `Effects` autoload, so gunfire actually reads as gunfire.
-- **Floor/wall detail**: both now use a procedural noise texture (Godot's built-in `FastNoiseLite`/`NoiseTexture2D`, no external image files needed) for real per-pixel albedo + normal-map variation instead of flat color, plus actual trim geometry — glowing floor border strips and a center marker, dark baseboards and light cap trim on every wall, amber warning rings on the pillars, and amber accent stripes on the cover walls.
-- **Smarter bots**: they now steer around obstacles instead of just walking into them (a short forward raycast deflects their movement along whatever they'd hit), strafe side-to-side while attacking instead of standing still, and keep chasing for 1.5s after losing sight of you instead of snapping back to patrol immediately.
-- **More detailed bot model**: knee joints, a hip connector (no more floating torso), shoulder pauldrons, a back-mounted power core to match the chest core, side indicator lights, and a visor-slit eye instead of a single dot.
+- **Three weapons**: Sniper, Handgun, and Knife, each with their own kitbashed model, stats, and behavior (see above). Switch with the scroll wheel or number keys 1/2/3; switching plays a dip-down/rise-up draw-and-holster animation and briefly locks out firing.
+- **Weapon list panel**: press **E** to toggle a panel (top-right) listing all three weapons with the active one highlighted.
+- **Real sniper scope**: aiming with the sniper doesn't just zoom the camera — it shows a full-screen circular vignette (generated procedurally at runtime, no image assets) with its own reticle, and hides the weapon model, like looking through genuine glass.
+- **Knife melee**: a fast swipe animation with a short-range hit-check timed to land partway through the swing.
+- **Toned-down visual style**: removed the glowing cyan/amber/red emissive accents from the gun, environment trim, and bot markers in favor of flat, grounded tactical colors (gunmetal, tan, matte red, painted hazard-stripe yellow) — less sci-fi, more military/industrial. Overall scene glow intensity was also reduced.
+- Bot max health rebalanced (3 → 100) to match the new weapon damage scale: one sniper shot, two knife hits, or four handgun shots to kill.
 
 ## How the bot AI works
 
@@ -74,7 +83,8 @@ All of those are `@export` vars on the Bot node, so you can tune difficulty per-
 Natural next steps:
 - Swap the `MeshInstance3D` blockout meshes for real 3D models (Godot imports `.glb`/`.fbx` directly).
 - Give bots a navmesh (`NavigationRegion3D` + `NavigationAgent3D`, baked in the editor) for proper pathfinding around obstacles instead of raycast-deflected straight-line chasing.
-- Add sound effects (gunshots, bot detection "alert" sting, footsteps) and a muzzle-flash light (`OmniLight3D`).
+- Add sound effects (gunshots, knife swipes, bot detection "alert" sting, footsteps) and a muzzle-flash light (`OmniLight3D`).
+- Ammo counts and a reload-when-empty requirement instead of unlimited ammo.
 - Multiple levels: duplicate `main.tscn`, build a new layout, and swap `run/main_scene` in `project.godot` or add a level-select menu.
 - A proper game-over screen instead of the current auto-respawn-after-death.
 
