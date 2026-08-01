@@ -1,6 +1,11 @@
-# Syfon v1.10
+# Syfon v1.11
 
-A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). Starts at a real main menu with settings, drops you into two connected areas joined by a tunnel, two enterable buildings for close-quarters fights, a watchtower, barrels, pillars, cover walls and crates — with textured/trimmed walls and floor, real recorded sound effects and music, real-time lighting and shadows, physics-based movement, three switchable weapons (including a dashing one-hit-kill knife), blood-spray and hit-marker feedback, a fleshed-out HUD, and detailed robotic enemies that walk, flinch, collapse when killed, and shoot back with their own tracers.
+A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). Starts at a real main menu with settings, drops you into two connected areas joined by a tunnel, two enterable buildings for close-quarters fights, a watchtower, barrels, pillars, cover walls and crates — with higher-detail textured/trimmed walls and floor, real recorded sound effects and music, real-time lighting and shadows, physics-based movement, three switchable weapons (including a dashing one-hit-kill knife), blood-spray and hit-marker feedback, a fleshed-out HUD, and detailed robotic enemies that walk, flinch, collapse when killed, and shoot back with imperfect (not aimbot) accuracy.
+
+## What's new in v1.11
+
+- **Better floor/wall graphics**: the procedural surface textures went from 512px to 1024px, both floor and walls now get a roughness texture (so specular highlights vary across the surface instead of looking uniformly matte/flat) and stronger normal-map bump, and the floor got a subtle metallic hint for a sealed-concrete sheen. Added real geometric detail too: 16 vertical seam strips along the perimeter walls (breaking up the flat 50-unit runs) and 4 floor expansion-joint lines, all in the same dark trim material already used for baseboards.
+- **Bots are no longer aimbots**: their shot spread is now distance-scaled (tight up close, noticeably worse at range — realistic falloff instead of pinpoint accuracy at any distance), they take a beat (`0.6s`) to react the first time they spot you before opening fire, and their fire rate dropped slightly (`1.1s` → `1.5s` between shots). All four values (`base_spread`, `spread_per_distance`, fire rate, reaction delay) are `@export` on the Bot node if you want to retune the difficulty further.
 
 ## What's new in v1.10
 

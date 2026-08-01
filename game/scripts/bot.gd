@@ -4,6 +4,7 @@ enum State { PATROL, CHASE, ATTACK, DEAD }
 
 const GRAVITY := 9.8
 const LOSE_SIGHT_DELAY := 1.5
+const REACTION_DELAY := 0.6
 
 @export var max_health := 100
 @export var move_speed := 3.0
@@ -11,9 +12,11 @@ const LOSE_SIGHT_DELAY := 1.5
 @export var detection_radius := 16.0
 @export var attack_range := 12.0
 @export var patrol_radius := 5.0
-@export var fire_cooldown := 1.1
+@export var fire_cooldown := 1.5
 @export var respawn_time := 6.0
 @export var damage_per_hit := 8
+@export var base_spread := 0.4
+@export var spread_per_distance := 0.05
 
 @onready var head: Node3D = $Head
 @onready var muzzle: Node3D = $Muzzle
@@ -155,7 +158,13 @@ func has_line_of_sight(target_pos: Vector3) -> bool:
 	return result.collider == player
 
 func fire_at_player() -> void:
-	var spread := Vector3(randf_range(-0.2, 0.2), randf_range(-0.15, 0.15), randf_range(-0.2, 0.2))
+	var distance: float = global_position.distance_to(player.global_position)
+	var spread_amount: float = base_spread + distance * spread_per_distance
+	var spread := Vector3(
+		randf_range(-spread_amount, spread_amount),
+		randf_range(-spread_amount * 0.6, spread_amount * 0.6),
+		randf_range(-spread_amount, spread_amount)
+	)
 	var target_pos: Vector3 = get_player_eye_position() + spread
 	var space_state: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(head.global_position, target_pos)
@@ -186,6 +195,8 @@ func update_state(delta: float) -> void:
 		if state == State.PATROL:
 			Sound.play_3d("bot_alert", global_position, -3.0)
 		if dist <= attack_range:
+			if state != State.ATTACK:
+				fire_timer = max(fire_timer, REACTION_DELAY)
 			state = State.ATTACK
 		else:
 			state = State.CHASE

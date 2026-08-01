@@ -1,4 +1,4 @@
-[gd_scene load_steps=38 format=3]
+[gd_scene load_steps=40 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/target.tscn" id="2_target"]
@@ -30,19 +30,28 @@ glow_intensity = 0.25
 [sub_resource type="FastNoiseLite" id="FastNoiseLite_surface"]
 frequency = 0.05
 
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_rough"]
+frequency = 0.18
+
 [sub_resource type="NoiseTexture2D" id="NoiseTexture2D_albedo"]
-width = 512
-height = 512
+width = 1024
+height = 1024
 seamless = true
 noise = SubResource("FastNoiseLite_surface")
 
 [sub_resource type="NoiseTexture2D" id="NoiseTexture2D_normal"]
+width = 1024
+height = 1024
+seamless = true
+as_normal_map = true
+bump_strength = 4.5
+noise = SubResource("FastNoiseLite_surface")
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_rough"]
 width = 512
 height = 512
 seamless = true
-as_normal_map = true
-bump_strength = 3.0
-noise = SubResource("FastNoiseLite_surface")
+noise = SubResource("FastNoiseLite_rough")
 
 [sub_resource type="BoxMesh" id="BoxMesh_unit"]
 size = Vector3(1, 1, 1)
@@ -91,10 +100,13 @@ size = Vector3(50, 0.5, 50)
 [sub_resource type="StandardMaterial3D" id="StdMat_floor"]
 albedo_color = Color(0.32, 0.33, 0.35, 1)
 albedo_texture = SubResource("NoiseTexture2D_albedo")
+metallic = 0.08
+metallic_specular = 0.3
 roughness = 0.85
+roughness_texture = SubResource("NoiseTexture2D_rough")
 normal_enabled = true
 normal_texture = SubResource("NoiseTexture2D_normal")
-normal_scale = 1.0
+normal_scale = 1.4
 uv1_scale = Vector3(16, 16, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_wall_ns"]
@@ -113,9 +125,10 @@ size = Vector3(0.6, 6, 50)
 albedo_color = Color(0.55, 0.52, 0.48, 1)
 albedo_texture = SubResource("NoiseTexture2D_albedo")
 roughness = 0.9
+roughness_texture = SubResource("NoiseTexture2D_rough")
 normal_enabled = true
 normal_texture = SubResource("NoiseTexture2D_normal")
-normal_scale = 0.8
+normal_scale = 1.1
 uv1_scale = Vector3(18, 3, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_crate"]
@@ -321,6 +334,126 @@ position = Vector3(-25, 5.75, 14.5)
 scale = Vector3(0.65, 0.3, 21)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_trim_light")
+
+[node name="WallNorthSeam1" type="MeshInstance3D" parent="."]
+position = Vector3(-15, 3, -24.6)
+scale = Vector3(0.12, 5.6, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallNorthSeam2" type="MeshInstance3D" parent="."]
+position = Vector3(-5, 3, -24.6)
+scale = Vector3(0.12, 5.6, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallNorthSeam3" type="MeshInstance3D" parent="."]
+position = Vector3(5, 3, -24.6)
+scale = Vector3(0.12, 5.6, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallNorthSeam4" type="MeshInstance3D" parent="."]
+position = Vector3(15, 3, -24.6)
+scale = Vector3(0.12, 5.6, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallSouthSeam1" type="MeshInstance3D" parent="."]
+position = Vector3(-15, 3, 24.6)
+scale = Vector3(0.12, 5.6, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallSouthSeam2" type="MeshInstance3D" parent="."]
+position = Vector3(-5, 3, 24.6)
+scale = Vector3(0.12, 5.6, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallSouthSeam3" type="MeshInstance3D" parent="."]
+position = Vector3(5, 3, 24.6)
+scale = Vector3(0.12, 5.6, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallSouthSeam4" type="MeshInstance3D" parent="."]
+position = Vector3(15, 3, 24.6)
+scale = Vector3(0.12, 5.6, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallEastSeam1" type="MeshInstance3D" parent="."]
+position = Vector3(24.6, 3, -15)
+scale = Vector3(0.06, 5.6, 0.12)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallEastSeam2" type="MeshInstance3D" parent="."]
+position = Vector3(24.6, 3, -5)
+scale = Vector3(0.06, 5.6, 0.12)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallEastSeam3" type="MeshInstance3D" parent="."]
+position = Vector3(24.6, 3, 5)
+scale = Vector3(0.06, 5.6, 0.12)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallEastSeam4" type="MeshInstance3D" parent="."]
+position = Vector3(24.6, 3, 15)
+scale = Vector3(0.06, 5.6, 0.12)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallWestNorthSeam1" type="MeshInstance3D" parent="."]
+position = Vector3(-24.6, 3, -20)
+scale = Vector3(0.06, 5.6, 0.12)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallWestNorthSeam2" type="MeshInstance3D" parent="."]
+position = Vector3(-24.6, 3, -12)
+scale = Vector3(0.06, 5.6, 0.12)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallWestSouthSeam1" type="MeshInstance3D" parent="."]
+position = Vector3(-24.6, 3, 12)
+scale = Vector3(0.06, 5.6, 0.12)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="WallWestSouthSeam2" type="MeshInstance3D" parent="."]
+position = Vector3(-24.6, 3, 20)
+scale = Vector3(0.06, 5.6, 0.12)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="FloorJointX1" type="MeshInstance3D" parent="."]
+position = Vector3(-12, 0.006, 0)
+scale = Vector3(0.1, 0.02, 50)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="FloorJointX2" type="MeshInstance3D" parent="."]
+position = Vector3(12, 0.006, 0)
+scale = Vector3(0.1, 0.02, 50)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="FloorJointZ1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.006, -12)
+scale = Vector3(50, 0.02, 0.1)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
+
+[node name="FloorJointZ2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.006, 12)
+scale = Vector3(50, 0.02, 0.1)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_trim_dark")
 
 [node name="Pillar1" type="StaticBody3D" parent="."]
 
