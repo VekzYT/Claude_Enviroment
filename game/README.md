@@ -1,14 +1,13 @@
-# Syfon v1.8
+# Syfon v1.9
 
-A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). Two connected areas joined by a tunnel — a 50x50 main arena with a watchtower, barrels, pillars, cover walls and crates, plus a second walled courtyard beyond it — with textured/trimmed walls and floor, full sound effects and music, real-time lighting and shadows, physics-based movement, three switchable weapons with buffed animations, blood-spray hit effects, a bottom-of-screen health bar, and detailed robotic enemies that walk, flinch, collapse when killed, and shoot back with their own tracers.
+A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). Two connected areas joined by a tunnel, two enterable buildings for close-quarters fights, a watchtower, barrels, pillars, cover walls and crates — with textured/trimmed walls and floor, real recorded sound effects and music, real-time lighting and shadows, physics-based movement, three switchable weapons with buffed animations, blood-spray hit effects, a bottom-of-screen health bar, and detailed robotic enemies that walk, flinch, collapse when killed, and shoot back with their own tracers.
 
-## What's new in v1.8
+## What's new in v1.9
 
-- **Sound effects and music**: every gunshot, knife swing/hit, footstep, jump/land, reload (bolt-cycle for the sniper, slide-rack for the handgun), weapon switch, weapon-panel toggle, target hit, bot alert/gunfire/death, and player hurt now has a sound, plus a looping ambient music track — all synthesized procedurally at startup (no external audio files were available to source in this environment, so every sound is generated from scratch in code: noise bursts with decay envelopes for gunshots/impacts, tone sweeps for alerts/UI blips, and a layered sine-wave drone for the music). Positional sounds (gunfire, footsteps, bot audio) play in 3D and get quieter with distance; UI/mechanical sounds play flat.
-- **Knife is now a one-hit kill** on anything with health, for real risk/reward melee.
-- **Bigger, non-square map**: cut an opening in the main arena's west wall leading through a lit tunnel into a brand-new second walled area (30x30) with its own pillar, crates, a barrel, a target, and two more bots — the map is now an explorable pair of connected spaces instead of one bare square.
+- **Real sound effects and music**: replaced last version's procedurally-synthesized placeholder audio with actual recorded/produced sounds, researched and downloaded from free-licensed asset libraries (Kenney.nl and OpenGameArt.org) — real gunshot recordings (CZ-52 pistol, Mosin Nagant rifle, SKS) trimmed to single shots, real reload/bolt-rack sounds, real sword swing/clash sounds for the knife, real footsteps/impacts/UI clicks, and a licensed background music loop. Every source and license is listed in `audio/CREDITS.md` — **the music track is CC-BY and requires attribution if you distribute this project**; everything else is CC0 (no attribution needed). See "Audio" below for full details.
+- **Two enterable buildings**: small CQB structures (open doorway, a low "window" wall you can shoot/see over, a roof, and an interior light) placed at opposite corners of the main arena, giving the map actual buildings to fight through instead of only open cover — more in line with a Call of Duty-style multiplayer map.
 
-## Why Godot
+## What's new in v1.7
 
 - **Blood effects**: every hit that lands on a bot, a target, or the player now spawns a small red particle burst at the impact point, oriented off the surface normal.
 - **Buffed weapon animations**: a subtle always-on idle sway when standing still; the sniper's bolt visibly cycles (lifts, slides back, slides forward, drops) during reload; the handgun's slide racks backward and snaps forward; the knife swing is now a proper three-phase windup → slash → recover arc instead of a simple symmetric wave.
@@ -58,8 +57,12 @@ Shoot or slash the red cylinder targets and robots for points — the robots (pa
 ```
 game/
   project.godot          # engine/project settings, autoloads
+  audio/
+    sfx/                   # gunshots, reloads, knife, footsteps, impacts, UI clicks (see CREDITS.md)
+    music/                  # background music loop (see CREDITS.md)
+    CREDITS.md               # source + license for every audio file
   scenes/
-    main.tscn             # both areas: lighting/sky, textured walls/floor, trim, tunnel, pillars, cover walls, crates, barrels, targets, bots, HUD
+    main.tscn             # both areas: lighting/sky, textured walls/floor, trim, tunnel, buildings, pillars, cover walls, crates, barrels, targets, bots, HUD
     player.tscn            # FPS controller: capsule body, camera, three kitbashed weapons (sniper/handgun/knife), hit-scan raycast
     target.tscn             # shootable static target
     bot.tscn                 # robotic enemy: detailed kitbashed body + AI script
@@ -70,8 +73,18 @@ game/
     game_state.gd             # autoload singleton: score, player health, active weapon, weapon-panel/scope UI state
     hud.gd                     # crosshair/score/health-bar/weapon-panel/scope-overlay UI binding, damage flash
     effects.gd                 # autoload: spawns the tracer line and blood-spray particles for every hit
-    sound.gd                   # autoload: procedurally synthesizes every sound effect and the music loop, plays them positionally (play_3d) or flat (play_ui)
+    sound.gd                   # autoload: loads every sound file from audio/, plays them positionally (play_3d) or flat (play_ui)
 ```
+
+## Audio
+
+Every sound in the game is a real audio file (not a placeholder tone) sourced from free asset libraries — see `audio/CREDITS.md` for the exact source and license of each file. Highlights:
+- Gunshots are real recordings (CZ-52 pistol for the handgun, Mosin Nagant rifle for the sniper, SKS for bot fire), trimmed down from longer multi-shot recordings to a single isolated shot each.
+- Knife swing/hit use real sword-on-sword recordings.
+- Footsteps, reloads, impacts, and UI sounds are all real recordings/produced SFX, not synthesized.
+- The music is a licensed loop (CC-BY, **requires attribution if you distribute this project** — see CREDITS.md).
+
+`sound.gd` loads every file once at startup into a `Dictionary` and exposes `play_3d(name, position, volume_db, pitch_variance)` for positional world sounds (gunfire, footsteps, bot audio — these fall off with distance) and `play_ui(name, volume_db)` for flat mechanical/UI sounds. Footsteps randomly pick from 5 variations each step. Want to swap any sound for your own? Drop a file into `audio/sfx/` or `audio/music/` and point the matching `load()` call in `sound.gd` at it.
 
 ## What's new in v1.6
 
@@ -97,8 +110,8 @@ All of those are `@export` vars on the Bot node, so you can tune difficulty per-
 Natural next steps:
 - Swap the `MeshInstance3D` blockout meshes for real 3D models (Godot imports `.glb`/`.fbx` directly).
 - Give bots a navmesh (`NavigationRegion3D` + `NavigationAgent3D`, baked in the editor) for proper pathfinding around obstacles instead of raycast-deflected straight-line chasing.
-- Swap the procedurally synthesized sounds in `sound.gd` for real recorded/composed audio files (drop `.ogg`/`.wav` files into the project and point `AudioStreamPlayer`/`AudioStreamPlayer3D.stream` at them) — the synthesized ones are a functional placeholder, not a substitute for real sound design.
 - A muzzle-flash light (`OmniLight3D`) synced to each shot for extra punch.
+- More buildings/lanes for a fuller Call-of-Duty-style 3-lane layout, and a proper composed/looped score instead of the single licensed track.
 - Ammo counts and a reload-when-empty requirement instead of unlimited ammo.
 - Multiple levels: duplicate `main.tscn`, build a new layout, and swap `run/main_scene` in `project.godot` or add a level-select menu.
 - A proper game-over screen instead of the current auto-respawn-after-death.

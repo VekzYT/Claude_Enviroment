@@ -1,12 +1,11 @@
 extends Node
 
-const SAMPLE_RATE := 22050
-
 var streams: Dictionary = {}
+var footstep_streams: Array = []
 var music_player: AudioStreamPlayer
 
 func _ready() -> void:
-	_build_sounds()
+	_load_sounds()
 	music_player = AudioStreamPlayer.new()
 	music_player.stream = streams["music"]
 	music_player.volume_db = -9.0
@@ -14,10 +13,11 @@ func _ready() -> void:
 	music_player.play()
 
 func play_3d(sound_name: String, position: Vector3, volume_db: float = 0.0, pitch_variance: float = 0.06) -> void:
-	if not streams.has(sound_name):
+	var stream: AudioStream = _resolve_stream(sound_name)
+	if stream == null:
 		return
 	var player := AudioStreamPlayer3D.new()
-	player.stream = streams[sound_name]
+	player.stream = stream
 	player.volume_db = volume_db
 	player.pitch_scale = 1.0 + randf_range(-pitch_variance, pitch_variance)
 	player.max_distance = 45.0
@@ -28,111 +28,51 @@ func play_3d(sound_name: String, position: Vector3, volume_db: float = 0.0, pitc
 	player.finished.connect(player.queue_free)
 
 func play_ui(sound_name: String, volume_db: float = 0.0) -> void:
-	if not streams.has(sound_name):
+	var stream: AudioStream = _resolve_stream(sound_name)
+	if stream == null:
 		return
 	var player := AudioStreamPlayer.new()
-	player.stream = streams[sound_name]
+	player.stream = stream
 	player.volume_db = volume_db
 	add_child(player)
 	player.play()
 	player.finished.connect(player.queue_free)
 
-func _make_stream(samples: PackedFloat32Array) -> AudioStreamWAV:
-	var stream := AudioStreamWAV.new()
-	stream.format = AudioStreamWAV.FORMAT_16_BITS
-	stream.mix_rate = SAMPLE_RATE
-	stream.stereo = false
-	var data := PackedByteArray()
-	data.resize(samples.size() * 2)
-	for i in samples.size():
-		var v: float = clamp(samples[i], -1.0, 1.0)
-		data.encode_s16(i * 2, int(v * 32000.0))
-	stream.data = data
-	return stream
+func _resolve_stream(sound_name: String):
+	if sound_name == "footstep":
+		if footstep_streams.is_empty():
+			return null
+		var index: int = randi() % footstep_streams.size()
+		return footstep_streams[index]
+	if streams.has(sound_name):
+		return streams[sound_name]
+	return null
 
-func _noise_burst(duration: float, decay: float, tone_freq: float, tone_amount: float) -> PackedFloat32Array:
-	var n: int = int(SAMPLE_RATE * duration)
-	var samples := PackedFloat32Array()
-	samples.resize(n)
-	for i in n:
-		var t: float = float(i) / SAMPLE_RATE
-		var envelope: float = exp(-t * decay)
-		var noise: float = randf_range(-1.0, 1.0)
-		var tone: float = sin(t * TAU * tone_freq)
-		samples[i] = lerp(noise, tone, tone_amount) * envelope
-	return samples
+func _load_sounds() -> void:
+	streams["handgun_shot"] = load("res://audio/sfx/handgun_shot.wav")
+	streams["sniper_shot"] = load("res://audio/sfx/sniper_shot.wav")
+	streams["bot_shot"] = load("res://audio/sfx/bot_shot.wav")
+	streams["reload_click"] = load("res://audio/sfx/reload_click.wav")
+	streams["bolt_cycle"] = load("res://audio/sfx/bolt_cycle.wav")
+	streams["knife_swing"] = load("res://audio/sfx/knife_swing.ogg")
+	streams["knife_hit"] = load("res://audio/sfx/knife_hit.ogg")
+	streams["jump"] = load("res://audio/sfx/jump.ogg")
+	streams["land"] = load("res://audio/sfx/land.ogg")
+	streams["player_hurt"] = load("res://audio/sfx/player_hurt.ogg")
+	streams["bot_death"] = load("res://audio/sfx/bot_death.ogg")
+	streams["target_hit"] = load("res://audio/sfx/target_hit.ogg")
+	streams["weapon_switch"] = load("res://audio/sfx/weapon_switch.ogg")
+	streams["ui_toggle"] = load("res://audio/sfx/ui_toggle.ogg")
+	streams["bot_alert"] = load("res://audio/sfx/bot_alert.ogg")
 
-func _smoothed_noise_burst(duration: float, decay: float, smooth_passes: int) -> PackedFloat32Array:
-	var n: int = int(SAMPLE_RATE * duration)
-	var samples := PackedFloat32Array()
-	samples.resize(n)
-	for i in n:
-		samples[i] = randf_range(-1.0, 1.0)
-	for _pass_index in smooth_passes:
-		var smoothed := PackedFloat32Array()
-		smoothed.resize(n)
-		for i in n:
-			var prev: float = samples[i - 1] if i > 0 else samples[i]
-			var next: float = samples[i + 1] if i < n - 1 else samples[i]
-			smoothed[i] = (prev + samples[i] + next) / 3.0
-		samples = smoothed
-	for i in n:
-		var t: float = float(i) / SAMPLE_RATE
-		samples[i] *= exp(-t * decay)
-	return samples
+	footstep_streams = [
+		load("res://audio/sfx/footstep_00.ogg"),
+		load("res://audio/sfx/footstep_01.ogg"),
+		load("res://audio/sfx/footstep_02.ogg"),
+		load("res://audio/sfx/footstep_03.ogg"),
+		load("res://audio/sfx/footstep_04.ogg"),
+	]
 
-func _tone_sweep(duration: float, freq_start: float, freq_end: float, decay: float) -> PackedFloat32Array:
-	var n: int = int(SAMPLE_RATE * duration)
-	var samples := PackedFloat32Array()
-	samples.resize(n)
-	var phase: float = 0.0
-	for i in n:
-		var t: float = float(i) / SAMPLE_RATE
-		var progress: float = t / duration
-		var freq: float = lerp(freq_start, freq_end, progress)
-		phase += TAU * freq / SAMPLE_RATE
-		var envelope: float = exp(-t * decay)
-		samples[i] = sin(phase) * envelope
-	return samples
-
-func _build_music_loop() -> PackedFloat32Array:
-	var duration := 8.0
-	var n: int = int(SAMPLE_RATE * duration)
-	var samples := PackedFloat32Array()
-	samples.resize(n)
-	var freqs: Array = [55.0, 82.5, 110.0]
-	for i in n:
-		var t: float = float(i) / SAMPLE_RATE
-		var value: float = 0.0
-		for f in freqs:
-			var freq: float = f
-			value += sin(t * TAU * freq)
-		value /= freqs.size()
-		var lfo: float = 0.65 + 0.35 * sin(t * TAU / duration)
-		samples[i] = value * lfo * 0.5
-	return samples
-
-func _build_sounds() -> void:
-	streams["handgun_shot"] = _make_stream(_noise_burst(0.14, 28.0, 100.0, 0.35))
-	streams["sniper_shot"] = _make_stream(_noise_burst(0.32, 12.0, 55.0, 0.4))
-	streams["bot_shot"] = _make_stream(_noise_burst(0.13, 30.0, 130.0, 0.3))
-	streams["knife_swing"] = _make_stream(_smoothed_noise_burst(0.22, 9.0, 3))
-	streams["knife_hit"] = _make_stream(_noise_burst(0.09, 40.0, 70.0, 0.5))
-	streams["reload_click"] = _make_stream(_noise_burst(0.035, 60.0, 900.0, 0.2))
-	streams["bolt_cycle"] = _make_stream(_noise_burst(0.05, 45.0, 500.0, 0.25))
-	streams["footstep"] = _make_stream(_noise_burst(0.07, 35.0, 90.0, 0.6))
-	streams["jump"] = _make_stream(_noise_burst(0.1, 22.0, 150.0, 0.4))
-	streams["land"] = _make_stream(_noise_burst(0.12, 20.0, 80.0, 0.55))
-	streams["bot_alert"] = _make_stream(_tone_sweep(0.22, 400.0, 900.0, 5.0))
-	streams["bot_death"] = _make_stream(_tone_sweep(0.5, 500.0, 80.0, 4.0))
-	streams["player_hurt"] = _make_stream(_noise_burst(0.18, 14.0, 120.0, 0.45))
-	streams["weapon_switch"] = _make_stream(_noise_burst(0.06, 50.0, 300.0, 0.3))
-	streams["ui_toggle"] = _make_stream(_tone_sweep(0.08, 600.0, 900.0, 20.0))
-	streams["target_hit"] = _make_stream(_tone_sweep(0.15, 800.0, 1200.0, 15.0))
-
-	var music_samples: PackedFloat32Array = _build_music_loop()
-	var music_stream: AudioStreamWAV = _make_stream(music_samples)
-	music_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	music_stream.loop_begin = 0
-	music_stream.loop_end = music_samples.size()
+	var music_stream = load("res://audio/music/theme.mp3")
+	music_stream.loop = true
 	streams["music"] = music_stream
