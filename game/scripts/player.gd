@@ -234,7 +234,11 @@ func shoot() -> void:
 			can_shoot = true
 	)
 
+	var hit_point: Vector3 = ray.to_global(ray.target_position)
 	if ray.is_colliding():
+		hit_point = ray.get_collision_point()
 		var target: Object = ray.get_collider()
 		if target and target.has_method("hit"):
 			target.hit()
+
+	Effects.spawn_tracer(muzzle_flash.global_position, hit_point, true)
