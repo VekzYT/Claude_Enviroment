@@ -1,6 +1,12 @@
-# Syfon v1.11
+# Syfon v1.12
 
-A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). Starts at a real main menu with settings, drops you into two connected areas joined by a tunnel, two enterable buildings for close-quarters fights, a watchtower, barrels, pillars, cover walls and crates — with higher-detail textured/trimmed walls and floor, real recorded sound effects and music, real-time lighting and shadows, physics-based movement, three switchable weapons (including a dashing one-hit-kill knife), blood-spray and hit-marker feedback, a fleshed-out HUD, and detailed robotic enemies that walk, flinch, collapse when killed, and shoot back with imperfect (not aimbot) accuracy.
+A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). Starts at a real main menu with settings, drops you into an Icelandic-themed landscape — mossy green ground, basalt-rock walls, snow-capped mountains ringing the horizon, and red-roofed houses — spanning two connected areas joined by a tunnel, two enterable buildings for close-quarters fights, a watchtower, barrels, pillars, cover walls and crates, with real recorded sound effects and music, real-time lighting and shadows, physics-based movement, three switchable weapons (including a dashing one-hit-kill knife), blood-spray and hit-marker feedback, a fleshed-out HUD, and detailed robotic enemies — each with its own paint scheme — that walk, flinch, collapse when killed, and shoot back with imperfect (not aimbot) accuracy.
+
+## What's new in v1.12
+
+- **Iceland-themed map**: the sky, ground, and walls were recolored for a cold Icelandic look (pale sky, mossy-green ground, basalt-grey rock walls, frosted trim), and 8 snow-capped mountains now ring the map's horizon beyond the perimeter walls.
+- **Houses**: the two CQB buildings were reskinned as proper houses — white walls, dark red pitched (gabled) roofs replacing the old flat rooftops — and two brand-new small decorative cabins were added out in Area B.
+- **Bots got distinct looks**: each of the 7 bots now has its own paint scheme (arctic white, moss green, volcanic black, steel blue, desert tan, crimson, plus the original grey/red) instead of all sharing one identical appearance, via new exported color properties on the bot script.
 
 ## What's new in v1.11
 

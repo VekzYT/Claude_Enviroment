@@ -18,6 +18,14 @@ const REACTION_DELAY := 0.6
 @export var base_spread := 0.4
 @export var spread_per_distance := 0.05
 
+@export var chassis_dark_color: Color = Color(0.16, 0.17, 0.19, 1)
+@export var chassis_light_color: Color = Color(0.32, 0.34, 0.37, 1)
+@export var accent_color: Color = Color(0.5, 0.08, 0.06, 1)
+
+const CHASSIS_DARK_DEFAULT := Color(0.16, 0.17, 0.19, 1)
+const CHASSIS_LIGHT_DEFAULT := Color(0.32, 0.34, 0.37, 1)
+const ACCENT_DEFAULT := Color(0.5, 0.08, 0.06, 1)
+
 @onready var head: Node3D = $Head
 @onready var muzzle: Node3D = $Muzzle
 @onready var mesh_root: Node3D = $MeshRoot
@@ -40,7 +48,30 @@ func _ready() -> void:
 	health = max_health
 	spawn_position = global_position
 	player = get_tree().get_first_node_in_group("player")
+	apply_color_variant()
 	pick_new_patrol_target()
+
+func apply_color_variant() -> void:
+	var is_default: bool = chassis_dark_color.is_equal_approx(CHASSIS_DARK_DEFAULT) \
+		and chassis_light_color.is_equal_approx(CHASSIS_LIGHT_DEFAULT) \
+		and accent_color.is_equal_approx(ACCENT_DEFAULT)
+	if is_default:
+		return
+	for child in mesh_root.get_children():
+		if not (child is MeshInstance3D):
+			continue
+		var mesh_instance: MeshInstance3D = child
+		var mat: StandardMaterial3D = mesh_instance.get_surface_override_material(0)
+		if mat == null:
+			continue
+		var new_mat: StandardMaterial3D = mat.duplicate()
+		if mat.albedo_color.is_equal_approx(CHASSIS_DARK_DEFAULT):
+			new_mat.albedo_color = chassis_dark_color
+		elif mat.albedo_color.is_equal_approx(CHASSIS_LIGHT_DEFAULT):
+			new_mat.albedo_color = chassis_light_color
+		elif mat.albedo_color.is_equal_approx(ACCENT_DEFAULT):
+			new_mat.albedo_color = accent_color
+		mesh_instance.set_surface_override_material(0, new_mat)
 
 func _physics_process(delta: float) -> void:
 	if state == State.DEAD:
