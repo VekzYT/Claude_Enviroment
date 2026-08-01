@@ -1,8 +1,14 @@
-# Syfon v1.7
+# Syfon v1.8
 
-A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). A 50x50 arena with textured, trimmed walls and floor, a watchtower with a walkable ramp, barrels, pillars, cover walls and crates, real-time lighting and shadows, physics-based movement, three switchable weapons with buffed animations (idle sway, bolt-action, slide-rack, a proper knife swing), blood-spray hit effects, a bottom-of-screen health bar, and detailed robotic enemies that walk, flinch, collapse when killed, and shoot back with their own tracers.
+A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). Two connected areas joined by a tunnel — a 50x50 main arena with a watchtower, barrels, pillars, cover walls and crates, plus a second walled courtyard beyond it — with textured/trimmed walls and floor, full sound effects and music, real-time lighting and shadows, physics-based movement, three switchable weapons with buffed animations, blood-spray hit effects, a bottom-of-screen health bar, and detailed robotic enemies that walk, flinch, collapse when killed, and shoot back with their own tracers.
 
-## What's new in v1.7
+## What's new in v1.8
+
+- **Sound effects and music**: every gunshot, knife swing/hit, footstep, jump/land, reload (bolt-cycle for the sniper, slide-rack for the handgun), weapon switch, weapon-panel toggle, target hit, bot alert/gunfire/death, and player hurt now has a sound, plus a looping ambient music track — all synthesized procedurally at startup (no external audio files were available to source in this environment, so every sound is generated from scratch in code: noise bursts with decay envelopes for gunshots/impacts, tone sweeps for alerts/UI blips, and a layered sine-wave drone for the music). Positional sounds (gunfire, footsteps, bot audio) play in 3D and get quieter with distance; UI/mechanical sounds play flat.
+- **Knife is now a one-hit kill** on anything with health, for real risk/reward melee.
+- **Bigger, non-square map**: cut an opening in the main arena's west wall leading through a lit tunnel into a brand-new second walled area (30x30) with its own pillar, crates, a barrel, a target, and two more bots — the map is now an explorable pair of connected spaces instead of one bare square.
+
+## Why Godot
 
 - **Blood effects**: every hit that lands on a bot, a target, or the player now spawns a small red particle burst at the impact point, oriented off the surface normal.
 - **Buffed weapon animations**: a subtle always-on idle sway when standing still; the sniper's bolt visibly cycles (lifts, slides back, slides forward, drops) during reload; the handgun's slide racks backward and snaps forward; the knife swing is now a proper three-phase windup → slash → recover arc instead of a simple symmetric wave.
@@ -45,7 +51,7 @@ Shoot or slash the red cylinder targets and robots for points — the robots (pa
 
 1. **Sniper** — highest damage (one-shots a robot), slowest fire rate and reload. Aiming brings up a genuine full-screen scope: heavy zoom, the weapon model hides, and a black circular vignette with a crosshair reticle covers the screen exactly like looking through an optic — not just an FOV zoom.
 2. **Handgun** — the all-rounder: moderate damage, fast fire rate, quick reload, normal FOV-zoom aim (no screen overlay).
-3. **Knife** — melee only, no reload, no aim. Left-click plays a fast swipe animation (arcs the blade across your view) with a short-range hit-check timed to the swing, dealing solid damage for the risk of getting close.
+3. **Knife** — melee only, no reload, no aim, **one-hit kill** on anything. Left-click plays a three-phase windup/slash/recover swipe animation with a short-range hit-check timed to land mid-slash — high risk (you have to get close) for a guaranteed kill.
 
 ## Project structure
 
@@ -53,17 +59,18 @@ Shoot or slash the red cylinder targets and robots for points — the robots (pa
 game/
   project.godot          # engine/project settings, autoloads
   scenes/
-    main.tscn             # the arena: lighting/sky, textured walls/floor, trim, pillars, cover walls, crates, targets, bots, HUD
+    main.tscn             # both areas: lighting/sky, textured walls/floor, trim, tunnel, pillars, cover walls, crates, barrels, targets, bots, HUD
     player.tscn            # FPS controller: capsule body, camera, three kitbashed weapons (sniper/handgun/knife), hit-scan raycast
     target.tscn             # shootable static target
     bot.tscn                 # robotic enemy: detailed kitbashed body + AI script
   scripts/
-    player.gd               # movement, mouse-look, weapon switching/aim/reload/melee, health/death
+    player.gd               # movement, mouse-look, weapon switching/aim/reload/melee, health/death, sound triggers
     target.gd                # hit/respawn logic
-    bot.gd                    # patrol/chase/attack AI state machine (obstacle avoidance + combat strafing), hitscan weapon, health/respawn
+    bot.gd                    # patrol/chase/attack AI state machine (obstacle avoidance + combat strafing), hitscan weapon, health/respawn, sound triggers
     game_state.gd             # autoload singleton: score, player health, active weapon, weapon-panel/scope UI state
     hud.gd                     # crosshair/score/health-bar/weapon-panel/scope-overlay UI binding, damage flash
-    effects.gd                 # autoload: spawns the tracer line for every gunshot fired
+    effects.gd                 # autoload: spawns the tracer line and blood-spray particles for every hit
+    sound.gd                   # autoload: procedurally synthesizes every sound effect and the music loop, plays them positionally (play_3d) or flat (play_ui)
 ```
 
 ## What's new in v1.6
@@ -90,7 +97,8 @@ All of those are `@export` vars on the Bot node, so you can tune difficulty per-
 Natural next steps:
 - Swap the `MeshInstance3D` blockout meshes for real 3D models (Godot imports `.glb`/`.fbx` directly).
 - Give bots a navmesh (`NavigationRegion3D` + `NavigationAgent3D`, baked in the editor) for proper pathfinding around obstacles instead of raycast-deflected straight-line chasing.
-- Add sound effects (gunshots, knife swipes, bot detection "alert" sting, footsteps) and a muzzle-flash light (`OmniLight3D`).
+- Swap the procedurally synthesized sounds in `sound.gd` for real recorded/composed audio files (drop `.ogg`/`.wav` files into the project and point `AudioStreamPlayer`/`AudioStreamPlayer3D.stream` at them) — the synthesized ones are a functional placeholder, not a substitute for real sound design.
+- A muzzle-flash light (`OmniLight3D`) synced to each shot for extra punch.
 - Ammo counts and a reload-when-empty requirement instead of unlimited ammo.
 - Multiple levels: duplicate `main.tscn`, build a new layout, and swap `run/main_scene` in `project.godot` or add a level-select menu.
 - A proper game-over screen instead of the current auto-respawn-after-death.

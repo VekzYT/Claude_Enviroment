@@ -44,7 +44,7 @@ var weapon_hip_positions: Array = []
 var weapon_hip_rotations: Array = []
 var magazine_base_positions: Array = []
 
-var weapon_damage: Array = [100, 25, 50]
+var weapon_damage: Array = [100, 25, 999]
 var weapon_fire_cooldown: Array = [1.3, 0.28, 0.45]
 var weapon_reload_time: Array = [2.4, 1.0, 0.0]
 var weapon_is_melee: Array = [false, false, true]
@@ -73,6 +73,9 @@ var camera_base_position: Vector3
 var sniper_bolt_base_position: Vector3
 var handgun_slide_base_position: Vector3
 var idle_time := 0.0
+var camera_kick := 0.0
+var footstep_step := 0
+var was_on_floor := true
 
 var mouse_delta := Vector2.ZERO
 var sway_offset := Vector2.ZERO
@@ -149,6 +152,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func toggle_weapon_panel() -> void:
 	weapon_panel_visible = not weapon_panel_visible
 	GameState.set_weapon_panel_open(weapon_panel_visible)
+	Sound.play_ui("ui_toggle", -8.0)
 
 func request_switch(new_index: int) -> void:
 	if is_dead:
@@ -164,6 +168,7 @@ func request_switch(new_index: int) -> void:
 	is_meleeing = false
 	can_shoot = false
 	GameState.set_current_weapon(wrapped)
+	Sound.play_ui("weapon_switch", -6.0)
 
 func active_weapon_index() -> int:
 	if is_switching:
@@ -180,8 +185,13 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 
+	if is_on_floor() and not was_on_floor:
+		Sound.play_3d("land", global_position, -6.0)
+	was_on_floor = is_on_floor()
+
 	if Input.is_physical_key_pressed(KEY_SPACE) and is_on_floor():
 		velocity.y = JUMP_VELOCITY
+		Sound.play_3d("jump", global_position, -6.0)
 
 	var input_dir := Vector2.ZERO
 	if Input.is_physical_key_pressed(KEY_W):
@@ -222,6 +232,10 @@ func update_view_bob(delta: float, moving: bool, horizontal_speed: float, strafe
 	if moving:
 		bob_time += delta * BOB_FREQUENCY * clamp(horizontal_speed / SPEED, 0.6, 1.6)
 		bob_fade = move_toward(bob_fade, 1.0, delta * 4.0)
+		var step: int = int(bob_time / PI)
+		if step != footstep_step:
+			footstep_step = step
+			Sound.play_3d("footstep", global_position, -10.0)
 	else:
 		bob_fade = move_toward(bob_fade, 0.0, delta * 4.0)
 
@@ -233,6 +247,9 @@ func update_view_bob(delta: float, moving: bool, horizontal_speed: float, strafe
 
 	camera.position = camera_base_position + bob_offset
 	camera.rotation.z = lerp(camera.rotation.z, -strafe_axis * deg_to_rad(1.5), delta * 5.0)
+
+	camera_kick = move_toward(camera_kick, 0.0, delta * 7.0)
+	camera.rotation.x = camera_kick
 
 func update_switch(delta: float) -> void:
 	if not is_switching:
@@ -266,6 +283,7 @@ func start_reload() -> void:
 	is_reloading = true
 	reload_progress = 0.0
 	can_shoot = false
+	Sound.play_ui("bolt_cycle" if idx == WEAPON_SNIPER else "reload_click", -4.0)
 
 func update_reload(delta: float) -> void:
 	if is_reloading:
@@ -316,6 +334,7 @@ func start_melee() -> void:
 	is_meleeing = true
 	melee_progress = 0.0
 	melee_hit_done = false
+	Sound.play_3d("knife_swing", camera.global_position, -4.0)
 
 func update_melee(delta: float) -> void:
 	if not is_meleeing:
@@ -342,6 +361,8 @@ func perform_melee_hit() -> void:
 			target.hit(weapon_damage[idx])
 			var normal: Vector3 = result.normal
 			Effects.spawn_blood(result.position, normal)
+			Sound.play_3d("knife_hit", result.position, -2.0)
+			camera_kick += deg_to_rad(5.0)
 
 func shoot() -> void:
 	if not can_shoot or is_reloading:
@@ -349,6 +370,7 @@ func shoot() -> void:
 	var idx: int = current_weapon_index
 	can_shoot = false
 	recoil_kick = 1.0
+	camera_kick += deg_to_rad(4.5) if idx == WEAPON_SNIPER else deg_to_rad(2.0)
 
 	var muzzle: MeshInstance3D = weapon_muzzles[idx]
 	if muzzle:
@@ -356,6 +378,9 @@ func shoot() -> void:
 		get_tree().create_timer(0.06).timeout.connect(func() -> void:
 			muzzle.visible = false
 		)
+
+	var shot_position: Vector3 = muzzle.global_position if muzzle else camera.global_position
+	Sound.play_3d("sniper_shot" if idx == WEAPON_SNIPER else "handgun_shot", shot_position, -2.0)
 
 	var cooldown: float = weapon_fire_cooldown[idx]
 	get_tree().create_timer(cooldown).timeout.connect(func() -> void:
@@ -455,6 +480,7 @@ func take_damage(amount: int) -> void:
 		return
 	health = max(health - amount, 0)
 	GameState.set_player_health(health)
+	Sound.play_ui("player_hurt", -3.0)
 	if health <= 0:
 		die()
 

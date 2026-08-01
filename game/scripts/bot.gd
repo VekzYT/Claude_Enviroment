@@ -171,6 +171,7 @@ func fire_at_player() -> void:
 			Effects.spawn_blood(hit_point, normal)
 
 	Effects.spawn_tracer(muzzle.global_position, hit_point, false)
+	Sound.play_3d("bot_shot", muzzle.global_position, -2.0)
 
 func update_state(delta: float) -> void:
 	if state == State.DEAD or player == null:
@@ -182,6 +183,8 @@ func update_state(delta: float) -> void:
 
 	if can_see:
 		lost_sight_timer = 0.0
+		if state == State.PATROL:
+			Sound.play_3d("bot_alert", global_position, -3.0)
 		if dist <= attack_range:
 			state = State.ATTACK
 		else:
@@ -215,6 +218,7 @@ func die() -> void:
 	collision.disabled = true
 	GameState.add_point()
 	play_death_animation()
+	Sound.play_3d("bot_death", global_position, -1.0)
 	get_tree().create_timer(respawn_time).timeout.connect(respawn)
 
 func play_death_animation() -> void:

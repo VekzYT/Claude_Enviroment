@@ -10,6 +10,7 @@ func hit(_damage: int = 1) -> void:
 	visible = false
 	collision.disabled = true
 	GameState.add_point()
+	Sound.play_3d("target_hit", global_position, -3.0)
 	get_tree().create_timer(respawn_time).timeout.connect(respawn)
 
 func respawn() -> void:
