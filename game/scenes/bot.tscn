@@ -1,0 +1,144 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/bot.gd" id="1_bot"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_bot"]
+radius = 0.32
+height = 1.7
+
+[sub_resource type="BoxMesh" id="BoxMesh_unit"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_unit"]
+radius = 0.5
+height = 1.0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_unit"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StdMat_bot_metal"]
+albedo_color = Color(0.16, 0.17, 0.19, 1)
+metallic = 0.8
+roughness = 0.4
+
+[sub_resource type="StandardMaterial3D" id="StdMat_bot_metal_light"]
+albedo_color = Color(0.32, 0.34, 0.37, 1)
+metallic = 0.75
+roughness = 0.3
+
+[sub_resource type="StandardMaterial3D" id="StdMat_bot_accent"]
+albedo_color = Color(0.9, 0.1, 0.08, 1)
+emission_enabled = true
+emission = Color(1.0, 0.15, 0.1, 1)
+emission_energy_multiplier = 6.0
+
+[node name="Bot" type="CharacterBody3D"]
+script = ExtResource("1_bot")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0.85, 0)
+shape = SubResource("CapsuleShape3D_bot")
+
+[node name="Head" type="Node3D" parent="."]
+position = Vector3(0, 1.6, 0)
+
+[node name="MeshRoot" type="Node3D" parent="."]
+
+[node name="LegLeft" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(-0.14, 0.35, 0)
+scale = Vector3(0.16, 0.7, 0.18)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal")
+
+[node name="LegRight" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0.14, 0.35, 0)
+scale = Vector3(0.16, 0.7, 0.18)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal")
+
+[node name="FootLeft" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(-0.14, 0.04, -0.02)
+scale = Vector3(0.2, 0.08, 0.26)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+
+[node name="FootRight" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0.14, 0.04, -0.02)
+scale = Vector3(0.2, 0.08, 0.26)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+
+[node name="Torso" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0, 1.02, 0)
+scale = Vector3(0.46, 0.55, 0.32)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal")
+
+[node name="ChestCore" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0, 1.05, -0.17)
+scale = Vector3(0.1, 0.1, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_accent")
+
+[node name="ShoulderLeft" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(-0.28, 1.28, 0)
+scale = Vector3(0.1, 0.1, 0.1)
+mesh = SubResource("SphereMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+
+[node name="ShoulderRight" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0.28, 1.28, 0)
+scale = Vector3(0.1, 0.1, 0.1)
+mesh = SubResource("SphereMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+
+[node name="ArmLeft" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(-0.28, 1.0, 0)
+scale = Vector3(0.12, 0.42, 0.12)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal")
+
+[node name="ArmRight" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0.28, 1.0, 0)
+scale = Vector3(0.12, 0.42, 0.12)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal")
+
+[node name="HeadMesh" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0, 1.62, 0)
+scale = Vector3(0.3, 0.28, 0.3)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+
+[node name="EyeMesh" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0, 1.63, -0.16)
+scale = Vector3(0.07, 0.05, 0.05)
+mesh = SubResource("SphereMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_accent")
+
+[node name="Antenna" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0, 1.85, 0.05)
+scale = Vector3(0.03, 0.18, 0.03)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal")
+
+[node name="AntennaTip" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0, 1.96, 0.05)
+scale = Vector3(0.035, 0.035, 0.035)
+mesh = SubResource("SphereMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_accent")
+
+[node name="GunBody" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0.34, 1.0, -0.28)
+scale = Vector3(0.09, 0.09, 0.4)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal")
+
+[node name="GunBarrel" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0.34, 1.0, -0.52)
+rotation_degrees = Vector3(-90, 0, 0)
+scale = Vector3(0.03, 0.14, 0.03)
+mesh = SubResource("CylinderMesh_unit")
+surface_material_override/0 = SubResource("StdMat_bot_metal_light")

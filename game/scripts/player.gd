@@ -16,6 +16,9 @@ const BOB_SIDE_AMPLITUDE := 0.03
 
 const RELOAD_DURATION := 1.6
 
+const MAX_HEALTH := 100
+const RESPAWN_DELAY := 2.0
+
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
 @onready var gun: Node3D = $Head/Camera3D/Gun
@@ -41,12 +44,19 @@ var bob_fade := 0.0
 var recoil_kick := 0.0
 var aim_blend := 0.0
 
+var health := MAX_HEALTH
+var is_dead := false
+var spawn_position: Vector3
+
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	add_to_group("player")
 	camera_base_position = camera.position
 	gun_hip_position = gun.position
 	gun_hip_rotation = gun.rotation
 	magazine_base_position = magazine.position
+	spawn_position = global_position
+	GameState.set_player_health(health)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
@@ -69,6 +79,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				shoot()
 
 func _physics_process(delta: float) -> void:
+	if is_dead:
+		velocity.x = 0.0
+		velocity.z = 0.0
+		move_and_slide()
+		return
+
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 
@@ -182,8 +198,29 @@ func update_gun_transform(delta: float) -> void:
 	gun.position = target_position
 	gun.rotation = target_rotation
 
+func take_damage(amount: int) -> void:
+	if is_dead:
+		return
+	health = max(health - amount, 0)
+	GameState.set_player_health(health)
+	if health <= 0:
+		die()
+
+func die() -> void:
+	is_dead = true
+	can_shoot = false
+	get_tree().create_timer(RESPAWN_DELAY).timeout.connect(respawn)
+
+func respawn() -> void:
+	is_dead = false
+	can_shoot = true
+	health = MAX_HEALTH
+	GameState.set_player_health(health)
+	global_position = spawn_position
+	velocity = Vector3.ZERO
+
 func shoot() -> void:
-	if not can_shoot or is_reloading:
+	if not can_shoot or is_reloading or is_dead:
 		return
 	can_shoot = false
 	recoil_kick = 1.0
