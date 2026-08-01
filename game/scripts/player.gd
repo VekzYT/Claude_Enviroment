@@ -141,7 +141,7 @@ func update_reload(delta: float) -> void:
 			is_reloading = false
 			can_shoot = true
 
-	var t := clamp(reload_progress, 0.0, 1.0)
+	var t: float = clamp(reload_progress, 0.0, 1.0)
 	var reload_curve: float = sin(t * PI) if t < 1.0 else 0.0
 
 	var mag_drop := 0.0

@@ -1,4 +1,4 @@
-# Syfon v1.2
+# Syfon v1.3
 
 A small first-person shooter prototype built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). One arena, real-time lighting and shadows, physics-based movement, a scoped weapon with reload/aim/recoil animation, and shootable targets that respawn.
 
