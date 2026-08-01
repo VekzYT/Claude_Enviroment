@@ -152,6 +152,12 @@ scale = Vector3(0.04, 0.14, 0.06)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_gunmetal_light")
 
+[node name="BoltHandle" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
+position = Vector3(0.06, 0.03, 0.1)
+scale = Vector3(0.018, 0.018, 0.09)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gunmetal_light")
+
 [node name="MuzzleFlash" type="MeshInstance3D" parent="Head/Camera3D/WeaponSniper"]
 position = Vector3(0, 0, -0.68)
 visible = false

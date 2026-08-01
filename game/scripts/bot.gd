@@ -19,6 +19,8 @@ const LOSE_SIGHT_DELAY := 1.5
 @onready var muzzle: Node3D = $Muzzle
 @onready var mesh_root: Node3D = $MeshRoot
 @onready var collision: CollisionShape3D = $CollisionShape3D
+@onready var leg_left: MeshInstance3D = $MeshRoot/LegLeft
+@onready var leg_right: MeshInstance3D = $MeshRoot/LegRight
 
 var state: int = State.PATROL
 var health: int
@@ -28,6 +30,7 @@ var patrol_wait := 0.0
 var fire_timer := 0.0
 var lost_sight_timer := 0.0
 var strafe_sign := 1.0
+var walk_cycle_time := 0.0
 var player: Node3D = null
 
 func _ready() -> void:
@@ -55,6 +58,15 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	update_state(delta)
+	update_walk_animation(delta)
+
+func update_walk_animation(delta: float) -> void:
+	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
+	if horizontal_speed > 0.2:
+		walk_cycle_time += delta * 8.0 * clamp(horizontal_speed / move_speed, 0.5, 1.8)
+	var swing: float = sin(walk_cycle_time) * 25.0
+	leg_left.rotation_degrees.x = swing
+	leg_right.rotation_degrees.x = -swing
 
 func pick_new_patrol_target() -> void:
 	var angle: float = randf_range(0.0, TAU)
@@ -155,6 +167,8 @@ func fire_at_player() -> void:
 		hit_point = result.position
 		if result.collider == player and player.has_method("take_damage"):
 			player.take_damage(damage_per_hit)
+			var normal: Vector3 = result.normal
+			Effects.spawn_blood(hit_point, normal)
 
 	Effects.spawn_tracer(muzzle.global_position, hit_point, false)
 
@@ -187,20 +201,38 @@ func hit(damage: int = 1) -> void:
 	health -= damage
 	if health <= 0:
 		die()
+	else:
+		play_hit_flinch()
+
+func play_hit_flinch() -> void:
+	var tween: Tween = create_tween()
+	tween.tween_property(mesh_root, "rotation:x", -0.18, 0.05)
+	tween.tween_property(mesh_root, "rotation:x", 0.0, 0.18)
 
 func die() -> void:
 	state = State.DEAD
 	velocity = Vector3.ZERO
-	mesh_root.visible = false
 	collision.disabled = true
 	GameState.add_point()
+	play_death_animation()
 	get_tree().create_timer(respawn_time).timeout.connect(respawn)
+
+func play_death_animation() -> void:
+	var tween: Tween = create_tween()
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(mesh_root, "rotation:x", deg_to_rad(78.0), 0.4)
+	tween.parallel().tween_property(mesh_root, "position:y", -0.55, 0.4)
+	tween.tween_callback(func() -> void:
+		mesh_root.visible = false
+	)
 
 func respawn() -> void:
 	health = max_health
 	global_position = spawn_position
 	rotation.y = 0.0
 	mesh_root.visible = true
+	mesh_root.rotation = Vector3.ZERO
+	mesh_root.position = Vector3.ZERO
 	collision.disabled = false
 	lost_sight_timer = 0.0
 	state = State.PATROL

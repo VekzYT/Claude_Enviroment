@@ -1,6 +1,13 @@
-# Syfon v1.6
+# Syfon v1.7
 
-A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). A 50x50 arena with textured, trimmed walls and floor, pillars, cover walls and crates, real-time lighting and shadows, physics-based movement, three switchable weapons with their own animations, a bottom-of-screen health bar, and detailed robotic enemies that patrol, chase, and shoot back with their own tracers.
+A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). A 50x50 arena with textured, trimmed walls and floor, a watchtower with a walkable ramp, barrels, pillars, cover walls and crates, real-time lighting and shadows, physics-based movement, three switchable weapons with buffed animations (idle sway, bolt-action, slide-rack, a proper knife swing), blood-spray hit effects, a bottom-of-screen health bar, and detailed robotic enemies that walk, flinch, collapse when killed, and shoot back with their own tracers.
+
+## What's new in v1.7
+
+- **Blood effects**: every hit that lands on a bot, a target, or the player now spawns a small red particle burst at the impact point, oriented off the surface normal.
+- **Buffed weapon animations**: a subtle always-on idle sway when standing still; the sniper's bolt visibly cycles (lifts, slides back, slides forward, drops) during reload; the handgun's slide racks backward and snaps forward; the knife swing is now a proper three-phase windup → slash → recover arc instead of a simple symmetric wave.
+- **Buffed bot animations**: legs now swing through a walk cycle while patrolling/chasing, bots flinch (a quick backward jolt) when hit, and dying now plays a toppling collapse instead of instantly vanishing.
+- **Map upgrade**: added a watchtower (four legs, a railed platform, and a walkable ramp at a safe ~31° incline) for a sniping vantage point and some verticality, plus six barrel props scattered around for extra cover variety.
 
 ## Why Godot
 

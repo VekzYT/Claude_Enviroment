@@ -3,9 +3,12 @@ extends Node
 const TRACER_LIFETIME := 0.09
 const TRACER_RADIUS := 0.02
 
+const BLOOD_LIFETIME := 0.7
+
 var tracer_mesh: CylinderMesh
 var player_tracer_material: StandardMaterial3D
 var bot_tracer_material: StandardMaterial3D
+var blood_mesh: SphereMesh
 
 func _ready() -> void:
 	tracer_mesh = CylinderMesh.new()
@@ -28,6 +31,16 @@ func _ready() -> void:
 	bot_tracer_material.emission_energy_multiplier = 10.0
 	bot_tracer_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 
+	blood_mesh = SphereMesh.new()
+	blood_mesh.radius = 0.05
+	blood_mesh.height = 0.1
+	blood_mesh.radial_segments = 6
+	blood_mesh.rings = 3
+	var blood_material := StandardMaterial3D.new()
+	blood_material.albedo_color = Color(0.42, 0.02, 0.02, 1)
+	blood_material.roughness = 0.35
+	blood_mesh.material = blood_material
+
 func spawn_tracer(from: Vector3, to: Vector3, is_player: bool) -> void:
 	var distance: float = from.distance_to(to)
 	if distance < 0.05:
@@ -48,3 +61,24 @@ func spawn_tracer(from: Vector3, to: Vector3, is_player: bool) -> void:
 	mesh_instance.scale = Vector3(TRACER_RADIUS, distance, TRACER_RADIUS)
 
 	get_tree().create_timer(TRACER_LIFETIME).timeout.connect(mesh_instance.queue_free)
+
+func spawn_blood(position: Vector3, normal: Vector3) -> void:
+	var particles := CPUParticles3D.new()
+	particles.mesh = blood_mesh
+	particles.emitting = true
+	particles.one_shot = true
+	particles.amount = 14
+	particles.lifetime = BLOOD_LIFETIME
+	particles.explosiveness = 0.9
+	particles.direction = normal if normal.length_squared() > 0.01 else Vector3.UP
+	particles.spread = 45.0
+	particles.initial_velocity_min = 1.2
+	particles.initial_velocity_max = 3.2
+	particles.gravity = Vector3(0, -9.0, 0)
+	particles.scale_amount_min = 0.3
+	particles.scale_amount_max = 1.0
+
+	get_tree().current_scene.add_child(particles)
+	particles.global_position = position
+
+	get_tree().create_timer(BLOOD_LIFETIME + 0.4).timeout.connect(particles.queue_free)

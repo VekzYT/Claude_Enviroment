@@ -32,8 +32,10 @@ const WEAPON_KNIFE := 2
 
 @onready var sniper_muzzle: MeshInstance3D = $Head/Camera3D/WeaponSniper/MuzzleFlash
 @onready var sniper_magazine: MeshInstance3D = $Head/Camera3D/WeaponSniper/Magazine
+@onready var sniper_bolt: MeshInstance3D = $Head/Camera3D/WeaponSniper/BoltHandle
 @onready var handgun_muzzle: MeshInstance3D = $Head/Camera3D/WeaponHandgun/MuzzleFlash
 @onready var handgun_magazine: MeshInstance3D = $Head/Camera3D/WeaponHandgun/Magazine
+@onready var handgun_slide: MeshInstance3D = $Head/Camera3D/WeaponHandgun/Slide
 
 var weapon_nodes: Array = []
 var weapon_muzzles: Array = []
@@ -68,6 +70,9 @@ var melee_progress := 1.0
 var melee_hit_done := false
 
 var camera_base_position: Vector3
+var sniper_bolt_base_position: Vector3
+var handgun_slide_base_position: Vector3
+var idle_time := 0.0
 
 var mouse_delta := Vector2.ZERO
 var sway_offset := Vector2.ZERO
@@ -103,6 +108,8 @@ func _ready() -> void:
 			magazine_base_positions.append(Vector3.ZERO)
 
 	camera_base_position = camera.position
+	sniper_bolt_base_position = sniper_bolt.position
+	handgun_slide_base_position = handgun_slide.position
 	spawn_position = global_position
 	GameState.set_player_health(health)
 	GameState.set_current_weapon(current_weapon_index)
@@ -284,6 +291,12 @@ func update_reload(delta: float) -> void:
 		var base: Vector3 = magazine_base_positions[active_idx]
 		mag.position = base + Vector3(0, -mag_drop * 0.22, 0)
 
+	if active_idx == WEAPON_SNIPER:
+		sniper_bolt.position = sniper_bolt_base_position + Vector3(0, reload_curve * 0.025, reload_curve * 0.06)
+		sniper_bolt.rotation_degrees = Vector3(0, 0, reload_curve * 35.0)
+	elif active_idx == WEAPON_HANDGUN:
+		handgun_slide.position = handgun_slide_base_position + Vector3(0, 0, reload_curve * 0.05)
+
 	reload_dip = Vector3(0, -reload_curve * 0.22, reload_curve * 0.05)
 	reload_rot = Vector3(reload_curve * deg_to_rad(-25), reload_curve * deg_to_rad(15), 0)
 
@@ -327,6 +340,8 @@ func perform_melee_hit() -> void:
 		var target: Object = result.collider
 		if target and target.has_method("hit"):
 			target.hit(weapon_damage[idx])
+			var normal: Vector3 = result.normal
+			Effects.spawn_blood(result.position, normal)
 
 func shoot() -> void:
 	if not can_shoot or is_reloading:
@@ -354,6 +369,7 @@ func shoot() -> void:
 		var target: Object = ray.get_collider()
 		if target and target.has_method("hit"):
 			target.hit(weapon_damage[idx])
+			Effects.spawn_blood(hit_point, ray.get_collision_normal())
 
 	var muzzle_position: Vector3 = muzzle.global_position if muzzle else camera.global_position
 	Effects.spawn_tracer(muzzle_position, hit_point, true)
@@ -384,9 +400,26 @@ func update_weapon_transform(delta: float) -> void:
 	var melee_offset := Vector3.ZERO
 	var melee_rot := Vector3.ZERO
 	if is_meleeing:
-		var m: float = sin(clamp(melee_progress, 0.0, 1.0) * PI)
-		melee_offset = Vector3(-m * 0.08, -m * 0.05, -m * 0.22)
-		melee_rot = Vector3(m * deg_to_rad(-10), m * deg_to_rad(45), m * deg_to_rad(-20))
+		var mt: float = clamp(melee_progress, 0.0, 1.0)
+		var swing_angle: float = 0.0
+		var thrust: float = 0.0
+		if mt < 0.3:
+			var p: float = mt / 0.3
+			swing_angle = lerp(20.0, -10.0, p)
+			thrust = lerp(0.05, -0.05, p)
+		elif mt < 0.55:
+			var p: float = (mt - 0.3) / 0.25
+			swing_angle = lerp(-10.0, -60.0, p)
+			thrust = lerp(-0.05, -0.28, p)
+		else:
+			var p: float = (mt - 0.55) / 0.45
+			swing_angle = lerp(-60.0, 0.0, p)
+			thrust = lerp(-0.28, 0.0, p)
+		melee_offset = Vector3(0.0, -abs(swing_angle) * 0.001, thrust)
+		melee_rot = Vector3(deg_to_rad(swing_angle * 0.15), deg_to_rad(swing_angle), deg_to_rad(swing_angle * 0.3))
+
+	idle_time += delta
+	var idle_sway := Vector3(sin(idle_time * 0.6) * 0.004, sin(idle_time * 0.9) * 0.003, 0.0)
 
 	var sway_scale: float = 1.0 - aim_blend * 0.7
 	if is_scoped:
@@ -403,10 +436,10 @@ func update_weapon_transform(delta: float) -> void:
 	var target_rotation: Vector3 = base_rotation
 
 	if is_melee:
-		target_position += melee_offset + (Vector3(sway_offset.x, sway_offset.y, 0) + gun_bob) * sway_scale
+		target_position += melee_offset + (Vector3(sway_offset.x, sway_offset.y, 0) + gun_bob + idle_sway) * sway_scale
 		target_rotation += melee_rot + (Vector3(sway_offset.y * 0.6, -sway_offset.x * 0.6, sway_offset.x * 0.4)) * sway_scale
 	else:
-		target_position += (Vector3(sway_offset.x, sway_offset.y, 0) + gun_bob + recoil_pos + reload_dip) * sway_scale
+		target_position += (Vector3(sway_offset.x, sway_offset.y, 0) + gun_bob + recoil_pos + reload_dip + idle_sway) * sway_scale
 		target_rotation += (Vector3(sway_offset.y * 0.6, -sway_offset.x * 0.6, sway_offset.x * 0.4) + recoil_rot + reload_rot) * sway_scale
 
 	for i in weapon_nodes.size():
