@@ -1,6 +1,14 @@
-# Syfon v1.9
+# Syfon v1.10
 
-A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). Two connected areas joined by a tunnel, two enterable buildings for close-quarters fights, a watchtower, barrels, pillars, cover walls and crates — with textured/trimmed walls and floor, real recorded sound effects and music, real-time lighting and shadows, physics-based movement, three switchable weapons with buffed animations, blood-spray hit effects, a bottom-of-screen health bar, and detailed robotic enemies that walk, flinch, collapse when killed, and shoot back with their own tracers.
+A small first-person shooter built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). Starts at a real main menu with settings, drops you into two connected areas joined by a tunnel, two enterable buildings for close-quarters fights, a watchtower, barrels, pillars, cover walls and crates — with textured/trimmed walls and floor, real recorded sound effects and music, real-time lighting and shadows, physics-based movement, three switchable weapons (including a dashing one-hit-kill knife), blood-spray and hit-marker feedback, a fleshed-out HUD, and detailed robotic enemies that walk, flinch, collapse when killed, and shoot back with their own tracers.
+
+## What's new in v1.10
+
+- **Main menu**: the game now opens on a proper title screen (Play / Settings / Quit) instead of dropping straight into the arena. `scenes/main_menu.tscn` is the new entry point (`run/main_scene` in `project.godot`).
+- **Settings menu**: Master/Music/SFX volume sliders (routed through real Godot audio buses) and a mouse sensitivity slider, saved to `user://settings.cfg` so they persist between runs. Reachable from the main menu and from the new pause menu.
+- **Pause menu**: press **Esc** during a match to pause (the game world actually freezes via `get_tree().paused`) and get Resume / Settings / Quit-to-Main-Menu — replacing the old "Esc just releases the mouse" behavior.
+- **Knife dash + cooldown**: attacking with the knife now lunges you forward in a quick burst timed with the swing, and locks the knife for `1.1s` afterward (shown as a small readiness bar under the crosshair) — no more spamming it.
+- **HUD overhaul**: hit markers (a flash at the crosshair when a shot or slash actually connects), the new knife-cooldown bar, a background panel behind the score (matching the health bar's style), and a pulsing low-health screen warning below 25 HP, on top of everything from before.
 
 ## What's new in v1.9
 
@@ -31,26 +39,26 @@ Godot is free, open-source, and its projects are plain text files, which is what
 
 ## 3. Run it
 
-- Press **F5** (or the ▶ Play button, top-right) to run the game.
+- Press **F5** (or the ▶ Play button, top-right) to run the game. It opens on the main menu — click **Play** to drop into the arena.
 - Click into the game window to capture the mouse, then:
   - **WASD** — move (adds walk bob/sway to the camera and weapon)
   - **Mouse** — look around
   - **Shift** — sprint
   - **Space** — jump
-  - **Left Click** — fire (guns) or slash (knife), with a visible tracer on gunfire
+  - **Left Click** — fire (guns) or dash-slash (knife), with a visible tracer on gunfire and a hit marker on a landed hit
   - **Right Click (hold)** — aim (guns only) — the sniper's aim covers the screen with a real scope overlay
   - **R** — reload (guns only; magazine drops out and slides back in)
   - **Mouse Wheel / 1, 2, 3** — switch weapons, with a draw/holster dip animation
   - **E** — toggle the weapon list panel (top-right), highlighting your current weapon
-  - **Esc** — release the mouse cursor
+  - **Esc** — pause (freezes the game, opens Resume / Settings / Quit to Main Menu)
 
-Shoot or slash the red cylinder targets and robots for points — the robots (patrolling near their spawn point) will chase you down and shoot back once they spot you, firing their own red tracers. Getting shot costs health, shown as a bar at the bottom of the screen with a red flash; at 0 you respawn after a couple of seconds.
+Shoot or slash the red cylinder targets and robots for points — the robots (patrolling near their spawn point) will chase you down and shoot back once they spot you, firing their own red tracers. Getting shot costs health, shown as a bar at the bottom of the screen with a red flash (and a pulsing screen warning under 25 HP); at 0 you respawn after a couple of seconds.
 
 ## The three weapons
 
 1. **Sniper** — highest damage (one-shots a robot), slowest fire rate and reload. Aiming brings up a genuine full-screen scope: heavy zoom, the weapon model hides, and a black circular vignette with a crosshair reticle covers the screen exactly like looking through an optic — not just an FOV zoom.
 2. **Handgun** — the all-rounder: moderate damage, fast fire rate, quick reload, normal FOV-zoom aim (no screen overlay).
-3. **Knife** — melee only, no reload, no aim, **one-hit kill** on anything. Left-click plays a three-phase windup/slash/recover swipe animation with a short-range hit-check timed to land mid-slash — high risk (you have to get close) for a guaranteed kill.
+3. **Knife** — melee only, no reload, no aim, **one-hit kill** on anything. Left-click dashes you forward in a quick burst while playing a three-phase windup/slash/recover swipe animation, with a short-range hit-check timed to land mid-slash. Locked out for `1.1s` after each use (shown as a small bar under the crosshair) — high risk (you have to close the distance and then wait) for a guaranteed kill.
 
 ## Project structure
 
@@ -62,18 +70,24 @@ game/
     music/                  # background music loop (see CREDITS.md)
     CREDITS.md               # source + license for every audio file
   scenes/
-    main.tscn             # both areas: lighting/sky, textured walls/floor, trim, tunnel, buildings, pillars, cover walls, crates, barrels, targets, bots, HUD
+    main_menu.tscn         # title screen: Play / Settings / Quit — this is run/main_scene
+    main.tscn             # both areas: lighting/sky, textured walls/floor, trim, tunnel, buildings, pillars, cover walls, crates, barrels, targets, bots, HUD, pause menu
     player.tscn            # FPS controller: capsule body, camera, three kitbashed weapons (sniper/handgun/knife), hit-scan raycast
     target.tscn             # shootable static target
     bot.tscn                 # robotic enemy: detailed kitbashed body + AI script
+    settings_panel.tscn       # reusable volume/sensitivity panel, instanced into both the main menu and the pause menu
   scripts/
-    player.gd               # movement, mouse-look, weapon switching/aim/reload/melee, health/death, sound triggers
+    main_menu.gd             # main menu button wiring
+    pause_menu.gd             # in-game pause menu (attached to main.tscn's PauseMenu node): freezes the tree, Resume/Settings/Quit
+    settings_panel.gd          # slider <-> Settings autoload wiring, shared by both menus
+    player.gd               # movement, mouse-look, weapon switching/aim/reload/melee (incl. knife dash+cooldown), health/death, sound triggers
     target.gd                # hit/respawn logic
     bot.gd                    # patrol/chase/attack AI state machine (obstacle avoidance + combat strafing), hitscan weapon, health/respawn, sound triggers
-    game_state.gd             # autoload singleton: score, player health, active weapon, weapon-panel/scope UI state
-    hud.gd                     # crosshair/score/health-bar/weapon-panel/scope-overlay UI binding, damage flash
+    game_state.gd             # autoload singleton: score, player health, active weapon, weapon-panel/scope/knife-cooldown UI state, hit-marker event, reset()
+    settings.gd                # autoload singleton: master/music/sfx volume (via real audio buses) + mouse sensitivity, persisted to user://settings.cfg
+    hud.gd                     # crosshair/hit-marker/score-panel/health-bar/knife-cooldown-bar/weapon-panel/scope-overlay/low-health-pulse UI binding
     effects.gd                 # autoload: spawns the tracer line and blood-spray particles for every hit
-    sound.gd                   # autoload: loads every sound file from audio/, plays them positionally (play_3d) or flat (play_ui)
+    sound.gd                   # autoload: loads every sound file from audio/, plays them positionally (play_3d) or flat (play_ui), routed to the Music/SFX buses
 ```
 
 ## Audio

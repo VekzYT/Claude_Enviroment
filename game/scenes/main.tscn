@@ -1,9 +1,11 @@
-[gd_scene load_steps=36 format=3]
+[gd_scene load_steps=38 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/target.tscn" id="2_target"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
 [ext_resource type="PackedScene" path="res://scenes/bot.tscn" id="4_bot"]
+[ext_resource type="Script" path="res://scripts/pause_menu.gd" id="5_pause"]
+[ext_resource type="PackedScene" path="res://scenes/settings_panel.tscn" id="6_settings"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.2, 0.45, 0.85, 1)
@@ -1147,6 +1149,56 @@ text = "+"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="HitMarker" type="Label" parent="HUD"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -18.0
+offset_top = -18.0
+offset_right = 18.0
+offset_bottom = 18.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+theme_override_colors/font_color = Color(1, 0.95, 0.85, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "✕"
+
+[node name="KnifeCooldownBG" type="ColorRect" parent="HUD"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = 24.0
+offset_right = 32.0
+offset_bottom = 34.0
+mouse_filter = 2
+color = Color(0.05, 0.05, 0.06, 0.75)
+visible = false
+
+[node name="KnifeCooldownFill" type="ColorRect" parent="HUD"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -30.0
+offset_top = 26.0
+offset_right = 30.0
+offset_bottom = 32.0
+mouse_filter = 2
+color = Color(0.6, 0.55, 0.4, 1)
+visible = false
+
+[node name="ScoreBG" type="ColorRect" parent="HUD"]
+offset_left = 14.0
+offset_top = 14.0
+offset_right = 226.0
+offset_bottom = 64.0
+mouse_filter = 2
+color = Color(0.05, 0.05, 0.06, 0.75)
+
 [node name="ScoreLabel" type="Label" parent="HUD"]
 offset_left = 20.0
 offset_top = 20.0
@@ -1203,7 +1255,7 @@ offset_top = -60.0
 offset_right = 720.0
 offset_bottom = -20.0
 theme_override_font_sizes/font_size = 18
-text = "WASD move   Shift sprint   Space jump   Click attack   Right-click aim   R reload   Scroll/1-2-3 switch   E weapons   Esc release mouse"
+text = "WASD move   Shift sprint   Space jump   Click attack   Right-click aim   R reload   Scroll/1-2-3 switch   E weapons   Esc pause"
 
 [node name="DamageFlash" type="ColorRect" parent="HUD"]
 anchors_preset = 15
@@ -1213,6 +1265,15 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0.8, 0.05, 0.05, 0)
+
+[node name="LowHealthPulse" type="ColorRect" parent="HUD"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.7, 0.02, 0.02, 0)
 
 [node name="WeaponPanelBG" type="ColorRect" parent="HUD"]
 anchor_left = 1.0
@@ -1274,4 +1335,75 @@ offset_right = 1.0
 offset_bottom = 140.0
 mouse_filter = 2
 color = Color(0, 0, 0, 0.85)
+visible = false
+
+[node name="PauseMenu" type="CanvasLayer" parent="."]
+layer = 10
+script = ExtResource("5_pause")
+
+[node name="Dimmer" type="ColorRect" parent="PauseMenu"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.55)
+visible = false
+
+[node name="MenuBox" type="Control" parent="PauseMenu"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+
+[node name="BoxBorder" type="ColorRect" parent="PauseMenu/MenuBox"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -164.0
+offset_top = -164.0
+offset_right = 164.0
+offset_bottom = 164.0
+color = Color(0.55, 0.47, 0.32, 1)
+
+[node name="Box" type="ColorRect" parent="PauseMenu/MenuBox/BoxBorder"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -160.0
+offset_right = 160.0
+offset_bottom = 160.0
+color = Color(0.08, 0.08, 0.09, 0.97)
+
+[node name="Content" type="VBoxContainer" parent="PauseMenu/MenuBox/BoxBorder/Box"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -130.0
+offset_top = -135.0
+offset_right = 130.0
+offset_bottom = 135.0
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="PauseMenu/MenuBox/BoxBorder/Box/Content"]
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+text = "PAUSED"
+
+[node name="ResumeButton" type="Button" parent="PauseMenu/MenuBox/BoxBorder/Box/Content"]
+custom_minimum_size = Vector2(0, 44)
+theme_override_font_sizes/font_size = 18
+text = "Resume"
+
+[node name="SettingsButton" type="Button" parent="PauseMenu/MenuBox/BoxBorder/Box/Content"]
+custom_minimum_size = Vector2(0, 44)
+theme_override_font_sizes/font_size = 18
+text = "Settings"
+
+[node name="QuitButton" type="Button" parent="PauseMenu/MenuBox/BoxBorder/Box/Content"]
+custom_minimum_size = Vector2(0, 44)
+theme_override_font_sizes/font_size = 18
+text = "Quit to Main Menu"
+
+[node name="SettingsPanel" parent="PauseMenu" instance=ExtResource("6_settings")]
 visible = false

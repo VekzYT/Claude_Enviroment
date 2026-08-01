@@ -15,6 +15,10 @@ const BOB_SIDE_AMPLITUDE := 0.03
 const SWITCH_DURATION := 0.3
 const MELEE_DURATION := 0.35
 
+const KNIFE_DASH_SPEED := 13.0
+const KNIFE_DASH_DURATION := 0.18
+const KNIFE_COOLDOWN := 1.1
+
 const MAX_HEALTH := 100
 const RESPAWN_DELAY := 2.0
 
@@ -68,6 +72,9 @@ var reload_rot := Vector3.ZERO
 var is_meleeing := false
 var melee_progress := 1.0
 var melee_hit_done := false
+var knife_dash_timer := 0.0
+var knife_dash_direction := Vector3.ZERO
+var knife_cooldown_timer := 0.0
 
 var camera_base_position: Vector3
 var sniper_bolt_base_position: Vector3
@@ -119,15 +126,14 @@ func _ready() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
-		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
-		head.rotate_x(-event.relative.y * MOUSE_SENSITIVITY)
+		var sensitivity: float = MOUSE_SENSITIVITY * Settings.mouse_sensitivity
+		rotate_y(-event.relative.x * sensitivity)
+		head.rotate_x(-event.relative.y * sensitivity)
 		head.rotation.x = clamp(head.rotation.x, deg_to_rad(-89), deg_to_rad(89))
 		mouse_delta += event.relative
 
 	if event is InputEventKey and event.pressed:
-		if event.keycode == KEY_ESCAPE:
-			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		elif event.keycode == KEY_R:
+		if event.keycode == KEY_R:
 			start_reload()
 		elif event.keycode == KEY_E:
 			toggle_weapon_panel()
@@ -207,7 +213,16 @@ func _physics_process(delta: float) -> void:
 	var speed: float = SPRINT_SPEED if Input.is_physical_key_pressed(KEY_SHIFT) else SPEED
 	var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 
-	if direction:
+	if knife_cooldown_timer > 0.0:
+		knife_cooldown_timer = max(knife_cooldown_timer - delta, 0.0)
+	if current_weapon_index == WEAPON_KNIFE:
+		GameState.set_knife_cooldown(clamp(knife_cooldown_timer / KNIFE_COOLDOWN, 0.0, 1.0))
+
+	if knife_dash_timer > 0.0:
+		knife_dash_timer = max(knife_dash_timer - delta, 0.0)
+		velocity.x = knife_dash_direction.x * KNIFE_DASH_SPEED
+		velocity.z = knife_dash_direction.z * KNIFE_DASH_SPEED
+	elif direction:
 		velocity.x = direction.x * speed
 		velocity.z = direction.z * speed
 	else:
@@ -329,11 +344,14 @@ func primary_action() -> void:
 		shoot()
 
 func start_melee() -> void:
-	if is_meleeing or is_switching:
+	if is_meleeing or is_switching or knife_cooldown_timer > 0.0:
 		return
 	is_meleeing = true
 	melee_progress = 0.0
 	melee_hit_done = false
+	knife_dash_timer = KNIFE_DASH_DURATION
+	knife_dash_direction = -transform.basis.z
+	knife_cooldown_timer = KNIFE_COOLDOWN
 	Sound.play_3d("knife_swing", camera.global_position, -4.0)
 
 func update_melee(delta: float) -> void:
@@ -363,6 +381,7 @@ func perform_melee_hit() -> void:
 			Effects.spawn_blood(result.position, normal)
 			Sound.play_3d("knife_hit", result.position, -2.0)
 			camera_kick += deg_to_rad(5.0)
+			GameState.trigger_hit_marker()
 
 func shoot() -> void:
 	if not can_shoot or is_reloading:
@@ -395,6 +414,7 @@ func shoot() -> void:
 		if target and target.has_method("hit"):
 			target.hit(weapon_damage[idx])
 			Effects.spawn_blood(hit_point, ray.get_collision_normal())
+			GameState.trigger_hit_marker()
 
 	var muzzle_position: Vector3 = muzzle.global_position if muzzle else camera.global_position
 	Effects.spawn_tracer(muzzle_position, hit_point, true)

@@ -9,6 +9,8 @@ func _ready() -> void:
 	music_player = AudioStreamPlayer.new()
 	music_player.stream = streams["music"]
 	music_player.volume_db = -9.0
+	music_player.bus = "Music"
+	music_player.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(music_player)
 	music_player.play()
 
@@ -19,6 +21,7 @@ func play_3d(sound_name: String, position: Vector3, volume_db: float = 0.0, pitc
 	var player := AudioStreamPlayer3D.new()
 	player.stream = stream
 	player.volume_db = volume_db
+	player.bus = "SFX"
 	player.pitch_scale = 1.0 + randf_range(-pitch_variance, pitch_variance)
 	player.max_distance = 45.0
 	player.unit_size = 6.0
@@ -34,6 +37,7 @@ func play_ui(sound_name: String, volume_db: float = 0.0) -> void:
 	var player := AudioStreamPlayer.new()
 	player.stream = stream
 	player.volume_db = volume_db
+	player.bus = "SFX"
 	add_child(player)
 	player.play()
 	player.finished.connect(player.queue_free)

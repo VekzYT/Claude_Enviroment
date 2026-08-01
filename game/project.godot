@@ -6,13 +6,14 @@ config_version=5
 
 [application]
 
-config/name="Syfon v1.9"
-run/main_scene="res://scenes/main.tscn"
+config/name="Syfon v1.10"
+run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 
 [autoload]
 
 GameState="*res://scripts/game_state.gd"
+Settings="*res://scripts/settings.gd"
 Effects="*res://scripts/effects.gd"
 Sound="*res://scripts/sound.gd"
 
