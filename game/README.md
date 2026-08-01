@@ -1,6 +1,6 @@
-# Syfon v1.0
+# Syfon v1.1
 
-A small first-person shooter prototype built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). One arena, real-time lighting and shadows, physics-based movement, and shootable targets that respawn.
+A small first-person shooter prototype built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). One arena, real-time lighting and shadows, physics-based movement, a scoped weapon with reload/aim/recoil animation, and shootable targets that respawn.
 
 ## Why Godot
 
@@ -21,11 +21,13 @@ Godot is free, open-source, and its projects are plain text files, which is what
 
 - Press **F5** (or the ▶ Play button, top-right) to run the game.
 - Click into the game window to capture the mouse, then:
-  - **WASD** — move
+  - **WASD** — move (adds walk bob/sway to the camera and gun)
   - **Mouse** — look around
   - **Shift** — sprint
   - **Space** — jump
-  - **Left Click** — shoot
+  - **Left Click** — shoot (with recoil kick)
+  - **Right Click (hold)** — aim down the scope (zooms FOV, centers the gun)
+  - **R** — reload (magazine drops out and slides back in, ~1.6s, can't fire mid-reload)
   - **Esc** — release the mouse cursor
 
 Shoot the red cylinder targets around the arena — they drop and respawn after ~1.4s, and your score ticks up top-left.
