@@ -1,0 +1,15 @@
+# Godot 4 local editor cache and imported-resource metadata (regenerated automatically)
+.godot/
+.import/
+
+# Exported builds
+export/
+*.pck
+*.exe
+*.x86_64
+*.app
+*.dmg
+
+# OS junk
+.DS_Store
+Thumbs.db

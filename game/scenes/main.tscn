@@ -1,0 +1,217 @@
+[gd_scene load_steps=18 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
+[ext_resource type="PackedScene" path="res://scenes/target.tscn" id="2_target"]
+[ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
+sky_top_color = Color(0.2, 0.45, 0.85, 1)
+sky_horizon_color = Color(0.65, 0.75, 0.85, 1)
+ground_bottom_color = Color(0.15, 0.15, 0.17, 1)
+ground_horizon_color = Color(0.4, 0.4, 0.42, 1)
+sun_angle_max = 30.0
+
+[sub_resource type="Sky" id="Sky_1"]
+sky_material = SubResource("ProceduralSkyMaterial_1")
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 2
+sky = SubResource("Sky_1")
+ambient_light_source = 3
+ambient_light_energy = 1.0
+tonemap_mode = 3
+ssao_enabled = true
+glow_enabled = true
+glow_intensity = 0.6
+
+[sub_resource type="BoxMesh" id="BoxMesh_floor"]
+size = Vector3(24, 0.5, 24)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(24, 0.5, 24)
+
+[sub_resource type="StandardMaterial3D" id="StdMat_floor"]
+albedo_color = Color(0.32, 0.33, 0.35, 1)
+roughness = 0.85
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall_ns"]
+size = Vector3(24, 5, 0.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_ns"]
+size = Vector3(24, 5, 0.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall_ew"]
+size = Vector3(0.5, 5, 24)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_ew"]
+size = Vector3(0.5, 5, 24)
+
+[sub_resource type="StandardMaterial3D" id="StdMat_wall"]
+albedo_color = Color(0.55, 0.52, 0.48, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_crate"]
+size = Vector3(1.5, 1.5, 1.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_crate"]
+size = Vector3(1.5, 1.5, 1.5)
+
+[sub_resource type="StandardMaterial3D" id="StdMat_crate"]
+albedo_color = Color(0.45, 0.3, 0.15, 1)
+roughness = 0.8
+
+[node name="Main" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+position = Vector3(0, 8, 0)
+rotation_degrees = Vector3(-45, -30, 0)
+shadow_enabled = true
+light_energy = 1.2
+
+[node name="Floor" type="StaticBody3D" parent="."]
+
+[node name="FloorMesh" type="MeshInstance3D" parent="Floor"]
+position = Vector3(0, -0.25, 0)
+mesh = SubResource("BoxMesh_floor")
+surface_material_override/0 = SubResource("StdMat_floor")
+
+[node name="FloorCollision" type="CollisionShape3D" parent="Floor"]
+position = Vector3(0, -0.25, 0)
+shape = SubResource("BoxShape3D_floor")
+
+[node name="WallNorth" type="StaticBody3D" parent="."]
+
+[node name="WallNorthMesh" type="MeshInstance3D" parent="WallNorth"]
+position = Vector3(0, 2.5, -12)
+mesh = SubResource("BoxMesh_wall_ns")
+surface_material_override/0 = SubResource("StdMat_wall")
+
+[node name="WallNorthCollision" type="CollisionShape3D" parent="WallNorth"]
+position = Vector3(0, 2.5, -12)
+shape = SubResource("BoxShape3D_wall_ns")
+
+[node name="WallSouth" type="StaticBody3D" parent="."]
+
+[node name="WallSouthMesh" type="MeshInstance3D" parent="WallSouth"]
+position = Vector3(0, 2.5, 12)
+mesh = SubResource("BoxMesh_wall_ns")
+surface_material_override/0 = SubResource("StdMat_wall")
+
+[node name="WallSouthCollision" type="CollisionShape3D" parent="WallSouth"]
+position = Vector3(0, 2.5, 12)
+shape = SubResource("BoxShape3D_wall_ns")
+
+[node name="WallEast" type="StaticBody3D" parent="."]
+
+[node name="WallEastMesh" type="MeshInstance3D" parent="WallEast"]
+position = Vector3(12, 2.5, 0)
+mesh = SubResource("BoxMesh_wall_ew")
+surface_material_override/0 = SubResource("StdMat_wall")
+
+[node name="WallEastCollision" type="CollisionShape3D" parent="WallEast"]
+position = Vector3(12, 2.5, 0)
+shape = SubResource("BoxShape3D_wall_ew")
+
+[node name="WallWest" type="StaticBody3D" parent="."]
+
+[node name="WallWestMesh" type="MeshInstance3D" parent="WallWest"]
+position = Vector3(-12, 2.5, 0)
+mesh = SubResource("BoxMesh_wall_ew")
+surface_material_override/0 = SubResource("StdMat_wall")
+
+[node name="WallWestCollision" type="CollisionShape3D" parent="WallWest"]
+position = Vector3(-12, 2.5, 0)
+shape = SubResource("BoxShape3D_wall_ew")
+
+[node name="Crate1" type="StaticBody3D" parent="."]
+
+[node name="Crate1Mesh" type="MeshInstance3D" parent="Crate1"]
+position = Vector3(3, 0.75, -3)
+mesh = SubResource("BoxMesh_crate")
+surface_material_override/0 = SubResource("StdMat_crate")
+
+[node name="Crate1Collision" type="CollisionShape3D" parent="Crate1"]
+position = Vector3(3, 0.75, -3)
+shape = SubResource("BoxShape3D_crate")
+
+[node name="Crate2" type="StaticBody3D" parent="."]
+
+[node name="Crate2Mesh" type="MeshInstance3D" parent="Crate2"]
+position = Vector3(-4, 0.75, -6)
+mesh = SubResource("BoxMesh_crate")
+surface_material_override/0 = SubResource("StdMat_crate")
+
+[node name="Crate2Collision" type="CollisionShape3D" parent="Crate2"]
+position = Vector3(-4, 0.75, -6)
+shape = SubResource("BoxShape3D_crate")
+
+[node name="Crate3" type="StaticBody3D" parent="."]
+
+[node name="Crate3Mesh" type="MeshInstance3D" parent="Crate3"]
+position = Vector3(6, 0.75, 4)
+mesh = SubResource("BoxMesh_crate")
+surface_material_override/0 = SubResource("StdMat_crate")
+
+[node name="Crate3Collision" type="CollisionShape3D" parent="Crate3"]
+position = Vector3(6, 0.75, 4)
+shape = SubResource("BoxShape3D_crate")
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+position = Vector3(0, 0, 8)
+
+[node name="Target1" parent="." instance=ExtResource("2_target")]
+position = Vector3(5, 0, -8)
+
+[node name="Target2" parent="." instance=ExtResource("2_target")]
+position = Vector3(-6, 0, -9)
+
+[node name="Target3" parent="." instance=ExtResource("2_target")]
+position = Vector3(0, 0, -10)
+
+[node name="Target4" parent="." instance=ExtResource("2_target")]
+position = Vector3(8, 0, 3)
+
+[node name="Target5" parent="." instance=ExtResource("2_target")]
+position = Vector3(-8, 0, 5)
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("3_hud")
+
+[node name="Crosshair" type="Label" parent="HUD"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -10.0
+offset_top = -16.0
+offset_right = 10.0
+offset_bottom = 16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 28
+text = "+"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ScoreLabel" type="Label" parent="HUD"]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 220.0
+offset_bottom = 60.0
+theme_override_font_sizes/font_size = 24
+text = "Score: 0"
+
+[node name="Instructions" type="Label" parent="HUD"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -60.0
+offset_right = 620.0
+offset_bottom = -20.0
+theme_override_font_sizes/font_size = 18
+text = "WASD move   Shift sprint   Space jump   Click to shoot   Esc release mouse"
