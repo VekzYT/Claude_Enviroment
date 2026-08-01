@@ -86,7 +86,7 @@ func _physics_process(delta: float) -> void:
 		input_dir.x += 1
 	input_dir = input_dir.normalized()
 
-	var speed := SPRINT_SPEED if Input.is_physical_key_pressed(KEY_SHIFT) else SPEED
+	var speed: float = SPRINT_SPEED if Input.is_physical_key_pressed(KEY_SHIFT) else SPEED
 	var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 
 	if direction:
@@ -142,7 +142,7 @@ func update_reload(delta: float) -> void:
 			can_shoot = true
 
 	var t := clamp(reload_progress, 0.0, 1.0)
-	var reload_curve := sin(t * PI) if t < 1.0 else 0.0
+	var reload_curve: float = sin(t * PI) if t < 1.0 else 0.0
 
 	var mag_drop := 0.0
 	if t < 0.5:
