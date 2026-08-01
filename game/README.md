@@ -1,4 +1,4 @@
-# Rift Breach
+# Syfon v1.0
 
 A small first-person shooter prototype built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). One arena, real-time lighting and shadows, physics-based movement, and shootable targets that respawn.
 
@@ -37,7 +37,7 @@ game/
   project.godot          # engine/project settings, input, autoloads
   scenes/
     main.tscn             # the arena: lighting/sky, floor, walls, cover crates, targets, HUD
-    player.tscn            # FPS controller: capsule body, camera, gun viewmodel, hit-scan raycast
+    player.tscn            # FPS controller: capsule body, camera, kitbashed gun viewmodel, hit-scan raycast
     target.tscn             # shootable target
   scripts/
     player.gd               # movement, mouse-look, shooting
@@ -55,3 +55,7 @@ This is intentionally a small, playable slice — a shooting-range prototype, no
 - Multiple levels: duplicate `main.tscn`, build a new layout, and swap `run/main_scene` in `project.godot` or add a level-select menu.
 
 Ask and I can build any of these out next.
+
+## Versioning
+
+The project name (and this file's title) carries a version suffix, tracked in `VERSION`, bumped on every update you ask for.
