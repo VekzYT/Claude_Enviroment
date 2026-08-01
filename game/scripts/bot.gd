@@ -18,13 +18,15 @@ const REACTION_DELAY := 0.6
 @export var base_spread := 0.4
 @export var spread_per_distance := 0.05
 
-@export var chassis_dark_color: Color = Color(0.16, 0.17, 0.19, 1)
-@export var chassis_light_color: Color = Color(0.32, 0.34, 0.37, 1)
-@export var accent_color: Color = Color(0.5, 0.08, 0.06, 1)
+@export var shirt_color: Color = Color(0.28, 0.33, 0.2, 1)
+@export var pants_color: Color = Color(0.22, 0.24, 0.18, 1)
+@export var gear_color: Color = Color(0.55, 0.08, 0.06, 1)
+@export var skin_color: Color = Color(0.82, 0.62, 0.48, 1)
 
-const CHASSIS_DARK_DEFAULT := Color(0.16, 0.17, 0.19, 1)
-const CHASSIS_LIGHT_DEFAULT := Color(0.32, 0.34, 0.37, 1)
-const ACCENT_DEFAULT := Color(0.5, 0.08, 0.06, 1)
+const SHIRT_DEFAULT := Color(0.28, 0.33, 0.2, 1)
+const PANTS_DEFAULT := Color(0.22, 0.24, 0.18, 1)
+const GEAR_DEFAULT := Color(0.55, 0.08, 0.06, 1)
+const SKIN_DEFAULT := Color(0.82, 0.62, 0.48, 1)
 
 @onready var head: Node3D = $Head
 @onready var muzzle: Node3D = $Muzzle
@@ -52,9 +54,10 @@ func _ready() -> void:
 	pick_new_patrol_target()
 
 func apply_color_variant() -> void:
-	var is_default: bool = chassis_dark_color.is_equal_approx(CHASSIS_DARK_DEFAULT) \
-		and chassis_light_color.is_equal_approx(CHASSIS_LIGHT_DEFAULT) \
-		and accent_color.is_equal_approx(ACCENT_DEFAULT)
+	var is_default: bool = shirt_color.is_equal_approx(SHIRT_DEFAULT) \
+		and pants_color.is_equal_approx(PANTS_DEFAULT) \
+		and gear_color.is_equal_approx(GEAR_DEFAULT) \
+		and skin_color.is_equal_approx(SKIN_DEFAULT)
 	if is_default:
 		return
 	for child in mesh_root.get_children():
@@ -65,12 +68,14 @@ func apply_color_variant() -> void:
 		if mat == null:
 			continue
 		var new_mat: StandardMaterial3D = mat.duplicate()
-		if mat.albedo_color.is_equal_approx(CHASSIS_DARK_DEFAULT):
-			new_mat.albedo_color = chassis_dark_color
-		elif mat.albedo_color.is_equal_approx(CHASSIS_LIGHT_DEFAULT):
-			new_mat.albedo_color = chassis_light_color
-		elif mat.albedo_color.is_equal_approx(ACCENT_DEFAULT):
-			new_mat.albedo_color = accent_color
+		if mat.albedo_color.is_equal_approx(SHIRT_DEFAULT):
+			new_mat.albedo_color = shirt_color
+		elif mat.albedo_color.is_equal_approx(PANTS_DEFAULT):
+			new_mat.albedo_color = pants_color
+		elif mat.albedo_color.is_equal_approx(GEAR_DEFAULT):
+			new_mat.albedo_color = gear_color
+		elif mat.albedo_color.is_equal_approx(SKIN_DEFAULT):
+			new_mat.albedo_color = skin_color
 		mesh_instance.set_surface_override_material(0, new_mat)
 
 func _physics_process(delta: float) -> void:

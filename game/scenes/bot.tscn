@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/bot.gd" id="1_bot"]
 
@@ -18,20 +18,44 @@ top_radius = 0.5
 bottom_radius = 0.5
 height = 1.0
 
-[sub_resource type="StandardMaterial3D" id="StdMat_bot_metal"]
-albedo_color = Color(0.16, 0.17, 0.19, 1)
-metallic = 0.8
-roughness = 0.4
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_fabric"]
+frequency = 0.35
 
-[sub_resource type="StandardMaterial3D" id="StdMat_bot_metal_light"]
-albedo_color = Color(0.32, 0.34, 0.37, 1)
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_fabric_rough"]
+width = 128
+height = 128
+seamless = true
+noise = SubResource("FastNoiseLite_fabric")
+
+[sub_resource type="StandardMaterial3D" id="StdMat_skin"]
+albedo_color = Color(0.82, 0.62, 0.48, 1)
+roughness = 0.75
+roughness_texture = SubResource("NoiseTexture2D_fabric_rough")
+
+[sub_resource type="StandardMaterial3D" id="StdMat_shirt"]
+albedo_color = Color(0.28, 0.33, 0.2, 1)
+roughness = 0.85
+roughness_texture = SubResource("NoiseTexture2D_fabric_rough")
+uv1_scale = Vector3(2, 2, 1)
+
+[sub_resource type="StandardMaterial3D" id="StdMat_pants"]
+albedo_color = Color(0.22, 0.24, 0.18, 1)
+roughness = 0.85
+roughness_texture = SubResource("NoiseTexture2D_fabric_rough")
+uv1_scale = Vector3(2, 2, 1)
+
+[sub_resource type="StandardMaterial3D" id="StdMat_gear"]
+albedo_color = Color(0.55, 0.08, 0.06, 1)
+roughness = 0.6
+
+[sub_resource type="StandardMaterial3D" id="StdMat_boots"]
+albedo_color = Color(0.08, 0.07, 0.06, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StdMat_gun"]
+albedo_color = Color(0.12, 0.12, 0.13, 1)
 metallic = 0.75
-roughness = 0.3
-
-[sub_resource type="StandardMaterial3D" id="StdMat_bot_accent"]
-albedo_color = Color(0.5, 0.08, 0.06, 1)
-metallic = 0.2
-roughness = 0.55
+roughness = 0.35
 
 [node name="Bot" type="CharacterBody3D"]
 script = ExtResource("1_bot")
@@ -44,151 +68,145 @@ shape = SubResource("CapsuleShape3D_bot")
 position = Vector3(0, 1.6, 0)
 
 [node name="Muzzle" type="Node3D" parent="."]
-position = Vector3(0.34, 1.0, -0.58)
+position = Vector3(0.3, 1.02, -0.63)
 
 [node name="MeshRoot" type="Node3D" parent="."]
 
 [node name="LegLeft" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(-0.14, 0.35, 0)
-scale = Vector3(0.16, 0.7, 0.18)
+position = Vector3(-0.13, 0.42, 0)
+scale = Vector3(0.15, 0.68, 0.17)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal")
+surface_material_override/0 = SubResource("StdMat_pants")
 
 [node name="LegRight" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0.14, 0.35, 0)
-scale = Vector3(0.16, 0.7, 0.18)
+position = Vector3(0.13, 0.42, 0)
+scale = Vector3(0.15, 0.68, 0.17)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal")
+surface_material_override/0 = SubResource("StdMat_pants")
 
 [node name="FootLeft" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(-0.14, 0.04, -0.02)
-scale = Vector3(0.2, 0.08, 0.26)
+position = Vector3(-0.13, 0.06, -0.02)
+scale = Vector3(0.18, 0.1, 0.26)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+surface_material_override/0 = SubResource("StdMat_boots")
 
 [node name="FootRight" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0.14, 0.04, -0.02)
-scale = Vector3(0.2, 0.08, 0.26)
+position = Vector3(0.13, 0.06, -0.02)
+scale = Vector3(0.18, 0.1, 0.26)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+surface_material_override/0 = SubResource("StdMat_boots")
 
 [node name="KneeLeft" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(-0.14, 0.36, 0)
-scale = Vector3(0.11, 0.11, 0.11)
+position = Vector3(-0.13, 0.36, 0)
+scale = Vector3(0.1, 0.1, 0.1)
 mesh = SubResource("SphereMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+surface_material_override/0 = SubResource("StdMat_pants")
 
 [node name="KneeRight" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0.14, 0.36, 0)
-scale = Vector3(0.11, 0.11, 0.11)
+position = Vector3(0.13, 0.36, 0)
+scale = Vector3(0.1, 0.1, 0.1)
 mesh = SubResource("SphereMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+surface_material_override/0 = SubResource("StdMat_pants")
 
-[node name="HipConnector" type="MeshInstance3D" parent="MeshRoot"]
+[node name="Belt" type="MeshInstance3D" parent="MeshRoot"]
 position = Vector3(0, 0.78, 0)
-scale = Vector3(0.34, 0.15, 0.24)
+scale = Vector3(0.36, 0.1, 0.24)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+surface_material_override/0 = SubResource("StdMat_boots")
 
 [node name="Torso" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0, 1.02, 0)
-scale = Vector3(0.46, 0.55, 0.32)
+position = Vector3(0, 1.05, 0)
+scale = Vector3(0.42, 0.46, 0.26)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal")
+surface_material_override/0 = SubResource("StdMat_shirt")
 
-[node name="ChestCore" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0, 1.05, -0.17)
-scale = Vector3(0.1, 0.1, 0.06)
+[node name="Vest" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0, 1.08, -0.14)
+scale = Vector3(0.32, 0.32, 0.06)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_accent")
+surface_material_override/0 = SubResource("StdMat_gear")
 
-[node name="BackCore" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0, 1.05, 0.17)
-scale = Vector3(0.16, 0.2, 0.08)
+[node name="Backpack" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0, 1.05, 0.16)
+scale = Vector3(0.26, 0.34, 0.14)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_accent")
-
-[node name="IndicatorLeft" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(-0.2, 1.15, -0.16)
-scale = Vector3(0.025, 0.025, 0.025)
-mesh = SubResource("SphereMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_accent")
-
-[node name="IndicatorRight" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0.2, 1.15, -0.16)
-scale = Vector3(0.025, 0.025, 0.025)
-mesh = SubResource("SphereMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_accent")
+surface_material_override/0 = SubResource("StdMat_gear")
 
 [node name="ShoulderLeft" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(-0.28, 1.28, 0)
+position = Vector3(-0.24, 1.28, 0)
 scale = Vector3(0.1, 0.1, 0.1)
 mesh = SubResource("SphereMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+surface_material_override/0 = SubResource("StdMat_shirt")
 
 [node name="ShoulderRight" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0.28, 1.28, 0)
+position = Vector3(0.24, 1.28, 0)
 scale = Vector3(0.1, 0.1, 0.1)
 mesh = SubResource("SphereMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal_light")
-
-[node name="PauldronLeft" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(-0.28, 1.3, 0)
-scale = Vector3(0.17, 0.12, 0.17)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal")
-
-[node name="PauldronRight" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0.28, 1.3, 0)
-scale = Vector3(0.17, 0.12, 0.17)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal")
+surface_material_override/0 = SubResource("StdMat_shirt")
 
 [node name="ArmLeft" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(-0.28, 1.0, 0)
-scale = Vector3(0.12, 0.42, 0.12)
+position = Vector3(-0.24, 1.02, 0)
+scale = Vector3(0.11, 0.42, 0.11)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal")
+surface_material_override/0 = SubResource("StdMat_shirt")
 
 [node name="ArmRight" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0.28, 1.0, 0)
-scale = Vector3(0.12, 0.42, 0.12)
+position = Vector3(0.24, 1.02, 0)
+scale = Vector3(0.11, 0.42, 0.11)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal")
+surface_material_override/0 = SubResource("StdMat_shirt")
+
+[node name="HandLeft" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(-0.24, 0.78, 0)
+scale = Vector3(0.09, 0.09, 0.09)
+mesh = SubResource("SphereMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="HandRight" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0.24, 0.78, 0)
+scale = Vector3(0.09, 0.09, 0.09)
+mesh = SubResource("SphereMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Neck" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0, 1.36, 0)
+scale = Vector3(0.1, 0.08, 0.1)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
 
 [node name="HeadMesh" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0, 1.62, 0)
-scale = Vector3(0.3, 0.28, 0.3)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal_light")
-
-[node name="EyeMesh" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0, 1.63, -0.16)
-scale = Vector3(0.22, 0.04, 0.03)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_accent")
-
-[node name="Antenna" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0, 1.85, 0.05)
-scale = Vector3(0.03, 0.18, 0.03)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal")
-
-[node name="AntennaTip" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0, 1.96, 0.05)
-scale = Vector3(0.035, 0.035, 0.035)
+position = Vector3(0, 1.5, 0)
+scale = Vector3(0.26, 0.28, 0.26)
 mesh = SubResource("SphereMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_accent")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Cap" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0, 1.63, 0)
+scale = Vector3(0.28, 0.14, 0.28)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gear")
+
+[node name="CapBrim" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0, 1.57, -0.15)
+scale = Vector3(0.24, 0.04, 0.1)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gear")
+
+[node name="GunStock" type="MeshInstance3D" parent="MeshRoot"]
+position = Vector3(0.3, 1.0, -0.08)
+scale = Vector3(0.06, 0.1, 0.16)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_gun")
 
 [node name="GunBody" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0.34, 1.0, -0.28)
-scale = Vector3(0.09, 0.09, 0.4)
+position = Vector3(0.3, 1.02, -0.28)
+scale = Vector3(0.08, 0.08, 0.38)
 mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal")
+surface_material_override/0 = SubResource("StdMat_gun")
 
 [node name="GunBarrel" type="MeshInstance3D" parent="MeshRoot"]
-position = Vector3(0.34, 1.0, -0.52)
+position = Vector3(0.3, 1.02, -0.5)
 rotation_degrees = Vector3(-90, 0, 0)
-scale = Vector3(0.03, 0.14, 0.03)
+scale = Vector3(0.025, 0.13, 0.025)
 mesh = SubResource("CylinderMesh_unit")
-surface_material_override/0 = SubResource("StdMat_bot_metal_light")
+surface_material_override/0 = SubResource("StdMat_gun")

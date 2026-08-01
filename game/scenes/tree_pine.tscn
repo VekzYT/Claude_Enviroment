@@ -1,0 +1,62 @@
+[gd_scene load_steps=9 format=3]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
+top_radius = 0.09
+bottom_radius = 0.13
+height = 1.6
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_bark"]
+frequency = 0.4
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_bark_rough"]
+width = 128
+height = 128
+seamless = true
+noise = SubResource("FastNoiseLite_bark")
+
+[sub_resource type="StandardMaterial3D" id="StdMat_bark"]
+albedo_color = Color(0.28, 0.18, 0.11, 1)
+roughness = 0.95
+roughness_texture = SubResource("NoiseTexture2D_bark_rough")
+
+[sub_resource type="StandardMaterial3D" id="StdMat_foliage"]
+albedo_color = Color(0.14, 0.32, 0.14, 1)
+roughness = 0.9
+roughness_texture = SubResource("NoiseTexture2D_bark_rough")
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_foliage1"]
+top_radius = 0.1
+bottom_radius = 0.85
+height = 1.3
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_foliage2"]
+top_radius = 0.08
+bottom_radius = 0.62
+height = 1.1
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_foliage3"]
+top_radius = 0.03
+bottom_radius = 0.4
+height = 0.95
+
+[node name="TreePine" type="Node3D"]
+
+[node name="Trunk" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.8, 0)
+mesh = SubResource("CylinderMesh_trunk")
+surface_material_override/0 = SubResource("StdMat_bark")
+
+[node name="Foliage1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.4, 0)
+mesh = SubResource("CylinderMesh_foliage1")
+surface_material_override/0 = SubResource("StdMat_foliage")
+
+[node name="Foliage2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.15, 0)
+mesh = SubResource("CylinderMesh_foliage2")
+surface_material_override/0 = SubResource("StdMat_foliage")
+
+[node name="Foliage3" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.85, 0)
+mesh = SubResource("CylinderMesh_foliage3")
+surface_material_override/0 = SubResource("StdMat_foliage")
