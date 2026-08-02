@@ -7,6 +7,10 @@ signal weapon_panel_visibility_changed(is_open: bool)
 signal scope_active_changed(active: bool)
 signal knife_cooldown_changed(fraction: float)
 signal hit_marker_triggered
+signal landmark_discovered(landmark_name: String)
+signal relic_collected(count: int, total: int)
+
+const RELICS_TOTAL := 6
 
 var score := 0
 var player_health := 100
@@ -14,6 +18,7 @@ var current_weapon := 1
 var weapon_panel_open := false
 var scope_active := false
 var knife_cooldown_fraction := 0.0
+var relics_collected := 0
 
 func add_point() -> void:
 	score += 1
@@ -42,7 +47,15 @@ func set_knife_cooldown(fraction: float) -> void:
 func trigger_hit_marker() -> void:
 	hit_marker_triggered.emit()
 
+func discover_landmark(landmark_name: String) -> void:
+	landmark_discovered.emit(landmark_name)
+
+func collect_relic() -> void:
+	relics_collected += 1
+	relic_collected.emit(relics_collected, RELICS_TOTAL)
+
 func reset() -> void:
+	relics_collected = 0
 	score = 0
 	score_changed.emit(score)
 	player_health = 100

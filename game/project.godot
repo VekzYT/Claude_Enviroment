@@ -6,7 +6,7 @@ config_version=5
 
 [application]
 
-config/name="Syfon v1.13"
+config/name="Syfon v1.14"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 
@@ -29,3 +29,8 @@ window/size/viewport_height=720
 [rendering]
 
 renderer/rendering_method="forward_plus"
+anti_aliasing/quality/msaa_3d=2
+anti_aliasing/quality/screen_space_aa=1
+environment/defaults/default_clear_color=Color(0.1, 0.35, 0.55, 1)
+environment/ssao/quality=2
+environment/ssil/quality=2

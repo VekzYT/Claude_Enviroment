@@ -23,10 +23,18 @@ const KNIFE_WEAPON_INDEX := 2
 @onready var scope_reticle_h: ColorRect = $ScopeReticleH
 @onready var scope_reticle_v: ColorRect = $ScopeReticleV
 
+@onready var compass_label: Label = $CompassLabel
+@onready var relic_label: Label = $RelicLabel
+@onready var toast_label: Label = $ToastLabel
+
 var last_health := 100
 var current_weapon_index := 1
 var weapon_names: Array = ["Sniper", "Handgun", "Knife"]
 var pulse_time := 0.0
+var player: Node3D = null
+var toast_tween: Tween = null
+
+const COMPASS_NAMES: Array[String] = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 
 func _ready() -> void:
 	GameState.score_changed.connect(_on_score_changed)
@@ -36,6 +44,8 @@ func _ready() -> void:
 	GameState.scope_active_changed.connect(_on_scope_active_changed)
 	GameState.knife_cooldown_changed.connect(_on_knife_cooldown_changed)
 	GameState.hit_marker_triggered.connect(_on_hit_marker_triggered)
+	GameState.landmark_discovered.connect(_on_landmark_discovered)
+	GameState.relic_collected.connect(_on_relic_collected)
 
 	_on_score_changed(GameState.score)
 	last_health = GameState.player_health
@@ -44,8 +54,11 @@ func _ready() -> void:
 	_on_weapon_panel_visibility_changed(GameState.weapon_panel_open)
 	_on_scope_active_changed(GameState.scope_active)
 	_on_knife_cooldown_changed(GameState.knife_cooldown_fraction)
+	relic_label.text = "Relics: %d / %d" % [GameState.relics_collected, GameState.RELICS_TOTAL]
 
 	hit_marker.visible = false
+	toast_label.visible = false
+	toast_label.modulate.a = 0.0
 	scope_overlay.texture = _build_scope_mask_texture()
 
 func _process(delta: float) -> void:
@@ -55,6 +68,40 @@ func _process(delta: float) -> void:
 	else:
 		pulse_time = 0.0
 		low_health_pulse.color.a = 0.0
+	update_compass()
+
+func update_compass() -> void:
+	if player == null:
+		player = get_tree().get_first_node_in_group("player")
+		if player == null:
+			return
+	var forward: Vector3 = -player.global_transform.basis.z
+	var bearing_rad: float = atan2(forward.x, -forward.z)
+	var bearing_deg: float = fposmod(rad_to_deg(bearing_rad), 360.0)
+	var idx: int = int(round(bearing_deg / 45.0)) % 8
+	compass_label.text = "%s   %d°" % [COMPASS_NAMES[idx], int(bearing_deg)]
+
+func _on_landmark_discovered(landmark_name: String) -> void:
+	show_toast("Discovered: %s" % landmark_name)
+	Sound.play_ui("ui_toggle", -4.0)
+
+func _on_relic_collected(count: int, total: int) -> void:
+	relic_label.text = "Relics: %d / %d" % [count, total]
+	show_toast("Relic collected (%d/%d)" % [count, total])
+
+func show_toast(text: String) -> void:
+	if toast_tween != null and toast_tween.is_valid():
+		toast_tween.kill()
+	toast_label.text = text
+	toast_label.visible = true
+	toast_label.modulate.a = 0.0
+	toast_tween = create_tween()
+	toast_tween.tween_property(toast_label, "modulate:a", 1.0, 0.3)
+	toast_tween.tween_interval(2.2)
+	toast_tween.tween_property(toast_label, "modulate:a", 0.0, 0.5)
+	toast_tween.tween_callback(func() -> void:
+		toast_label.visible = false
+	)
 
 func _on_score_changed(new_score: int) -> void:
 	score_label.text = "Score: %d" % new_score

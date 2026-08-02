@@ -26,8 +26,12 @@ const EXCLUSION_CENTERS: Array[Vector2] = [
 	Vector2(-50, 18),
 	Vector2(-16, -44),
 	Vector2(30, -40),
+	Vector2(0, 46),
+	Vector2(0, 33),
+	Vector2(-35, 0),
+	Vector2(-35, -12),
 ]
-const EXCLUSION_RADII: Array[float] = [30.0, 9.0, 9.0, 6.0, 6.0, 7.0]
+const EXCLUSION_RADII: Array[float] = [30.0, 9.0, 9.0, 6.0, 6.0, 7.0, 13.0, 8.0, 12.0, 8.0]
 
 const GRASS_EXCLUSION_CENTERS: Array[Vector2] = [
 	Vector2(36, 24),
@@ -35,8 +39,12 @@ const GRASS_EXCLUSION_CENTERS: Array[Vector2] = [
 	Vector2(-50, 18),
 	Vector2(-16, -44),
 	Vector2(30, -40),
+	Vector2(0, 46),
+	Vector2(0, 33),
+	Vector2(-35, 0),
+	Vector2(-35, -12),
 ]
-const GRASS_EXCLUSION_RADII: Array[float] = [9.0, 9.0, 6.0, 6.0, 7.0]
+const GRASS_EXCLUSION_RADII: Array[float] = [9.0, 9.0, 6.0, 6.0, 7.0, 13.0, 8.0, 12.0, 8.0]
 
 var rng := RandomNumberGenerator.new()
 

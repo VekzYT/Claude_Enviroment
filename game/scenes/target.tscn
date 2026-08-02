@@ -2,9 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/target.gd" id="1_target"]
 
-[sub_resource type="CylinderShape3D" id="CylinderShape3D_1"]
-radius = 0.5
-height = 1.6
+[sub_resource type="BoxShape3D" id="BoxShape3D_1"]
+size = Vector3(0.9, 1.6, 0.9)
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_1"]
 top_radius = 0.5
@@ -26,4 +25,4 @@ surface_material_override/0 = SubResource("StdMat_target")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 position = Vector3(0, 0.8, 0)
-shape = SubResource("CylinderShape3D_1")
+shape = SubResource("BoxShape3D_1")
