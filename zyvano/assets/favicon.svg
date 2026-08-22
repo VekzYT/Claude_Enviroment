@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 150">
+  <rect x="0" y="0" width="120" height="150" fill="#0a0a0b"/>
+  <g fill="#f5f4f0">
+    <path d="M60 6 L66 20 L60 34 L54 20 Z"/>
+    <text x="60" y="118" text-anchor="middle" font-family="'Mrs Saint Delafield', cursive" font-size="110">Z</text>
+    <path d="M22 70 C 10 66, 4 74, 2 84 C 12 82, 20 80, 28 88 C 26 78, 26 74, 22 70 Z"/>
+    <path d="M98 70 C 110 66, 116 74, 118 84 C 108 82, 100 80, 92 88 C 94 78, 94 74, 98 70 Z"/>
+    <ellipse cx="60" cy="140" rx="3.2" ry="4.2"/>
+  </g>
+</svg>
