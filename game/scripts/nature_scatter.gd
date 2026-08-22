@@ -128,11 +128,11 @@ func _build_grass_blade_mesh() -> ArrayMesh:
 
 func scatter_grass() -> void:
 	var blade_mesh: ArrayMesh = _build_grass_blade_mesh()
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.24, 0.42, 0.16, 1)
-	mat.roughness = 0.9
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.vertex_color_use_as_albedo = true
+	var shader: Shader = load("res://shaders/grass_wind.gdshader") as Shader
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	mat.set_shader_parameter("base_color", Color(0.24, 0.42, 0.16, 1))
+	mat.set_shader_parameter("blade_height", 0.32)
 	blade_mesh.surface_set_material(0, mat)
 
 	var multimesh := MultiMesh.new()

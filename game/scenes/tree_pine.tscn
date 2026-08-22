@@ -1,4 +1,6 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Shader" path="res://shaders/foliage_wind.gdshader" id="1_foliage_wind"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
 top_radius = 0.09
@@ -19,10 +21,14 @@ albedo_color = Color(0.28, 0.18, 0.11, 1)
 roughness = 0.95
 roughness_texture = SubResource("NoiseTexture2D_bark_rough")
 
-[sub_resource type="StandardMaterial3D" id="StdMat_foliage"]
-albedo_color = Color(0.14, 0.32, 0.14, 1)
-roughness = 0.9
-roughness_texture = SubResource("NoiseTexture2D_bark_rough")
+[sub_resource type="ShaderMaterial" id="ShaderMat_foliage"]
+shader = ExtResource("1_foliage_wind")
+shader_parameter/base_color = Color(0.14, 0.32, 0.14, 1)
+shader_parameter/roughness_value = 0.9
+shader_parameter/roughness_tex = SubResource("NoiseTexture2D_bark_rough")
+shader_parameter/wind_strength = 0.06
+shader_parameter/wind_speed = 1.2
+shader_parameter/wind_frequency = 0.4
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_foliage1"]
 top_radius = 0.1
@@ -49,14 +55,14 @@ surface_material_override/0 = SubResource("StdMat_bark")
 [node name="Foliage1" type="MeshInstance3D" parent="."]
 position = Vector3(0, 1.4, 0)
 mesh = SubResource("CylinderMesh_foliage1")
-surface_material_override/0 = SubResource("StdMat_foliage")
+surface_material_override/0 = SubResource("ShaderMat_foliage")
 
 [node name="Foliage2" type="MeshInstance3D" parent="."]
 position = Vector3(0, 2.15, 0)
 mesh = SubResource("CylinderMesh_foliage2")
-surface_material_override/0 = SubResource("StdMat_foliage")
+surface_material_override/0 = SubResource("ShaderMat_foliage")
 
 [node name="Foliage3" type="MeshInstance3D" parent="."]
 position = Vector3(0, 2.85, 0)
 mesh = SubResource("CylinderMesh_foliage3")
-surface_material_override/0 = SubResource("StdMat_foliage")
+surface_material_override/0 = SubResource("ShaderMat_foliage")

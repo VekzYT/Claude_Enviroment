@@ -1,4 +1,4 @@
-[gd_scene load_steps=50 format=3]
+[gd_scene load_steps=59 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/target.tscn" id="2_target"]
@@ -12,6 +12,19 @@
 [ext_resource type="Script" path="res://scripts/nature_scatter.gd" id="10_nature"]
 [ext_resource type="Script" path="res://scripts/landmarks.gd" id="11_landmarks"]
 [ext_resource type="PackedScene" path="res://scenes/relic.tscn" id="12_relic"]
+[ext_resource type="Texture2D" path="res://textures/grass_albedo.jpg" id="13_grass_albedo"]
+[ext_resource type="Texture2D" path="res://textures/grass_normal.jpg" id="14_grass_normal"]
+[ext_resource type="Texture2D" path="res://textures/grass_rough.jpg" id="15_grass_rough"]
+[ext_resource type="Texture2D" path="res://textures/sand_albedo.jpg" id="16_sand_albedo"]
+[ext_resource type="Texture2D" path="res://textures/sand_normal.jpg" id="17_sand_normal"]
+[ext_resource type="Texture2D" path="res://textures/sand_rough.jpg" id="18_sand_rough"]
+[ext_resource type="Texture2D" path="res://textures/rock_albedo.jpg" id="19_rock_albedo"]
+[ext_resource type="Texture2D" path="res://textures/rock_normal.jpg" id="20_rock_normal"]
+[ext_resource type="Texture2D" path="res://textures/rock_rough.jpg" id="21_rock_rough"]
+[ext_resource type="Texture2D" path="res://textures/wood_albedo.jpg" id="22_wood_albedo"]
+[ext_resource type="Texture2D" path="res://textures/wood_normal.jpg" id="23_wood_normal"]
+[ext_resource type="Texture2D" path="res://textures/wood_rough.jpg" id="24_wood_rough"]
+[ext_resource type="Shader" path="res://shaders/ocean.gdshader" id="25_ocean_shader"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.45, 0.62, 0.8, 1)
@@ -47,32 +60,6 @@ fog_aerial_perspective = 0.5
 adjustment_enabled = true
 adjustment_saturation = 1.08
 
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_surface"]
-frequency = 0.05
-
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_rough"]
-frequency = 0.18
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_albedo"]
-width = 1024
-height = 1024
-seamless = true
-noise = SubResource("FastNoiseLite_surface")
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_normal"]
-width = 1024
-height = 1024
-seamless = true
-as_normal_map = true
-bump_strength = 4.5
-noise = SubResource("FastNoiseLite_surface")
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_rough"]
-width = 512
-height = 512
-seamless = true
-noise = SubResource("FastNoiseLite_rough")
-
 [sub_resource type="BoxMesh" id="BoxMesh_unit"]
 size = Vector3(1, 1, 1)
 
@@ -83,6 +70,11 @@ size = Vector3(1, 1, 1)
 top_radius = 1.0
 bottom_radius = 1.0
 height = 1.0
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ocean"]
+size = Vector2(600, 600)
+subdivide_width = 64
+subdivide_depth = 64
 
 [sub_resource type="StandardMaterial3D" id="StdMat_trim_dark"]
 albedo_color = Color(0.08, 0.08, 0.09, 1)
@@ -112,43 +104,44 @@ metallic = 0.6
 roughness = 0.55
 
 [sub_resource type="StandardMaterial3D" id="StdMat_grass"]
-albedo_color = Color(0.24, 0.4, 0.18, 1)
-albedo_texture = SubResource("NoiseTexture2D_albedo")
-roughness = 0.9
-roughness_texture = SubResource("NoiseTexture2D_rough")
+albedo_color = Color(0.75, 0.8, 0.7, 1)
+albedo_texture = ExtResource("13_grass_albedo")
+roughness = 0.95
+roughness_texture = ExtResource("15_grass_rough")
 normal_enabled = true
-normal_texture = SubResource("NoiseTexture2D_normal")
-normal_scale = 1.2
+normal_texture = ExtResource("14_grass_normal")
+normal_scale = 1.0
 uv1_scale = Vector3(24, 24, 1)
 
 [sub_resource type="StandardMaterial3D" id="StdMat_sand"]
-albedo_color = Color(0.76, 0.68, 0.5, 1)
-albedo_texture = SubResource("NoiseTexture2D_albedo")
-roughness = 0.85
-roughness_texture = SubResource("NoiseTexture2D_rough")
+albedo_color = Color(1, 1, 1, 1)
+albedo_texture = ExtResource("16_sand_albedo")
+roughness = 0.9
+roughness_texture = ExtResource("18_sand_rough")
 normal_enabled = true
-normal_texture = SubResource("NoiseTexture2D_normal")
-normal_scale = 0.8
+normal_texture = ExtResource("17_sand_normal")
+normal_scale = 0.7
 uv1_scale = Vector3(20, 20, 1)
 
-[sub_resource type="StandardMaterial3D" id="StdMat_ocean"]
-albedo_color = Color(0.1, 0.35, 0.55, 0.88)
-transparency = 1
-metallic = 0.3
-roughness = 0.15
-normal_enabled = true
-normal_texture = SubResource("NoiseTexture2D_normal")
-normal_scale = 0.6
-uv1_scale = Vector3(40, 40, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMat_ocean"]
+shader = ExtResource("25_ocean_shader")
+shader_parameter/shallow_color = Color(0.15, 0.55, 0.65, 0.75)
+shader_parameter/deep_color = Color(0.03, 0.18, 0.35, 0.92)
+shader_parameter/wave_height = 0.35
+shader_parameter/wave_speed = 0.6
+shader_parameter/wave_scale = 0.06
+shader_parameter/fresnel_power = 3.0
+shader_parameter/roughness_value = 0.1
+shader_parameter/metallic_value = 0.4
 
 [sub_resource type="StandardMaterial3D" id="StdMat_wall"]
-albedo_color = Color(0.38, 0.37, 0.36, 1)
-albedo_texture = SubResource("NoiseTexture2D_albedo")
-roughness = 0.9
-roughness_texture = SubResource("NoiseTexture2D_rough")
+albedo_color = Color(0.85, 0.85, 0.87, 1)
+albedo_texture = ExtResource("19_rock_albedo")
+roughness = 0.95
+roughness_texture = ExtResource("21_rock_rough")
 normal_enabled = true
-normal_texture = SubResource("NoiseTexture2D_normal")
-normal_scale = 1.1
+normal_texture = ExtResource("20_rock_normal")
+normal_scale = 1.3
 uv1_scale = Vector3(4, 4, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_crate"]
@@ -158,8 +151,14 @@ size = Vector3(1.5, 1.5, 1.5)
 size = Vector3(1.5, 1.5, 1.5)
 
 [sub_resource type="StandardMaterial3D" id="StdMat_crate"]
-albedo_color = Color(0.45, 0.3, 0.15, 1)
-roughness = 0.8
+albedo_color = Color(0.8, 0.75, 0.65, 1)
+albedo_texture = ExtResource("22_wood_albedo")
+roughness = 0.85
+roughness_texture = ExtResource("24_wood_rough")
+normal_enabled = true
+normal_texture = ExtResource("23_wood_normal")
+normal_scale = 1.0
+uv1_scale = Vector3(1, 1, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_pillar"]
 size = Vector3(1.2, 4, 1.2)
@@ -184,11 +183,14 @@ bottom_radius = 1.0
 height = 1.0
 
 [sub_resource type="StandardMaterial3D" id="StdMat_mountain"]
-albedo_color = Color(0.34, 0.32, 0.3, 1)
-albedo_texture = SubResource("NoiseTexture2D_albedo")
+albedo_color = Color(0.7, 0.68, 0.68, 1)
+albedo_texture = ExtResource("19_rock_albedo")
 roughness = 0.95
-roughness_texture = SubResource("NoiseTexture2D_rough")
-uv1_scale = Vector3(4, 4, 1)
+roughness_texture = ExtResource("21_rock_rough")
+normal_enabled = true
+normal_texture = ExtResource("20_rock_normal")
+normal_scale = 1.2
+uv1_scale = Vector3(3, 3, 1)
 
 [sub_resource type="StandardMaterial3D" id="StdMat_snow"]
 albedo_color = Color(0.93, 0.95, 0.98, 1)
@@ -282,9 +284,8 @@ surface_material_override/0 = SubResource("StdMat_snow")
 
 [node name="Ocean" type="MeshInstance3D" parent="."]
 position = Vector3(0, -0.8, 0)
-scale = Vector3(300, 0.4, 300)
-mesh = SubResource("CylinderMesh_unit")
-surface_material_override/0 = SubResource("StdMat_ocean")
+mesh = SubResource("PlaneMesh_ocean")
+surface_material_override/0 = SubResource("ShaderMat_ocean")
 
 [node name="IslandMainGrassMesh" type="MeshInstance3D" parent="."]
 position = Vector3(0, -3, 0)
