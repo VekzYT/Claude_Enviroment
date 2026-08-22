@@ -1,10 +1,20 @@
-# Syfon v2.0 — Dead Woods
+# Syfon v2.1 — Dead Woods
 
 A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release is the world build: a **huge, dense forest** you can get genuinely lost in.
 
-Starts at a real main menu with settings, then drops you into an abandoned survivor camp in the middle of a 400×400-metre forest — around 1,150 trees, deadfall, bushes, ferns, boulders and 16,000 blades of undergrowth, all swaying in the wind, under a cold overcast sky with heavy volumetric mist. Four dirt roads run out of the camp to seven other locations to find: a ranger watchtower you can climb, an abandoned cabin with a collapsed roof, a crashed convoy, chapel ruins, a radio tower with a red beacon, a graveyard clearing, and a black-water pond. A compass, a landmark-discovery system, and eight scattered supply caches guide the exploring. Real recorded sound effects and music, real-time shadows, fog, SSAO/SSIL and anti-aliasing, physics-based movement, and three switchable weapons (including a dashing one-hit-kill knife) carry over from the shooter builds.
+Starts at a real main menu with settings, then drops you into an abandoned survivor camp in the middle of a forest of rolling hills and four mountain massifs — around 1,400 trees across four species, deadfall, bushes, ferns, wildflowers, boulders and 18,000 blades of undergrowth, all swaying in the wind under a cold overcast sky. Four dirt roads run out of the camp to eight other locations to find: a ranger watchtower you can climb, an abandoned cabin with a collapsed roof, a crashed convoy, chapel ruins, a radio tower with a red beacon, a graveyard clearing, a black-water pond, and a raised rocky lookout. A compass, a landmark-discovery system, and eight scattered supply caches guide the exploring.
 
 **Zombies are not in yet** — this release intentionally clears out the old human soldier bots so the world can be built first.
+
+## What's new in v2.1
+
+- **Real terrain instead of a flat plane.** The ground is now a generated heightmap — 480×480 m of rolling hills at 4 m resolution, with smooth interpolated normals and an exact triangle-mesh collider, so the surface you see is the surface you walk on. `scripts/terrain.gd` owns the height field and every other system asks it where the ground is.
+- **Four mountains.** Three are steep scenery with proper rock faces; the fourth is deliberately shaped under Godot's 45° walk limit so you can actually hike to its summit. Seven more peaks sit past the boundary as skyline. Fog was thinned so all of it is visible.
+- **Nothing is flat-shaded or boxy any more.** Tree canopies and boulders are spheres and cones pushed around by 3D noise and re-normalled, so silhouettes are irregular. Boulders come in three distinct shapes; the old box rocks and the old box "hill" with its ramp are gone — that hill is a real terrain mesa now.
+- **Four tree species.** Firs with four tight tiers, spruces with three broad ones, pale-trunked birches and dark oaks with three-blob irregular crowns, plus leaning deadfall with bare branches. Height, radius, lean, canopy width and colour are all randomised per tree.
+- **Wildflowers** in six colours, clumped one species per patch the way real wildflowers grow, on open gently-sloping ground. A single mesh does stem and bloom; the shader picks which is which from vertex height and takes the bloom colour per instance.
+- **Slope-aware ground.** A new terrain shader blends forest floor into rock by real surface slope, with a low-frequency mottle to hide tiling. It builds its tangent frame in the shader, so a 14,000-vertex mesh needs no tangent data.
+- **Placement is terrain-aware.** Every tree, bush, fern, flower, boulder and blade samples the ground height and the slope, so nothing floats, nothing sinks, and nothing grows on a cliff.
 
 ## What's new in v2.0
 
