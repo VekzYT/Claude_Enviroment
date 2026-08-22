@@ -11,7 +11,7 @@ script = ExtResource("1_menu")
 [node name="Background" type="ColorRect" parent="."]
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(0.08, 0.09, 0.1, 1)
+color = Color(0.05, 0.06, 0.05, 1)
 
 [node name="Vignette" type="ColorRect" parent="."]
 anchor_left = 0.5
@@ -22,7 +22,7 @@ offset_left = -640.0
 offset_top = -200.0
 offset_right = 640.0
 offset_bottom = 200.0
-color = Color(0.14, 0.15, 0.15, 0.4)
+color = Color(0.11, 0.14, 0.1, 0.45)
 
 [node name="Title" type="Label" parent="."]
 anchor_left = 0.5
@@ -34,7 +34,7 @@ offset_top = -60.0
 offset_right = 320.0
 offset_bottom = 50.0
 theme_override_font_sizes/font_size = 72
-theme_override_colors/font_color = Color(0.82, 0.76, 0.6, 1)
+theme_override_colors/font_color = Color(0.62, 0.72, 0.45, 1)
 horizontal_alignment = 1
 text = "SYFON"
 
@@ -49,7 +49,7 @@ offset_right = 320.0
 offset_bottom = 78.0
 theme_override_font_sizes/font_size = 18
 horizontal_alignment = 1
-text = "v1.10 — TACTICAL SHOOTER"
+text = "v2.0  —  DEAD WOODS"
 
 [node name="ButtonBox" type="VBoxContainer" parent="."]
 anchor_left = 0.5
@@ -65,7 +65,7 @@ theme_override_constants/separation = 16
 [node name="PlayButton" type="Button" parent="ButtonBox"]
 custom_minimum_size = Vector2(240, 52)
 theme_override_font_sizes/font_size = 22
-text = "PLAY"
+text = "ENTER THE FOREST"
 
 [node name="SettingsButton" type="Button" parent="ButtonBox"]
 custom_minimum_size = Vector2(240, 52)

@@ -16,6 +16,6 @@ func _on_body_entered(body: Node3D) -> void:
 		return
 	if body.is_in_group("player"):
 		collected = true
-		GameState.collect_relic()
+		GameState.collect_supply()
 		Sound.play_ui("weapon_switch", -4.0)
 		queue_free()

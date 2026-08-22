@@ -1,6 +1,27 @@
-# Syfon v1.15
+# Syfon v2.0 — Dead Woods
 
-A small first-person shooter and island explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). Starts at a real main menu with settings, then drops you onto a circular island ringed by a shader-animated ocean, with two raised hills to climb, real-texture grass and sand underfoot, wind-swaying grass blades and tree foliage, patches of pine and broadleaf forest, scattered rocks, snow-capped mountains on the distant horizon, and a small village of red-roofed houses — with a compass and a landmark-discovery system to guide exploration, glowing collectible relics to hunt down, a central combat clearing holding a watchtower, barrels, pillars, cover walls and crates, real recorded sound effects and music, real-time lighting, shadows, fog and anti-aliasing, physics-based movement, three switchable weapons (including a dashing one-hit-kill knife), blood-spray and hit-marker feedback, a fleshed-out HUD, and human soldier enemies — each with their own uniform and gear color scheme — that walk, flinch, collapse when killed, and shoot back with imperfect (not aimbot) accuracy.
+A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release is the world build: a **huge, dense forest** you can get genuinely lost in.
+
+Starts at a real main menu with settings, then drops you into an abandoned survivor camp in the middle of a 400×400-metre forest — around 1,150 trees, deadfall, bushes, ferns, boulders and 16,000 blades of undergrowth, all swaying in the wind, under a cold overcast sky with heavy volumetric mist. Four dirt roads run out of the camp to seven other locations to find: a ranger watchtower you can climb, an abandoned cabin with a collapsed roof, a crashed convoy, chapel ruins, a radio tower with a red beacon, a graveyard clearing, and a black-water pond. A compass, a landmark-discovery system, and eight scattered supply caches guide the exploring. Real recorded sound effects and music, real-time shadows, fog, SSAO/SSIL and anti-aliasing, physics-based movement, and three switchable weapons (including a dashing one-hit-kill knife) carry over from the shooter builds.
+
+**Zombies are not in yet** — this release intentionally clears out the old human soldier bots so the world can be built first.
+
+## What's new in v2.0
+
+- **Whole game re-themed to a zombie apocalypse.** The island is gone. The map is now a huge, flat, dense forest with a cold overcast sky, desaturated colour grading, heavy distance fog and volumetric mist. The menu reads *DEAD WOODS*.
+- **The forest is real scale.** 400×400 m of walkable ground with ~950 pines/firs, ~210 dead leaning trunks with bare branches, 520 bushes, 2,500 ferns, 190 boulders and ~16,000 grass blades. Every trunk has collision, so you cannot walk through trees.
+- **Built for performance, not just looks.** All of that is batched into 9 `MultiMesh` instances instead of ~25,000 separate nodes, and all 1,160 tree collisions live in a *single* `StaticBody3D` rather than one physics body per tree. Placement is seeded, so the forest is byte-identical every run.
+- **New real textures**: forest floor, dirt, bark, dirty concrete and rusty metal (CC0, Poly Haven) on top of the existing grass/sand/rock/wood sets — see `textures/CREDITS.md`.
+- **Real scanned models**: `dead_tree_trunk_02` and `tree_stump_01` glTF scans are placed sparsely as detail anchors. Poly Haven's full tree scans are ~900 MB of mesh data *each*, which is hopeless for a thousand-tree forest, so the bulk woodland is batched procedural geometry wearing real bark textures instead — the same trade real open-world games make.
+- **New `bark.gdshader`**, plus rewritten wind shaders: gusts now roll across the forest as a travelling wave rather than every plant swaying in lockstep, and each instance carries its own colour tint so a thousand copies of one trunk mesh don't read as clones.
+- **Eight locations to find**, each with a discovery banner: Survivor Camp, Ranger Watchtower, Abandoned Cabin, Crashed Convoy, Chapel Ruins, Radio Tower, The Graves, Blackwater Pond and Rocky Lookout.
+- **Relics are now supply caches** (amber, 8 of them) and the old shooting-range targets and human bots have been removed.
+
+### Notes for the zombie pass
+
+- `player.gd` damages anything it hits via duck typing (`if target.has_method("hit")`), so a zombie only needs a `hit(damage)` method to be shootable and stabbable.
+- `GameState.add_point()` is still wired to the HUD score and is currently unused — it is there for zombie kills.
+- The old bot AI (patrol / chase / attack state machine, line-of-sight checks, spread-based aiming) was deleted in this commit but is recoverable from git history as a starting point.
 
 ## What's new in v1.15
 

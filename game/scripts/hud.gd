@@ -24,7 +24,7 @@ const KNIFE_WEAPON_INDEX := 2
 @onready var scope_reticle_v: ColorRect = $ScopeReticleV
 
 @onready var compass_label: Label = $CompassLabel
-@onready var relic_label: Label = $RelicLabel
+@onready var supply_label: Label = $SupplyLabel
 @onready var toast_label: Label = $ToastLabel
 
 var last_health := 100
@@ -45,7 +45,7 @@ func _ready() -> void:
 	GameState.knife_cooldown_changed.connect(_on_knife_cooldown_changed)
 	GameState.hit_marker_triggered.connect(_on_hit_marker_triggered)
 	GameState.landmark_discovered.connect(_on_landmark_discovered)
-	GameState.relic_collected.connect(_on_relic_collected)
+	GameState.supply_collected.connect(_on_supply_collected)
 
 	_on_score_changed(GameState.score)
 	last_health = GameState.player_health
@@ -54,7 +54,7 @@ func _ready() -> void:
 	_on_weapon_panel_visibility_changed(GameState.weapon_panel_open)
 	_on_scope_active_changed(GameState.scope_active)
 	_on_knife_cooldown_changed(GameState.knife_cooldown_fraction)
-	relic_label.text = "Relics: %d / %d" % [GameState.relics_collected, GameState.RELICS_TOTAL]
+	supply_label.text = "Supplies: %d / %d" % [GameState.supplies_collected, GameState.SUPPLIES_TOTAL]
 
 	hit_marker.visible = false
 	toast_label.visible = false
@@ -85,9 +85,9 @@ func _on_landmark_discovered(landmark_name: String) -> void:
 	show_toast("Discovered: %s" % landmark_name)
 	Sound.play_ui("ui_toggle", -4.0)
 
-func _on_relic_collected(count: int, total: int) -> void:
-	relic_label.text = "Relics: %d / %d" % [count, total]
-	show_toast("Relic collected (%d/%d)" % [count, total])
+func _on_supply_collected(count: int, total: int) -> void:
+	supply_label.text = "Supplies: %d / %d" % [count, total]
+	show_toast("Supplies recovered  (%d/%d)" % [count, total])
 
 func show_toast(text: String) -> void:
 	if toast_tween != null and toast_tween.is_valid():
