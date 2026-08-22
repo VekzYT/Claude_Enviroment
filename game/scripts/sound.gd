@@ -25,7 +25,13 @@ func play_3d(sound_name: String, position: Vector3, volume_db: float = 0.0, pitc
 	player.pitch_scale = 1.0 + randf_range(-pitch_variance, pitch_variance)
 	player.max_distance = 45.0
 	player.unit_size = 6.0
-	get_tree().current_scene.add_child(player)
+	# current_scene is null during scene changes and whenever a scene was not
+	# loaded through the scene system, which dropped the sound and spammed
+	# errors. This autoload is always in the tree, so it is a safe host.
+	var host: Node = get_tree().current_scene
+	if host == null:
+		host = self
+	host.add_child(player)
 	player.global_position = position
 	player.play()
 	player.finished.connect(player.queue_free)

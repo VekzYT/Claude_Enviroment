@@ -1,15 +1,4 @@
-# Godot 4 local editor cache and imported-resource metadata (regenerated automatically)
+# Godot's import cache and generated import metadata. Both are rebuilt from the
+# source assets the first time the project is opened.
 .godot/
-.import/
-
-# Exported builds
-export/
-*.pck
-*.exe
-*.x86_64
-*.app
-*.dmg
-
-# OS junk
-.DS_Store
-Thumbs.db
+*.import

@@ -12,9 +12,14 @@ uniform sampler2D ground_rough : filter_linear_mipmap, repeat_enable, hint_defau
 uniform sampler2D cliff_albedo : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D cliff_normal : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform sampler2D cliff_rough : filter_linear_mipmap, repeat_enable, hint_default_white;
+uniform sampler2D dirt_albedo : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D dirt_normal : hint_normal, filter_linear_mipmap, repeat_enable;
+uniform sampler2D dirt_rough : filter_linear_mipmap, repeat_enable, hint_default_white;
 
 uniform vec4 ground_tint : source_color = vec4(0.60, 0.60, 0.55, 1.0);
 uniform vec4 cliff_tint : source_color = vec4(0.62, 0.62, 0.63, 1.0);
+uniform vec4 dirt_tint : source_color = vec4(0.78, 0.70, 0.58, 1.0);
+uniform float dirt_tile = 8.0;
 uniform float ground_tile = 11.0;
 uniform float cliff_tile = 15.0;
 uniform float macro_tile = 160.0;
@@ -24,16 +29,21 @@ uniform float normal_strength : hint_range(0.0, 3.0) = 1.1;
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
+varying float dirt_mask;
 
 void vertex() {
 	w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	w_nrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	// Vertex colour carries how worn the ground is: roads and camps ride in the
+	// mesh itself, so their edges follow the terrain and never read as slabs.
+	dirt_mask = COLOR.r;
 }
 
 void fragment() {
 	vec2 uv_g = w_pos.xz / ground_tile;
 	vec2 uv_c = w_pos.xz / cliff_tile;
 	vec2 uv_m = w_pos.xz / macro_tile;
+	vec2 uv_d = w_pos.xz / dirt_tile;
 
 	float slope = 1.0 - clamp(w_nrm.y, 0.0, 1.0);
 	float m = smoothstep(slope_start, slope_end, slope);
@@ -46,15 +56,21 @@ void fragment() {
 	float macro = texture(ground_albedo, uv_m).r;
 	g_col *= mix(0.82, 1.18, macro);
 
-	ALBEDO = mix(g_col, c_col, m);
-	ROUGHNESS = mix(texture(ground_rough, uv_g).r, texture(cliff_rough, uv_c).r, m);
+	// Worn dirt first, then rock takes over wherever the slope is steep.
+	vec3 d_col = texture(dirt_albedo, uv_d).rgb * dirt_tint.rgb;
+	vec3 base = mix(g_col, d_col, dirt_mask);
+	ALBEDO = mix(base, c_col, m);
+
+	float r_base = mix(texture(ground_rough, uv_g).r, texture(dirt_rough, uv_d).r, dirt_mask);
+	ROUGHNESS = mix(r_base, texture(cliff_rough, uv_c).r, m);
 	METALLIC = 0.0;
 
 	// Build the tangent frame in the shader by projecting world +X onto the
 	// surface. That keeps normal mapping working without storing tangents on a
 	// 14k-vertex mesh, and stays continuous everywhere (terrain normals never
 	// point along X, so the projection never degenerates).
-	vec3 nm = mix(texture(ground_normal, uv_g).xyz, texture(cliff_normal, uv_c).xyz, m) * 2.0 - 1.0;
+	vec3 n_base = mix(texture(ground_normal, uv_g).xyz, texture(dirt_normal, uv_d).xyz, dirt_mask);
+	vec3 nm = mix(n_base, texture(cliff_normal, uv_c).xyz, m) * 2.0 - 1.0;
 	vec3 T = normalize(vec3(1.0, 0.0, 0.0) - w_nrm * w_nrm.x);
 	vec3 B = normalize(cross(T, w_nrm));
 	vec3 pn = normalize(w_nrm + (T * nm.x + B * nm.y) * normal_strength);

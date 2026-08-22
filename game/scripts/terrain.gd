@@ -49,6 +49,9 @@ const POI_CENTERS: Array[Vector2] = [
 const POI_RADII: Array[float] = [24.0, 15.0, 17.0, 20.0, 21.0, 15.0, 19.0, 27.0, 26.0]
 const POI_BLENDS: Array[float] = [18.0, 14.0, 14.0, 16.0, 16.0, 14.0, 16.0, 18.0, 22.0]
 const POI_HEIGHTS: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 12.0]
+# How bare each pad is. Roads and camps are worn to dirt; the lookout stays
+# rocky and the pond keeps some ground cover at its rim.
+const POI_DIRT: Array[float] = [1.0, 0.85, 0.8, 0.9, 0.7, 0.8, 0.95, 0.45, 0.0]
 
 # Dirt roads out of camp, graded level like a real cut road.
 const ROAD_ENDS: Array[Vector2] = [
@@ -61,6 +64,9 @@ const ROAD_HALF := 6.0
 const ROAD_BLEND := 17.0
 
 var heights: PackedFloat32Array = PackedFloat32Array()
+# 0 = full ground cover, 1 = bare dirt. Painted into vertex colour so roads and
+# clearings are part of the terrain surface instead of flat slabs laid on top.
+var dirt: PackedFloat32Array = PackedFloat32Array()
 var side: int = 0
 var built := false
 
@@ -127,6 +133,38 @@ func _flatten(p: Vector2) -> Vector2:
 		return Vector2(road_w, 0.0)
 	return Vector2(best_w, best_h)
 
+# Worn-ground mask. Edges are pushed around by noise so a road never reads as
+# a ruled line and a clearing never reads as a circle.
+func _dirt_at(p: Vector2, edge_noise: FastNoiseLite) -> float:
+	var wobble: float = edge_noise.get_noise_2d(p.x, p.y) * 5.5
+	var best: float = 0.0
+	for i in POI_CENTERS.size():
+		if POI_DIRT[i] <= 0.0:
+			continue
+		var d: float = p.distance_to(POI_CENTERS[i]) + wobble
+		var core: float = POI_RADII[i] * 0.8
+		var edge: float = POI_RADII[i] + 5.0
+		var w: float = 0.0
+		if d <= core:
+			w = 1.0
+		elif d < edge:
+			w = _smoothstep01(1.0 - (d - core) / (edge - core))
+		w *= POI_DIRT[i]
+		if w > best:
+			best = w
+	var seg: int = 0
+	while seg + 1 < ROAD_ENDS.size():
+		var d: float = _distance_to_segment(p, ROAD_ENDS[seg], ROAD_ENDS[seg + 1]) + wobble
+		var w: float = 0.0
+		if d <= ROAD_HALF * 0.8:
+			w = 1.0
+		elif d < ROAD_HALF + 4.0:
+			w = _smoothstep01(1.0 - (d - ROAD_HALF * 0.8) / (ROAD_HALF + 4.0 - ROAD_HALF * 0.8))
+		if w > best:
+			best = w
+		seg += 2
+	return best
+
 func _raw_height(x: float, z: float, hills: FastNoiseLite, detail: FastNoiseLite, ridge: FastNoiseLite) -> float:
 	var h: float = hills.get_noise_2d(x, z) * HILL_AMP
 	h += detail.get_noise_2d(x, z) * DETAIL_AMP
@@ -162,7 +200,14 @@ func _bake_heights() -> void:
 	ridge.frequency = 0.011
 	ridge.fractal_octaves = 3
 
+	var edge_noise := FastNoiseLite.new()
+	edge_noise.seed = 5519
+	edge_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	edge_noise.frequency = 0.035
+	edge_noise.fractal_octaves = 2
+
 	heights.resize(side * side)
+	dirt.resize(side * side)
 	for iz in side:
 		var z: float = -HALF + float(iz) * CELL
 		for ix in side:
@@ -171,6 +216,7 @@ func _bake_heights() -> void:
 			var f: Vector2 = _flatten(Vector2(x, z))
 			var blended: float = raw + (f.y - raw) * f.x
 			heights[iz * side + ix] = blended
+			dirt[iz * side + ix] = _dirt_at(Vector2(x, z), edge_noise)
 
 func _grid_height(ix: int, iz: int) -> float:
 	var cx: int = clampi(ix, 0, side - 1)
@@ -222,9 +268,11 @@ func _build_mesh_and_collider() -> void:
 	var verts := PackedVector3Array()
 	var norms := PackedVector3Array()
 	var uvs := PackedVector2Array()
+	var cols := PackedColorArray()
 	verts.resize(vcount)
 	norms.resize(vcount)
 	uvs.resize(vcount)
+	cols.resize(vcount)
 
 	for iz in side:
 		var z: float = -HALF + float(iz) * CELL
@@ -241,6 +289,8 @@ func _build_mesh_and_collider() -> void:
 			var hu: float = _grid_height(ix, iz + 1)
 			norms[idx] = Vector3(hl - hr, 2.0 * CELL, hd - hu).normalized()
 			uvs[idx] = Vector2(x, z)
+			var dv: float = dirt[idx]
+			cols[idx] = Color(dv, dv, dv, 1.0)
 
 	var quads: int = side - 1
 	var indices := PackedInt32Array()
@@ -254,18 +304,22 @@ func _build_mesh_and_collider() -> void:
 			var v10: int = iz * side + ix + 1
 			var v01: int = (iz + 1) * side + ix
 			var v11: int = (iz + 1) * side + ix + 1
+			# Wind so the surface faces up. Godot builds a triangle's plane as
+			# (p1-p3) x (p1-p2); the opposite order points the normal into the
+			# ground, which makes the mesh backface-cull from above and lets a
+			# body fall straight through the collider.
 			indices[i] = v00
-			indices[i + 1] = v01
-			indices[i + 2] = v10
+			indices[i + 1] = v10
+			indices[i + 2] = v01
 			indices[i + 3] = v10
-			indices[i + 4] = v01
-			indices[i + 5] = v11
+			indices[i + 4] = v11
+			indices[i + 5] = v01
 			faces[i] = verts[v00]
-			faces[i + 1] = verts[v01]
-			faces[i + 2] = verts[v10]
+			faces[i + 1] = verts[v10]
+			faces[i + 2] = verts[v01]
 			faces[i + 3] = verts[v10]
-			faces[i + 4] = verts[v01]
-			faces[i + 5] = verts[v11]
+			faces[i + 4] = verts[v11]
+			faces[i + 5] = verts[v01]
 			i += 6
 
 	var arrays := []
@@ -273,6 +327,7 @@ func _build_mesh_and_collider() -> void:
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = norms
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_COLOR] = cols
 	arrays[Mesh.ARRAY_INDEX] = indices
 
 	var mesh := ArrayMesh.new()
@@ -284,6 +339,8 @@ func _build_mesh_and_collider() -> void:
 	mmi.material_override = _terrain_material()
 	add_child(mmi)
 
+	_build_skirt(verts)
+
 	var shape := ConcavePolygonShape3D.new()
 	shape.set_faces(faces)
 	var body := StaticBody3D.new()
@@ -292,6 +349,52 @@ func _build_mesh_and_collider() -> void:
 	cs.shape = shape
 	body.add_child(cs)
 	add_child(body)
+
+# The height grid stops at HALF, which left a hard black gap between the last
+# triangle and the sky. This carries the outer edge of the sheet far past the
+# view distance, seamlessly, so the ground always meets the horizon.
+func _build_skirt(verts: PackedVector3Array) -> void:
+	const OUTER := 1500.0
+	var k: float = OUTER / HALF
+	var ring: PackedInt32Array = PackedInt32Array()
+	# Walk the grid boundary once, in order.
+	for ix in side:
+		ring.append(ix)
+	for iz in range(1, side):
+		ring.append(iz * side + side - 1)
+	for ix in range(side - 2, -1, -1):
+		ring.append((side - 1) * side + ix)
+	for iz in range(side - 2, 0, -1):
+		ring.append(iz * side)
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in ring.size():
+		var a: Vector3 = verts[ring[i]]
+		var b: Vector3 = verts[ring[(i + 1) % ring.size()]]
+		# Outer points map the square outward, so the seam stays exact.
+		var ao := Vector3(a.x * k, -18.0, a.z * k)
+		var bo := Vector3(b.x * k, -18.0, b.z * k)
+		st.set_color(Color(0.0, 0.0, 0.0, 1.0))
+		st.set_uv(Vector2(a.x, a.z))
+		st.add_vertex(a)
+		st.set_uv(Vector2(bo.x, bo.z))
+		st.add_vertex(bo)
+		st.set_uv(Vector2(b.x, b.z))
+		st.add_vertex(b)
+		st.set_uv(Vector2(a.x, a.z))
+		st.add_vertex(a)
+		st.set_uv(Vector2(ao.x, ao.z))
+		st.add_vertex(ao)
+		st.set_uv(Vector2(bo.x, bo.z))
+		st.add_vertex(bo)
+	st.generate_normals()
+	var inst := MeshInstance3D.new()
+	inst.name = "HorizonSkirt"
+	inst.mesh = st.commit()
+	inst.material_override = _terrain_material()
+	inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(inst)
 
 func _terrain_material() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
@@ -302,8 +405,13 @@ func _terrain_material() -> ShaderMaterial:
 	mat.set_shader_parameter("cliff_albedo", load("res://textures/rock_albedo.jpg"))
 	mat.set_shader_parameter("cliff_normal", load("res://textures/rock_normal.jpg"))
 	mat.set_shader_parameter("cliff_rough", load("res://textures/rock_rough.jpg"))
-	mat.set_shader_parameter("ground_tint", Color(0.6, 0.6, 0.55, 1.0))
-	mat.set_shader_parameter("cliff_tint", Color(0.62, 0.62, 0.63, 1.0))
+	mat.set_shader_parameter("dirt_albedo", load("res://textures/dirt_albedo.jpg"))
+	mat.set_shader_parameter("dirt_normal", load("res://textures/dirt_normal.jpg"))
+	mat.set_shader_parameter("dirt_rough", load("res://textures/dirt_rough.jpg"))
+	mat.set_shader_parameter("dirt_tint", Color(0.60, 0.53, 0.42, 1.0))
+	mat.set_shader_parameter("dirt_tile", 8.0)
+	mat.set_shader_parameter("ground_tint", Color(0.50, 0.62, 0.36, 1.0))
+	mat.set_shader_parameter("cliff_tint", Color(0.58, 0.56, 0.54, 1.0))
 	mat.set_shader_parameter("ground_tile", 11.0)
 	mat.set_shader_parameter("cliff_tile", 15.0)
 	mat.set_shader_parameter("macro_tile", 160.0)
@@ -317,9 +425,9 @@ func _terrain_material() -> ShaderMaterial:
 func _build_backdrop_mountains() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 8812
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.40, 0.42, 0.46, 1.0)
-	mat.roughness = 1.0
+	# Reusing the terrain material means distant peaks get the same slope-blended
+	# rock as the ground instead of reading as flat grey cardboard.
+	var mat: ShaderMaterial = _terrain_material()
 	var snow := StandardMaterial3D.new()
 	snow.albedo_color = Color(0.80, 0.83, 0.88, 1.0)
 	snow.roughness = 0.85
@@ -380,7 +488,7 @@ func _make_peak_mesh(radius: float, peak: float, rng: RandomNumberGenerator) -> 
 			var warp: float = 1.0 + n.get_noise_2d(cos(a) * 2.0, sin(a) * 2.0) * 0.30
 			var rad: float = radius * rt * warp
 			var hgt: float = peak * pow(1.0 - rt, 1.7)
-			hgt += n.get_noise_2d(cos(a) * 3.0 + rt * 4.0, sin(a) * 3.0) * peak * 0.10 * (1.0 - rt)
+			hgt += n.get_noise_2d(cos(a) * 3.0 + rt * 4.0, sin(a) * 3.0) * peak * 0.09 * (1.0 - rt) * rt
 			pts.append(Vector3(cos(a) * rad, hgt, sin(a) * rad))
 	var apex := Vector3(0.0, peak, 0.0)
 

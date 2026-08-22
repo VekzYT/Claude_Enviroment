@@ -1,10 +1,26 @@
-# Syfon v2.1 — Dead Woods
+# Syfon v2.2 — Dead Woods
 
 A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release is the world build: a **huge, dense forest** you can get genuinely lost in.
 
-Starts at a real main menu with settings, then drops you into an abandoned survivor camp in the middle of a forest of rolling hills and four mountain massifs — around 1,400 trees across four species, deadfall, bushes, ferns, wildflowers, boulders and 18,000 blades of undergrowth, all swaying in the wind under a cold overcast sky. Four dirt roads run out of the camp to eight other locations to find: a ranger watchtower you can climb, an abandoned cabin with a collapsed roof, a crashed convoy, chapel ruins, a radio tower with a red beacon, a graveyard clearing, a black-water pond, and a raised rocky lookout. A compass, a landmark-discovery system, and eight scattered supply caches guide the exploring.
+Starts at a real main menu with settings, then drops you into an abandoned survivor camp in a forest of rolling hills and four mountain massifs — around 1,400 trees across four species, deadfall, bushes, ferns, wildflowers, boulders and 18,000 blades of undergrowth, all swaying in the wind under a cold overcast sky. Dirt tracks wind out of camp to eight other locations to find. A compass, a landmark-discovery system and eight supply caches guide the exploring.
 
 **Zombies are not in yet** — this release intentionally clears out the old human soldier bots so the world can be built first.
+
+## What's new in v2.2
+
+**Fixed: could not move.** The terrain's triangles were wound the wrong way round. Godot builds a triangle's plane as `(p1-p3) x (p1-p2)`, and the opposite order points the surface normal *into* the ground — so the collider only existed from below and the mesh was backface-culled from above. The player dropped through the surface and jammed inside it. Verified fixed by driving the character 16.5 m in a headless run: `on_floor = true`, and the player's feet track the terrain height to within a millimetre.
+
+**Fixed: 3D sounds threw an error and went silent.** `Sound.play_3d()` parents each new player to `get_tree().current_scene`, which is null during scene changes. It now falls back to the always-present autoload.
+
+**Much less blocky.**
+
+- Roads and clearings were flat rectangular slabs laid on the ground — the single biggest offender. They are now painted into the terrain itself through a vertex-colour wear mask, with noise-warped edges, so a track wanders and follows the hills instead of reading as a ruled tan rectangle.
+- The horizon ended in a hard black band where the height grid stopped. A skirt now carries the ground out to 1,500 m, seamlessly welded to the edge of the sheet.
+- Distant peaks were flat grey cardboard; they now wear the same slope-blended terrain material as the ground, and their summits no longer pick up a noise notch.
+- Camp tents were boxes with slab roofs. They are proper A-frames now, feet on the ground and meeting at a ridge.
+- The palette was drab grey gravel throughout. The ground reads as forest floor again, the sky is overcast rather than black, and undergrowth is bright enough to look like grass instead of debris.
+
+*Verified by actually running the engine this time* — a headless Godot 4.3 build renders the scene, drives the character, and reports zero script or shader errors.
 
 ## What's new in v2.1
 

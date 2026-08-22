@@ -560,7 +560,7 @@ func _scatter_ferns() -> void:
 			var shade: float = rng.randf_range(0.66, 1.22)
 			col.append(Color(shade * 0.9, shade, shade * 0.8, 1.0))
 	_add_multimesh("Ferns", _cross_quad_mesh(0.42, 0.85),
-		_foliage_material(Color(0.095, 0.160, 0.080, 1.0), Color(0.205, 0.290, 0.130, 1.0), 0.85, 0.09, 1.5),
+		_foliage_material(Color(0.140, 0.210, 0.095, 1.0), Color(0.300, 0.380, 0.160, 1.0), 0.85, 0.09, 1.5),
 		xf, col, false)
 
 func _scatter_undergrowth() -> void:
@@ -580,8 +580,8 @@ func _scatter_undergrowth() -> void:
 			col.append(Color(shade, shade, shade * 0.9, 1.0))
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/grass_wind.gdshader") as Shader
-	mat.set_shader_parameter("root_color", Color(0.095, 0.130, 0.070, 1.0))
-	mat.set_shader_parameter("tip_color", Color(0.250, 0.310, 0.140, 1.0))
+	mat.set_shader_parameter("root_color", Color(0.150, 0.190, 0.090, 1.0))
+	mat.set_shader_parameter("tip_color", Color(0.380, 0.450, 0.190, 1.0))
 	mat.set_shader_parameter("blade_height", 0.34)
 	_add_multimesh("Undergrowth", _cross_quad_mesh(0.055, 0.34), mat, xf, col, false)
 

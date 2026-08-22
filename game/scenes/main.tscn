@@ -1,4 +1,4 @@
-[gd_scene load_steps=46 format=3]
+[gd_scene load_steps=45 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="2_hud"]
@@ -26,10 +26,10 @@
 [ext_resource type="Texture2D" path="res://textures/rock_rough.jpg" id="26_rock_rough"]
 
 [sub_resource type="ProceduralSkyMaterial" id="Sky_overcast"]
-sky_top_color = Color(0.16, 0.18, 0.2, 1)
-sky_horizon_color = Color(0.42, 0.4, 0.36, 1)
-ground_bottom_color = Color(0.07, 0.07, 0.06, 1)
-ground_horizon_color = Color(0.3, 0.28, 0.25, 1)
+sky_top_color = Color(0.21, 0.24, 0.28, 1)
+sky_horizon_color = Color(0.54, 0.54, 0.52, 1)
+ground_bottom_color = Color(0.26, 0.27, 0.25, 1)
+ground_horizon_color = Color(0.47, 0.47, 0.44, 1)
 sun_angle_max = 60.0
 sun_curve = 0.2
 
@@ -55,7 +55,7 @@ glow_intensity = 0.22
 glow_bloom = 0.04
 glow_hdr_threshold = 1.3
 fog_enabled = true
-fog_light_color = Color(0.44, 0.47, 0.45, 1)
+fog_light_color = Color(0.60, 0.63, 0.62, 1)
 fog_light_energy = 0.8
 fog_density = 0.0058
 fog_sky_affect = 0.55
@@ -66,9 +66,9 @@ volumetric_fog_albedo = Color(0.6, 0.63, 0.6, 1)
 volumetric_fog_emission = Color(0.03, 0.035, 0.033, 1)
 volumetric_fog_length = 140.0
 adjustment_enabled = true
-adjustment_brightness = 0.96
+adjustment_brightness = 0.98
 adjustment_contrast = 1.08
-adjustment_saturation = 0.68
+adjustment_saturation = 0.80
 
 [sub_resource type="BoxMesh" id="BoxMesh_unit"]
 size = Vector3(1, 1, 1)
@@ -91,16 +91,6 @@ size = Vector3(400, 60, 3)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_bound_ew"]
 size = Vector3(3, 60, 400)
-
-[sub_resource type="StandardMaterial3D" id="Mat_dirt"]
-albedo_color = Color(0.72, 0.68, 0.62, 1)
-albedo_texture = ExtResource("12_dirt_albedo")
-roughness = 0.96
-roughness_texture = ExtResource("14_dirt_rough")
-normal_enabled = true
-normal_texture = ExtResource("13_dirt_normal")
-normal_scale = 1.1
-uv1_scale = Vector3(24, 3, 1)
 
 [sub_resource type="StandardMaterial3D" id="Mat_dirt_clearing"]
 albedo_color = Color(0.72, 0.68, 0.62, 1)
@@ -250,40 +240,6 @@ shape = SubResource("BoxShape3D_bound_ew")
 position = Vector3(-196, 28, 0)
 shape = SubResource("BoxShape3D_bound_ew")
 
-[node name="RoadEast" type="MeshInstance3D" parent="."]
-position = Vector3(65, 0.035, 20)
-rotation_degrees = Vector3(0, -17.103, 0)
-scale = Vector3(136.01, 0.06, 9)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("Mat_dirt")
-
-[node name="RoadWest" type="MeshInstance3D" parent="."]
-position = Vector3(-60, 0.035, 47.5)
-rotation_degrees = Vector3(0, -141.633, 0)
-scale = Vector3(153.05, 0.06, 9)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("Mat_dirt")
-
-[node name="RoadNorth" type="MeshInstance3D" parent="."]
-position = Vector3(-20, 0.035, -65)
-rotation_degrees = Vector3(0, 107.103, 0)
-scale = Vector3(136.01, 0.06, 9)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("Mat_dirt")
-
-[node name="RoadSouth" type="MeshInstance3D" parent="."]
-position = Vector3(15, 0.035, 70)
-rotation_degrees = Vector3(0, -77.905, 0)
-scale = Vector3(143.18, 0.06, 9)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("Mat_dirt")
-
-[node name="CampClearing" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.075, 0)
-scale = Vector3(34, 0.06, 34)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("Mat_dirt_clearing")
-
 [node name="ForestScatter" type="Node3D" parent="."]
 script = ExtResource("6_forest")
 terrain_path = NodePath("../Terrain")
@@ -296,20 +252,7 @@ position = Vector3(60, 0.16, -30)
 mesh = SubResource("PlaneMesh_pond")
 surface_material_override/0 = SubResource("ShaderMat_pond")
 
-[node name="PondBasin" type="MeshInstance3D" parent="."]
-position = Vector3(60, 0.05, -30)
-scale = Vector3(50, 0.06, 50)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("Mat_dirt_clearing")
-
 [node name="CampTentA" type="StaticBody3D" parent="."]
-
-[node name="CampTentABody" type="MeshInstance3D" parent="CampTentA"]
-position = Vector3(-8, 1, -7)
-rotation_degrees = Vector3(0, 18, 0)
-scale = Vector3(4, 2, 5)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("Mat_canvas")
 
 [node name="CampTentAShape" type="CollisionShape3D" parent="CampTentA"]
 position = Vector3(-8, 1, -7)
@@ -318,27 +261,20 @@ scale = Vector3(4, 2, 5)
 shape = SubResource("BoxShape3D_unit")
 
 [node name="CampTentARoofL" type="MeshInstance3D" parent="."]
-position = Vector3(-9.05, 2.5, -7)
-rotation_degrees = Vector3(0, 18, 40)
-scale = Vector3(3.2, 0.16, 5.2)
+position = Vector3(-8.761, 1.150, -6.753)
+rotation_degrees = Vector3(0, 18, 55.18)
+scale = Vector3(2.802, 0.12, 5.0)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("Mat_canvas")
 
 [node name="CampTentARoofR" type="MeshInstance3D" parent="."]
-position = Vector3(-6.95, 2.5, -7)
-rotation_degrees = Vector3(0, 18, -40)
-scale = Vector3(3.2, 0.16, 5.2)
+position = Vector3(-7.239, 1.150, -7.247)
+rotation_degrees = Vector3(0, 18, -55.18)
+scale = Vector3(2.802, 0.12, 5.0)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("Mat_canvas")
 
 [node name="CampTentB" type="StaticBody3D" parent="."]
-
-[node name="CampTentBBody" type="MeshInstance3D" parent="CampTentB"]
-position = Vector3(9, 0.9, -9)
-rotation_degrees = Vector3(0, -32, 0)
-scale = Vector3(3.6, 1.8, 4.4)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("Mat_canvas")
 
 [node name="CampTentBShape" type="CollisionShape3D" parent="CampTentB"]
 position = Vector3(9, 0.9, -9)
@@ -347,16 +283,16 @@ scale = Vector3(3.6, 1.8, 4.4)
 shape = SubResource("BoxShape3D_unit")
 
 [node name="CampTentBRoofL" type="MeshInstance3D" parent="."]
-position = Vector3(8.05, 2.25, -9)
-rotation_degrees = Vector3(0, -32, 40)
-scale = Vector3(2.9, 0.16, 4.6)
+position = Vector3(8.385, 1.000, -9.384)
+rotation_degrees = Vector3(0, -32, 54.06)
+scale = Vector3(2.470, 0.12, 4.4)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("Mat_canvas")
 
 [node name="CampTentBRoofR" type="MeshInstance3D" parent="."]
-position = Vector3(9.95, 2.25, -9)
-rotation_degrees = Vector3(0, -32, -40)
-scale = Vector3(2.9, 0.16, 4.6)
+position = Vector3(9.615, 1.000, -8.616)
+rotation_degrees = Vector3(0, -32, -54.06)
+scale = Vector3(2.470, 0.12, 4.4)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("Mat_canvas")
 
@@ -1088,12 +1024,6 @@ surface_material_override/0 = SubResource("Mat_dirt_clearing")
 position = Vector3(31, 0.12, 141.6)
 rotation_degrees = Vector3(0, -24, 0)
 scale = Vector3(1.5, 0.24, 2.6)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("Mat_dirt_clearing")
-
-[node name="GraveClearingDirt" type="MeshInstance3D" parent="."]
-position = Vector3(30, 0.075, 140)
-scale = Vector3(26, 0.05, 26)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("Mat_dirt_clearing")
 
