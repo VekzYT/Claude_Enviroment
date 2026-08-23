@@ -1,4 +1,4 @@
-[gd_scene load_steps=51 format=3]
+[gd_scene load_steps=53 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="2_hud"]
@@ -13,6 +13,8 @@
 [ext_resource type="Script" path="res://scripts/chopping_block.gd" id="31_block"]
 [ext_resource type="Script" path="res://scripts/map_table.gd" id="32_maptable"]
 [ext_resource type="Script" path="res://scripts/map_screen.gd" id="33_mapscreen"]
+[ext_resource type="Script" path="res://scripts/campfire.gd" id="34_campfire"]
+[ext_resource type="Script" path="res://scripts/inventory_screen.gd" id="35_pack"]
 [ext_resource type="Script" path="res://scripts/landmarks.gd" id="7_landmarks"]
 [ext_resource type="Shader" path="res://shaders/ocean.gdshader" id="8_water"]
 [ext_resource type="Texture2D" path="res://textures/dirt_albedo.jpg" id="12_dirt_albedo"]
@@ -302,38 +304,9 @@ scale = Vector3(2.470, 0.12, 4.4)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("Mat_canvas")
 
-[node name="CampfireRing" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.15, -2)
-scale = Vector3(2.4, 0.3, 2.4)
-mesh = SubResource("CylinderMesh_unit")
-surface_material_override/0 = SubResource("Mat_rock")
-
-[node name="CampfireLogA" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.35, -2)
-rotation_degrees = Vector3(0, 25, 78)
-scale = Vector3(0.22, 2.2, 0.22)
-mesh = SubResource("CylinderMesh_unit")
-surface_material_override/0 = SubResource("Mat_wood_dark")
-
-[node name="CampfireLogB" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.35, -2)
-rotation_degrees = Vector3(0, -50, 78)
-scale = Vector3(0.22, 2.2, 0.22)
-mesh = SubResource("CylinderMesh_unit")
-surface_material_override/0 = SubResource("Mat_wood_dark")
-
-[node name="CampfireEmbers" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.22, -2)
-scale = Vector3(1.1, 0.16, 1.1)
-mesh = SubResource("CylinderMesh_unit")
-surface_material_override/0 = SubResource("Mat_ember")
-
-[node name="CampfireLight" type="OmniLight3D" parent="."]
-position = Vector3(0, 1.1, -2)
-light_color = Color(1, 0.55, 0.22, 1)
-light_energy = 2.6
-omni_range = 16.0
-shadow_enabled = true
+[node name="Campfire" type="Node3D" parent="."]
+position = Vector3(0, 0, -2)
+script = ExtResource("34_campfire")
 
 [node name="CampBarricadeA" type="StaticBody3D" parent="."]
 
@@ -1458,6 +1431,9 @@ map_screen_path = NodePath("../MapScreen")
 
 [node name="MapScreen" type="CanvasLayer" parent="." groups=["map_screen"]]
 script = ExtResource("33_mapscreen")
+
+[node name="InventoryScreen" type="CanvasLayer" parent="." groups=["inventory_screen"]]
+script = ExtResource("35_pack")
 
 [node name="CabinDetail" type="Node3D" parent="."]
 script = ExtResource("29_cabin")

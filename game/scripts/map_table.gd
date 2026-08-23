@@ -13,7 +13,7 @@ func _ready() -> void:
 
 func _build() -> void:
 	var paper := StandardMaterial3D.new()
-	paper.albedo_color = Color(0.78, 0.72, 0.56)
+	paper.albedo_color = Color(0.86, 0.80, 0.63)
 	paper.roughness = 0.95
 	var ink := StandardMaterial3D.new()
 	ink.albedo_color = Color(0.30, 0.24, 0.16)
@@ -26,7 +26,7 @@ func _build() -> void:
 	sheet.name = "Sheet"
 	sheet.mesh = box
 	sheet.material_override = paper
-	sheet.scale = Vector3(0.62, 0.012, 0.46)
+	sheet.scale = Vector3(0.78, 0.014, 0.58)
 	sheet.rotation_degrees = Vector3(0, 12, 0)
 	add_child(sheet)
 
@@ -55,9 +55,12 @@ func _build() -> void:
 
 	var shape := CollisionShape3D.new()
 	var area := BoxShape3D.new()
-	area.size = Vector3(1.1, 0.9, 1.0)
+	# Hugs the sheet on the table top. A tall box centred above it looked fine
+	# from across the room but was impossible to hit up close, because looking
+	# down at the map sent the ray over the top of the volume.
+	area.size = Vector3(0.9, 0.16, 0.72)
 	shape.shape = area
-	shape.position = Vector3(0, 0.3, 0)
+	shape.position = Vector3(0, 0.03, 0)
 	add_child(shape)
 
 func prompt_for(_player: Node) -> String:
@@ -68,5 +71,10 @@ func interact(_player: Node) -> void:
 		screen = get_node_or_null(map_screen_path)
 	if screen == null:
 		screen = get_tree().get_first_node_in_group("map_screen")
-	if screen != null:
-		screen.call("open_map")
+	if screen == null:
+		return
+	var first_time: bool = not GameState.map_known
+	GameState.learn_map()
+	screen.call("open_map")
+	if first_time:
+		GameState.announce("Map memorised. Press M to open it anywhere.")

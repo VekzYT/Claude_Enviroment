@@ -127,3 +127,42 @@ func spawn_wood_chips(position: Vector3, normal: Vector3) -> void:
 	particles.emitting = true
 	particles.finished.connect(particles.queue_free)
 
+
+# A canopy coming apart when the tree hits the ground.
+func spawn_leaf_burst(position: Vector3, tint: Color, count: int = 26) -> void:
+	var particles := GPUParticles3D.new()
+	var mat := ParticleProcessMaterial.new()
+	mat.direction = Vector3(0, 1, 0)
+	mat.spread = 180.0
+	mat.initial_velocity_min = 1.0
+	mat.initial_velocity_max = 4.2
+	mat.gravity = Vector3(0.0, -2.4, 0.0)
+	mat.scale_min = 0.6
+	mat.scale_max = 1.6
+	mat.damping_min = 1.2
+	mat.damping_max = 3.0
+	# Leaves flutter rather than fall straight: a little spin on the way down.
+	mat.angular_velocity_min = -220.0
+	mat.angular_velocity_max = 220.0
+	mat.color = tint
+
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(0.16, 0.11)
+	var leaf_mat := StandardMaterial3D.new()
+	leaf_mat.albedo_color = tint
+	leaf_mat.roughness = 0.95
+	leaf_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	leaf_mat.vertex_color_use_as_albedo = true
+	mesh.material = leaf_mat
+
+	particles.process_material = mat
+	particles.draw_pass_1 = mesh
+	particles.amount = count
+	particles.lifetime = 2.6
+	particles.one_shot = true
+	particles.explosiveness = 0.85
+	_host().add_child(particles)
+	particles.global_position = position
+	particles.emitting = true
+	# Particles do not free themselves; one_shot bursts would pile up otherwise.
+	particles.finished.connect(particles.queue_free)

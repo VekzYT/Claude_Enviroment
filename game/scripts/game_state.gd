@@ -17,6 +17,10 @@ signal day_changed(day: int)
 signal time_changed(time_of_day: float)
 signal carry_changed(carrying: bool)
 signal map_visibility_changed(open: bool)
+signal inventory_visibility_changed(open: bool)
+signal hunger_changed(fraction: float)
+signal apples_changed(count: int)
+signal map_known_changed(known: bool)
 
 const SUPPLIES_TOTAL := 8
 # The horde is not implemented yet, but everything counts down to it: the day
@@ -38,6 +42,13 @@ var day := 1
 var time_of_day := 0.30
 var carrying_log := false
 var map_open := false
+var inventory_open := false
+# 1 is full, 0 is starving. Drains over roughly three days of walking around.
+var hunger := 1.0
+var apples := 0
+# Set the first time the chart on the cabin table is read; after that the map
+# can be opened from anywhere.
+var map_known := false
 
 func add_point() -> void:
 	score += 1
@@ -108,6 +119,29 @@ func set_map_open(value: bool) -> void:
 	map_open = value
 	map_visibility_changed.emit(map_open)
 
+func set_inventory_open(value: bool) -> void:
+	if value == inventory_open:
+		return
+	inventory_open = value
+	inventory_visibility_changed.emit(inventory_open)
+
+func set_hunger(fraction: float) -> void:
+	var f: float = clampf(fraction, 0.0, 1.0)
+	if is_equal_approx(f, hunger):
+		return
+	hunger = f
+	hunger_changed.emit(hunger)
+
+func add_apples(count: int) -> void:
+	apples = maxi(apples + count, 0)
+	apples_changed.emit(apples)
+
+func learn_map() -> void:
+	if map_known:
+		return
+	map_known = true
+	map_known_changed.emit(map_known)
+
 func days_until_horde() -> int:
 	return maxi(HORDE_DAY - day, 0)
 
@@ -132,6 +166,14 @@ func reset() -> void:
 	carry_changed.emit(carrying_log)
 	map_open = false
 	map_visibility_changed.emit(map_open)
+	inventory_open = false
+	inventory_visibility_changed.emit(inventory_open)
+	hunger = 1.0
+	hunger_changed.emit(hunger)
+	apples = 0
+	apples_changed.emit(apples)
+	map_known = false
+	map_known_changed.emit(map_known)
 	held_item = "Bare hands"
 	held_item_changed.emit(held_item)
 	interact_prompt = ""

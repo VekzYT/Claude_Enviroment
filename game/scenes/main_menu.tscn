@@ -95,7 +95,7 @@ offset_right = 300.0
 offset_bottom = -139.0
 mouse_filter = 2
 horizontal_alignment = 1
-text = "TEN DAYS"
+text = "PROVISIONS"
 
 [node name="Tagline" type="Label" parent="."]
 anchor_left = 0.5

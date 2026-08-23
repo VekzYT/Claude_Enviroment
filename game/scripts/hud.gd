@@ -45,6 +45,7 @@ var health_fill: ColorRect
 var health_lag: ColorRect
 var health_value: Label
 var stamina_fill: ColorRect
+var hunger_fill: ColorRect
 
 var item_card: PanelContainer
 var item_icon: Panel
@@ -88,6 +89,7 @@ func _ready() -> void:
 
 	GameState.health_changed.connect(_on_health_changed)
 	GameState.stamina_changed.connect(_on_stamina_changed)
+	GameState.hunger_changed.connect(_on_hunger_changed)
 	GameState.weapon_changed.connect(_on_weapon_changed)
 	GameState.scope_active_changed.connect(_on_scope_active_changed)
 	GameState.knife_cooldown_changed.connect(_on_knife_cooldown_changed)
@@ -106,6 +108,7 @@ func _ready() -> void:
 	health_lag_value = float(last_health)
 	_on_health_changed(GameState.player_health)
 	_on_stamina_changed(GameState.stamina)
+	_on_hunger_changed(GameState.hunger)
 	_on_weapon_changed(GameState.current_weapon)
 	_on_scope_active_changed(GameState.scope_active)
 	_on_knife_cooldown_changed(GameState.knife_cooldown_fraction)
@@ -386,6 +389,12 @@ func _build_vitals() -> void:
 	stamina_fill = stamina_holder[1]
 	column.add_child(stamina_holder[0])
 
+	# Food sits under wind, because running on an empty stomach is what makes
+	# both of them matter at the same time.
+	var hunger_holder: Array = _bar(BAR_WIDTH, STAMINA_BAR_HEIGHT, Color(0.72, 0.55, 0.24))
+	hunger_fill = hunger_holder[1]
+	column.add_child(hunger_holder[0])
+
 	# Knife readiness lives under the crosshair, not down here, so it stays
 	# where the eye already is mid-fight.
 	var knife_holder: Array = _bar(64.0, 5.0, UITheme.ACCENT_DIM)
@@ -454,7 +463,7 @@ func _build_toast() -> void:
 
 func _build_hints() -> void:
 	hint_label = _label(
-		"WASD move      SHIFT sprint      SPACE jump      LMB swing      E interact      SCROLL swap      ESC pause",
+		"WASD move    SHIFT sprint    LMB swing    E interact    TAB pack    M map    F eat    SCROLL swap    ESC pause",
 		UITheme.body_light(), 14, UITheme.TEXT_FAINT, HORIZONTAL_ALIGNMENT_CENTER)
 	hint_label.name = "Hints"
 	hint_label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -575,6 +584,16 @@ func _on_stamina_changed(fraction: float) -> void:
 		stamina_fill.color = UITheme.STAMINA
 	else:
 		stamina_fill.color = UITheme.WARN
+
+func _on_hunger_changed(fraction: float) -> void:
+	var f: float = clampf(fraction, 0.0, 1.0)
+	hunger_fill.size.x = (BAR_WIDTH - 2.0) * f
+	if f > 0.5:
+		hunger_fill.color = Color(0.72, 0.55, 0.24)
+	elif f > 0.22:
+		hunger_fill.color = UITheme.WARN
+	else:
+		hunger_fill.color = UITheme.BAD
 
 func flash_damage() -> void:
 	damage_vignette.modulate.a = 0.85

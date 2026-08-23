@@ -71,6 +71,7 @@ var side: int = 0
 var built := false
 
 func _ready() -> void:
+	add_to_group("terrain")
 	ensure_built()
 
 # Safe to call from anywhere; the first caller pays for the build. This keeps

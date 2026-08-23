@@ -29,6 +29,13 @@ const STAMINA_REGEN := 0.20
 const STAMINA_REGEN_DELAY := 0.9
 const STAMINA_SPRINT_FLOOR := 0.12
 
+# Hunger runs down over about three days of ordinary walking, faster if you
+# sprint. Empty, it starts costing health rather than killing you outright.
+const HUNGER_DRAIN := 1.0 / (3.0 * 480.0)
+const HUNGER_SPRINT_EXTRA := 2.2
+const HUNGER_STARVE_DAMAGE := 2.0
+const APPLE_RESTORE := 0.22
+
 # How hard the ground pulls you to a stop. The old code fed `speed` straight to
 # move_toward(), which is a per-call step, not a rate -- so you stopped dead in
 # a single frame and the amount depended on the frame rate.
@@ -112,6 +119,8 @@ var footstep_step := 0
 var was_on_floor := true
 var stamina := 1.0
 var stamina_idle := 0.0
+var hunger := 1.0
+var starve_tick := 0.0
 var jump_held := false
 var winded := false
 
@@ -213,7 +222,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			if GameState.map_open:
+			if GameState.map_open or GameState.inventory_open:
 				return
 			if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
 				Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -424,6 +433,20 @@ func give_item(id: int) -> void:
 	Sound.play_ui("weapon_switch", -4.0)
 	request_switch(id)
 
+# Once the chart on the cabin table has been read, the map travels with you.
+func open_map_screen() -> void:
+	if not GameState.map_known:
+		GameState.announce("You have not seen a map of the valley yet.")
+		return
+	var screen: Node = get_tree().get_first_node_in_group("map_screen")
+	if screen != null:
+		screen.call("open_map")
+
+func open_pack_screen() -> void:
+	var screen: Node = get_tree().get_first_node_in_group("inventory_screen")
+	if screen != null:
+		screen.call("open_pack")
+
 func active_weapon_index() -> int:
 	if is_switching:
 		return switch_out_index if switch_progress < 0.5 else switch_in_index
@@ -498,6 +521,7 @@ func _physics_process(delta: float) -> void:
 	var horizontal_speed := Vector2(velocity.x, velocity.z).length()
 	var moving := is_on_floor() and horizontal_speed > 0.3
 
+	update_hunger(delta, wants_sprint and moving)
 	update_interaction()
 	update_view_bob(delta, moving, horizontal_speed, input_dir.x)
 	update_switch(delta)
@@ -527,6 +551,33 @@ func update_stamina(delta: float, wants_sprint: bool) -> bool:
 			winded = false
 	GameState.set_stamina(stamina)
 	return sprinting
+
+func update_hunger(delta: float, sprinting: bool) -> void:
+	var drain: float = HUNGER_DRAIN
+	if sprinting:
+		drain *= HUNGER_SPRINT_EXTRA
+	hunger = maxf(hunger - drain * delta, 0.0)
+	GameState.set_hunger(hunger)
+	if hunger > 0.0:
+		starve_tick = 0.0
+		return
+	# Starving: a slow bleed, so you have time to do something about it.
+	starve_tick += delta
+	if starve_tick >= 4.0:
+		starve_tick = 0.0
+		take_damage(int(HUNGER_STARVE_DAMAGE))
+		GameState.announce("You are starving.")
+
+func eat_apple() -> bool:
+	if GameState.apples <= 0:
+		GameState.announce("No food in your pack.")
+		return false
+	GameState.add_apples(-1)
+	hunger = minf(hunger + APPLE_RESTORE, 1.0)
+	GameState.set_hunger(hunger)
+	GameState.announce("You eat an apple.")
+	Sound.play_ui("weapon_switch", -12.0)
+	return true
 
 func update_view_bob(delta: float, moving: bool, horizontal_speed: float, strafe_axis: float) -> void:
 	if moving:
@@ -709,7 +760,6 @@ func perform_melee_hit() -> void:
 				GameState.announce("Timber! Carry the log to your block.")
 				Sound.play_3d("land", result.position, 2.0)
 				camera_kick += deg_to_rad(6.0)
-				_drop_felled_log(outcome)
 			return
 
 	if idx == ITEM_HANDS and target is CollisionObject3D:
@@ -731,25 +781,6 @@ func perform_melee_hit() -> void:
 		Sound.play_3d("knife_hit", result.position, -2.0)
 		camera_kick += deg_to_rad(5.0)
 		GameState.trigger_hit_marker()
-
-# Leaves a carryable trunk where the tree came down.
-func _drop_felled_log(outcome: Dictionary) -> void:
-	var base: Vector3 = outcome.get("base", global_position)
-	var dropped: Node3D = log_pickup_scene.instantiate() as Node3D
-	if outcome.has("tint"):
-		dropped.set("tint", outcome["tint"])
-	var host: Node = get_parent()
-	if host == null:
-		host = get_tree().current_scene
-	host.add_child(dropped)
-	# Lying just clear of the stump, across the direction it fell.
-	var away: Vector3 = (base - global_position)
-	away.y = 0.0
-	if away.length() < 0.1:
-		away = Vector3(1, 0, 0)
-	away = away.normalized()
-	dropped.global_position = base + away * 1.6 + Vector3(0, 0.34, 0)
-	dropped.rotation.y = atan2(away.x, away.z)
 
 func shoot() -> void:
 	if not can_shoot or is_reloading:

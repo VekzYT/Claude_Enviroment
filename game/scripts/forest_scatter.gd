@@ -408,7 +408,7 @@ func _scatter_conifers() -> void:
 		pending.append({
 			"trunk": trunk_slot, "tiers": tier_slots, "cs": cs,
 			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
-			"tint": Color(0.42, 0.31, 0.20),
+			"tint": Color(0.42, 0.31, 0.20), "species": "conifer",
 		})
 
 	var trunk_mesh: CylinderMesh = _trunk_mesh()
@@ -512,7 +512,7 @@ func _scatter_broadleaf() -> void:
 		pending.append({
 			"trunk": trunk_slot, "blobs": blob_slots, "cs": cs,
 			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
-			"tint": Color(0.52, 0.43, 0.31),
+			"tint": Color(0.52, 0.43, 0.31), "species": "broadleaf",
 		})
 
 	var bark_mat: ShaderMaterial = _bark_material(Color(0.7, 0.66, 0.6, 1.0), Vector2(1.0, 2.2), 0.95)
@@ -571,7 +571,7 @@ func _scatter_dead_trees() -> void:
 		pending.append({
 			"trunk": trunk_slot, "branches": branch_slots, "cs": cs,
 			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
-			"tint": Color(0.45, 0.41, 0.34),
+			"tint": Color(0.45, 0.41, 0.34), "species": "dead",
 		})
 
 	var dead_mat: ShaderMaterial = _bark_material(Color(0.5, 0.46, 0.4, 1.0), Vector2(1.0, 2.5), 1.0)
@@ -757,6 +757,9 @@ func _place_model(path: String, prefix: String, count: int,
 
 const TREE_BASE_HP := 5
 const FALL_DURATION := 2.1
+const FRUIT_CHANCE := 0.55
+const LOG_SCENE: PackedScene = preload("res://scenes/log_pickup.tscn")
+const APPLE_SCENE: PackedScene = preload("res://scenes/apple_pickup.tscn")
 const STUMP_HEIGHT := 0.42
 
 func _register_tree(rec: Dictionary, parts: Array) -> void:
@@ -771,6 +774,7 @@ func _register_tree(rec: Dictionary, parts: Array) -> void:
 		# Carried through to the log that drops, so a birch trunk stays pale
 		# and an oak stays dark all the way to the chopping block.
 		"tint": rec.get("tint", Color(0.46, 0.35, 0.23)),
+		"species": rec.get("species", "conifer"),
 	}
 	trees.append(entry)
 	if rec["cs"] != null:
@@ -881,7 +885,91 @@ func _process(delta: float) -> void:
 		_apply_tree_rotation(a["tree"], a["axis"], angle)
 		if t < 1.0:
 			still_going.append(a)
+		elif not bool(a["shake"]):
+			_settle_felled(a["tree"], a["axis"], float(a["angle"]))
 	falling = still_going
+
+# The moment a felled tree finishes hitting the ground: the canopy bursts and
+# is taken away, the standing geometry is removed, and a carryable log is left
+# lying exactly where the trunk came to rest.
+func _settle_felled(tree: Dictionary, axis: Vector3, angle: float) -> void:
+	if bool(tree.get("settled", false)):
+		return
+	tree["settled"] = true
+
+	var base: Vector3 = tree["base"]
+	var rot := Basis(axis, angle)
+	var parts: Array = tree["parts"]
+	var tint: Color = tree["tint"]
+
+	# Everything past the trunk is canopy. Burst it where it landed.
+	for i in range(1, parts.size()):
+		var part: Dictionary = parts[i]
+		var rest: Transform3D = part["rest"]
+		var landed: Vector3 = base + rot * (rest.origin - base)
+		if i <= 3:
+			Effects.spawn_leaf_burst(landed, _leaf_tint(tree), 22)
+		_hide_part(part)
+
+	# Where the trunk ended up, and which way it is lying.
+	var trunk: Dictionary = parts[0]
+	var trunk_rest: Transform3D = trunk["rest"]
+	var trunk_origin: Vector3 = base + rot * (trunk_rest.origin - base)
+	_hide_part(trunk)
+
+	# A trunk instance is scaled so its own +Y is the length; after the fall
+	# that axis is where the log should lie.
+	var along: Vector3 = (rot * trunk_rest.basis.y).normalized()
+	along.y = 0.0
+	if along.length() < 0.05:
+		along = Vector3(1, 0, 0)
+	along = along.normalized()
+
+	var length: float = clampf(float(tree["height"]) * 0.45, 2.2, 4.6)
+	var radius: float = clampf(float(tree["radius"]) * 1.05, 0.24, 0.44)
+	var log_node: Node3D = LOG_SCENE.instantiate() as Node3D
+	log_node.set("tint", tint)
+	log_node.set("trunk_radius", radius)
+	log_node.set("trunk_length", length)
+	get_parent().add_child(log_node)
+	# Sat on the ground a little way out from the stump, along the fall line.
+	var rest_spot := Vector3(base.x, 0.0, base.z) + along * (length * 0.5 + 0.6)
+	log_node.global_position = Vector3(rest_spot.x, _ground(rest_spot.x, rest_spot.z) + radius, rest_spot.z)
+	log_node.rotation.y = atan2(along.x, along.z)
+
+	if String(tree["species"]) == "broadleaf":
+		_drop_fruit(trunk_origin, along, length)
+
+func _leaf_tint(tree: Dictionary) -> Color:
+	if String(tree["species"]) == "conifer":
+		return Color(0.22, 0.35, 0.22)
+	if String(tree["species"]) == "dead":
+		return Color(0.38, 0.33, 0.24)
+	return Color(0.34, 0.48, 0.24)
+
+# Pushes a MultiMesh instance out of sight. There is no per-instance visibility
+# flag, so it is scaled to nothing and parked under the terrain.
+func _hide_part(part: Dictionary) -> void:
+	var mm: MultiMesh = part["mm"]
+	if mm == null:
+		return
+	mm.set_instance_transform(int(part["i"]), Transform3D(
+		Basis.IDENTITY.scaled(Vector3(0.0001, 0.0001, 0.0001)),
+		Vector3(0.0, -900.0, 0.0)))
+
+# Broadleaf canopies sometimes have fruit in them.
+func _drop_fruit(near: Vector3, along: Vector3, length: float) -> void:
+	if rng.randf() > FRUIT_CHANCE:
+		return
+	var count: int = rng.randi_range(1, 3)
+	for i in count:
+		var apple: Node3D = APPLE_SCENE.instantiate() as Node3D
+		get_parent().add_child(apple)
+		var sideways: Vector3 = Vector3(-along.z, 0.0, along.x)
+		var spot: Vector3 = near \
+			+ along * rng.randf_range(-length * 0.25, length * 0.35) \
+			+ sideways * rng.randf_range(-1.2, 1.2)
+		apple.global_position = Vector3(spot.x, _ground(spot.x, spot.z) + 0.14, spot.z)
 
 func _apply_tree_rotation(tree: Dictionary, axis: Vector3, angle: float) -> void:
 	var base: Vector3 = tree["base"]

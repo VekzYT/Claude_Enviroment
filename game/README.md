@@ -1,4 +1,4 @@
-# Syfon v2.5 — Ten Days
+# Syfon v2.6 — Provisions
 
 A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release gives it a clock and a reason to hurry.
 
@@ -7,6 +7,45 @@ You wake outside a log cabin in a forest of rolling hills and four mountain mass
 There is a map on the cabin table showing the whole valley, including the three places where people are still living and still trading. The sun rises and sets, the days count up, and **on day 10 they come**.
 
 **Zombies are not in yet** — the countdown is real, the horde is not there to meet it. Everything else is built around its arrival.
+
+## What's new in v2.6
+
+### Fixed: the felled tree left a ghost
+
+Felling a tree left the whole fallen tree lying there *and* spawned a separate log a metre away — two copies of the same thing. The tree now **becomes** the log. When the trunk finishes hitting the ground:
+
+- the canopy bursts into tumbling leaves and is taken away,
+- the standing geometry is removed from the batch entirely,
+- and a carryable log is left lying **exactly where the trunk came to rest**, along the line it fell, sized and tinted from the tree it came off.
+
+### Fixed: you could not read the map
+
+The map's interaction volume was a tall box floating from y 0.73 to **1.63** — well above the sheet it belonged to. Walking up to the table and looking down at the map sent the ray straight over the top of the box and into the table, so it only worked from a couple of metres back at exactly the right angle. The trigger now hugs the sheet on the table top. The sheet is bigger and lighter too, and **reading it once memorises it** — after that, **M** opens the map anywhere.
+
+### Apples, and hunger
+
+- Felling a **broadleaf** tree has a 55% chance of shaking one to three apples out of the canopy. They sit on the ground where they fell, bobbing, and go into your pack.
+- **Hunger** runs down over about three days of ordinary walking, and more than twice as fast while sprinting. It has its own bar under stamina, going amber then red. Empty, it costs you 2 health every four seconds — a slow bleed with time to do something about it, not a death sentence.
+- **F** eats an apple, from the world or from inside the pack. One apple is 22% of a full stomach.
+
+### A pack, on Tab
+
+**Tab** or **I** opens your pack: what is in your hands (or that both are full of log), your wood, apples and supply caches, and your hunger and health as bars. **F** eats from there too. It shares the map's visual language.
+
+### The map shows the valley now
+
+It was an empty dark panel with a few pips on it. It now renders **the actual terrain**, sampled from the same `TerrainGrid` the world is built on, so it cannot go stale:
+
+- **Hillshaded relief** — the height field lit from the north-west, so ridges and valleys read as raised and sunken.
+- **Height banding** from low green through scrub and bare rock to snow, with **contour lines every 8 m**.
+- **Worn ground** — roads and cleared pads painted in from the same clearing test the forest uses to avoid them.
+- **Blackwater Pond**, drawn where it actually is.
+- A **50 m grid** and a **scale bar**, so distances mean something.
+- All ten locations, traders in amber, your position and heading.
+
+### The campfire
+
+It was a 4.8-metre stone pancake with two 2.2 m logs lying flat on it and a glowing dinner plate in the middle. It is now about 1.3 m across: a ring of eleven individual stones (some soot-blackened), an ash bed, four logs leaning into a tepee with two burnt through and fallen across the front, a bed of embers with loose coals, real flame and smoke particles, and a light that flickers on two out-of-phase waves plus noise — because a single sine reads as a fault rather than a fire.
 
 ## What's new in v2.5
 
@@ -227,7 +266,9 @@ Godot is free, open-source, and its projects are plain text files, which is what
   - **Shift** — sprint (costs stamina, shown under the health bar; run it dry and you're winded until it recovers)
   - **Mouse Wheel** — cycle through what you're actually carrying, with a draw/holster dip animation
   - **E** — interact with whatever is under the crosshair: pick up the axe, shoulder a felled log, drop it on the chopping block, read the map. With a log on your shoulder and nothing in front of you, **E** sets it down.
-  - **M** — close the map (**Esc** works too)
+  - **M** — open the map anywhere, once you've read the one on the cabin table
+  - **Tab** or **I** — open your pack
+  - **F** — eat an apple
   - **Esc** — pause (freezes the game, opens Resume / Settings / Quit to Main Menu)
 
 You start with an empty inventory. The axe on the chopping block outside the cabin is the first thing you can own — walk up to it, press **E**, then left-click to swing. Five bites drop a tree; each bite banks a wood.
@@ -275,6 +316,9 @@ game/
     chopping_block.gd           # takes a carried log and turns axe swings into wood
     map_screen.gd                # the valley map: roads, contours, locations, traders and the horde countdown
     map_table.gd                  # the chart on the cabin table that opens it
+    inventory_screen.gd            # the pack: what you carry, your materials, hunger and health
+    apple_pickup.gd                 # fruit shaken out of a broadleaf canopy when it comes down
+    campfire.gd                      # stone ring, tepee logs, embers, flame and smoke, and a light that flickers
     forest_scatter.gd         # the forest itself, and the chop registry: every tree keyed by its own collision shape, fell animation, stump pool
     target.gd                # hit/respawn logic
     bot.gd                    # patrol/chase/attack AI state machine (obstacle avoidance + combat strafing), hitscan weapon, health/respawn, sound triggers
