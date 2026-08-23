@@ -20,7 +20,7 @@ const LANDMARK_POSITIONS: Array[Vector3] = [
 	Vector3(-40.0, 0.0, -130.0),
 	Vector3(95.0, 0.0, -85.0),
 	Vector3(130.0, 0.0, 40.0),
-	Vector3(-120.0, 0.0, -95.0),
+	Vector3(-120.0, 0.0, 95.0),
 	Vector3(-150.0, 0.0, -30.0),
 	Vector3(30.0, 0.0, 140.0),
 	Vector3(60.0, 0.0, -30.0),

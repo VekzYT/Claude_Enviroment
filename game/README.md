@@ -1,10 +1,57 @@
-# Syfon v2.4 — Homestead
+# Syfon v2.5 — Ten Days
 
-A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release is the pass that makes it feel like a game rather than a prototype: a real interface, real fonts, and models with something in them besides boxes.
+A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release gives it a clock and a reason to hurry.
 
-You wake outside a log cabin in a forest of rolling hills and four mountain massifs — around 1,400 trees across four species, deadfall, bushes, ferns, wildflowers, boulders and 18,000 blades of undergrowth, all swaying in the wind under a cold overcast sky. Your inventory is empty; you have nothing but your own two hands. An axe stands buried in the chopping block on the porch. Take it, and the forest becomes a resource.
+You wake outside a log cabin in a forest of rolling hills and four mountain massifs. Your inventory is empty; you have nothing but your own two hands. An axe stands buried in the chopping block on the porch. Take it, and the forest becomes a resource — but not a free one: felling a tree gets you a **log**, and a log has to be carried home on your shoulder and split on the block before any of it is firewood.
 
-**Zombies are not in yet** — this release intentionally clears out the old human soldier bots so the world can be built first.
+There is a map on the cabin table showing the whole valley, including the three places where people are still living and still trading. The sun rises and sets, the days count up, and **on day 10 they come**.
+
+**Zombies are not in yet** — the countdown is real, the horde is not there to meet it. Everything else is built around its arrival.
+
+## What's new in v2.5
+
+### The axe swings across, not down
+
+The felling stroke was an overhead chop. It is now a horizontal right-to-left sweep: cocked back over the right shoulder through a decelerating wind-up, driven across the body on a quadratic (accelerating) arc so the head carries its weight into the cut, then a longer eased recovery back to guard. Yaw carries the arc, roll lays the bit over so the edge leads, and the arms travel sideways with it instead of punching forward.
+
+### Wood is work now
+
+Felling a tree used to hand you four wood on the spot. The loop is longer, and every step is a thing you do:
+
+1. **Fell the tree** — five bites, same as before. It drops a **carryable log** where it came down, tinted to the species it came from.
+2. **Shoulder it.** A log occupies both arms: the axe goes away, you cannot swing, you cannot sprint, and you move at 62% speed. Press **E** with nothing in front of you to set it down again.
+3. **Carry it to your chopping block** and press **E** to drop it on top.
+4. **Split it** — swing the axe at the loaded block. Each of four splits gives **3 wood** and takes a visible bite out of the round; the last one scatters the halves off the block. A whole log is **12 wood**, three times what felling used to pay, and you have to walk it home to get it.
+
+### A map, and people to trade with
+
+There is a chart weighted down on the cabin table. Press **E** to read it, **M** or **Esc** to put it down. It draws itself from the same coordinates the world is built from, so it cannot go stale: contour rings for the four mountains, the road network, and every location marked. Walking into a place fills in what you learn about it.
+
+Three of them still have people in them, marked in amber:
+
+| Place | Who's there |
+|---|---|
+| **Ranger Watchtower** | A ranger holding the tower. Rope and tools. |
+| **Crashed Convoy** | Two survivors camped in the wrecks. Fuel and ammunition. |
+| **Chapel Ruins** | A dozen people sheltering. Medicine, and news. |
+
+*(The traders are marked and described; actually bartering with them is the next piece of work.)*
+
+### Day and night, and a deadline
+
+A single `WorldClock` node owns the whole cycle so the sun, the sky, the fog and the lamps can never disagree about what time it is. A day is **eight minutes**. Over it:
+
+- The sun arcs from due east at sunrise to due west at sunset, climbing to 58° at noon, running through keyframed colour and intensity — deep blue at midnight, hard orange at dawn and dusk, pale and bright at midday.
+- The sky's top and horizon colours are keyframed separately, so dawn goes orange at the horizon while the zenith is still night.
+- Ambient light drops to a quarter after dark, the fill light turns cold blue, night fog thickens, and the sun stops casting shadows entirely rather than smearing them from below the horizon.
+- **The cabin lamps and the porch lantern come up as the light goes** — which is most of what sells dusk.
+
+The HUD gained a day chip: the day number, a dial that turns once per day, and the phase of the day. Inside the last three days the number turns amber, then red, and the caption starts counting down. Day 10 announces *"They are here."*
+
+### Fixed
+
+- **Chapel Ruins was in the wrong place.** Its landmark trigger sat at z −95 while its cleared pad is at z +95 — so it was pinned on top of the Rocky Lookout and could never be discovered where the map says it is.
+- **Interaction volumes could swallow each other.** The chopping block's trigger reaches around the axe standing in it. Anything interactable with nothing to say is now transparent to the interaction ray, which carries on to whatever is behind it.
 
 ## What's new in v2.4
 
@@ -179,7 +226,8 @@ Godot is free, open-source, and its projects are plain text files, which is what
   - **R** — reload (guns only; magazine drops out and slides back in)
   - **Shift** — sprint (costs stamina, shown under the health bar; run it dry and you're winded until it recovers)
   - **Mouse Wheel** — cycle through what you're actually carrying, with a draw/holster dip animation
-  - **E** — pick up the thing you're looking at (the prompt appears under the crosshair when something is in reach)
+  - **E** — interact with whatever is under the crosshair: pick up the axe, shoulder a felled log, drop it on the chopping block, read the map. With a log on your shoulder and nothing in front of you, **E** sets it down.
+  - **M** — close the map (**Esc** works too)
   - **Esc** — pause (freezes the game, opens Resume / Settings / Quit to Main Menu)
 
 You start with an empty inventory. The axe on the chopping block outside the cabin is the first thing you can own — walk up to it, press **E**, then left-click to swing. Five bites drop a tree; each bite banks a wood.
@@ -208,7 +256,8 @@ game/
     target.tscn             # shootable static target
     bot.tscn                 # robotic enemy: detailed kitbashed body + AI script
     settings_panel.tscn       # reusable volume/sensitivity panel, instanced into both the main menu and the pause menu
-    axe_pickup.tscn            # the starter axe in the chopping block: Area3D in the "pickup" group, tilts as it waits
+    axe_pickup.tscn            # the starter axe in the chopping block: an interactable that tilts as it waits
+    log_pickup.tscn             # a felled log on the ground, spawned wherever a tree comes down
   ui/
     fonts/                   # Oswald + Barlow Condensed (OFL) and their licences -- see CREDITS.md
   scripts/
@@ -220,7 +269,12 @@ game/
     hud.gd                    # builds and drives the whole HUD: compass ribbon, condition panel, crosshair, item card, prompts, toasts, vignettes
     hand_rig.gd                # one first-person arm: tapered forearm, palm, four three-jointed fingers and a thumb, with a grip curl
     cabin_detail.gd             # log courses, roof shingles, chimney stones, window, door, porch rail, woodpile and lantern for the starter cabin
-    axe_pickup.gd            # the world axe: idle tilt, "Hold E" prompt, hands the item to the player and sinks away
+    axe_pickup.gd            # the world axe: idle tilt, prompt, hands the item to the player and sinks away
+    world_clock.gd            # the day/night cycle: sun arc and colour, sky, ambient, fog, lamps, and the day counter
+    log_pickup.gd              # a felled trunk lying where it came down, waiting to be shouldered
+    chopping_block.gd           # takes a carried log and turns axe swings into wood
+    map_screen.gd                # the valley map: roads, contours, locations, traders and the horde countdown
+    map_table.gd                  # the chart on the cabin table that opens it
     forest_scatter.gd         # the forest itself, and the chop registry: every tree keyed by its own collision shape, fell animation, stump pool
     target.gd                # hit/respawn logic
     bot.gd                    # patrol/chase/attack AI state machine (obstacle avoidance + combat strafing), hitscan weapon, health/respawn, sound triggers

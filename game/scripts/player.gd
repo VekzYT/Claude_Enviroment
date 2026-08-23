@@ -142,6 +142,14 @@ var arm_left_rest: Transform3D
 var arm_right_rest: Transform3D
 var grip_blend := 0.0
 
+# A shouldered log is not an inventory item -- it occupies both arms, so the
+# axe goes away and nothing can be swung until it is put down.
+const LOG_CARRY_SPEED := 0.62
+var carrying_log := false
+var carried_log_tint: Color = Color(0.46, 0.35, 0.23)
+var carried_log_node: Node3D = null
+var log_pickup_scene: PackedScene = preload("res://scenes/log_pickup.tscn")
+
 var health := MAX_HEALTH
 var is_dead := false
 var spawn_position: Vector3
@@ -205,6 +213,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
+			if GameState.map_open:
+				return
 			if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
 				Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 			else:
@@ -251,36 +261,160 @@ func request_switch(new_index: int) -> void:
 	GameState.set_held_item(weapon_titles[wrapped])
 	Sound.play_ui("weapon_switch", -6.0)
 
-# Looks for a pickup under the crosshair each frame and reports it to the HUD.
+# Looks for something interactable under the crosshair each frame and asks it
+# what it would like the prompt to say. Anything in the "interactable" group
+# with prompt_for()/interact() works, which is how the axe, a felled log, the
+# chopping block and the map all share one key.
 func update_interaction() -> void:
 	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
 	var from: Vector3 = camera.global_position
 	var to: Vector3 = from + (-camera.global_transform.basis.z) * INTERACT_RANGE
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
-	query.exclude = [get_rid()]
 	query.collide_with_areas = true
-	var result: Dictionary = space.intersect_ray(query)
+	var skip: Array[RID] = [get_rid()]
 	var found: Node = null
-	if not result.is_empty():
+	var prompt := ""
+	# Trigger volumes overlap -- the chopping block's reaches around the axe
+	# standing in it. An interactable with nothing to say is treated as
+	# transparent and the ray carries on past it rather than blocking whatever
+	# is actually behind it.
+	for attempt in 4:
+		query.exclude = skip
+		var result: Dictionary = space.intersect_ray(query)
+		if result.is_empty():
+			break
 		var hit: Object = result.collider
-		if hit is Node and (hit as Node).is_in_group("pickup"):
-			found = hit as Node
-	if found != interact_target:
-		interact_target = found
-		if found == null:
-			GameState.set_interact_prompt("")
-		else:
-			GameState.set_interact_prompt("[E]  Pick up %s" % String(found.get("item_title")))
+		if hit is Node and (hit as Node).is_in_group("interactable"):
+			var candidate: Node = hit as Node
+			if candidate.has_method("prompt_for"):
+				prompt = String(candidate.call("prompt_for", self))
+				if prompt != "":
+					found = candidate
+					break
+			if hit is CollisionObject3D:
+				skip.append((hit as CollisionObject3D).get_rid())
+				continue
+		break
+	interact_target = found
+	if prompt == "":
+		GameState.set_interact_prompt("")
+	else:
+		GameState.set_interact_prompt("[E]  %s" % prompt)
 
 func try_interact() -> void:
-	if is_dead or interact_target == null:
+	if is_dead:
 		return
-	var id: int = int(interact_target.get("item_id"))
-	give_item(id)
-	if interact_target.has_method("consume"):
-		interact_target.call("consume")
-	interact_target = null
-	GameState.set_interact_prompt("")
+	if interact_target != null and interact_target.has_method("interact"):
+		interact_target.call("interact", self)
+		interact_target = null
+		GameState.set_interact_prompt("")
+		return
+	# Nothing in front of you, but you are holding a log: set it down here.
+	if carrying_log:
+		drop_log()
+
+# Called by a log lying on the ground. Refuses if both arms are already full.
+func take_log(tint: Color) -> bool:
+	if carrying_log or is_dead:
+		return false
+	carrying_log = true
+	carried_log_tint = tint
+	GameState.set_carrying_log(true)
+	GameState.announce("Log on your shoulder. Take it to the chopping block.")
+	Sound.play_ui("weapon_switch", -4.0)
+	_show_carried_log(true)
+	return true
+
+# Hands the log over without spawning one back into the world -- used by the
+# chopping block, which takes possession of it.
+func release_log() -> Color:
+	carrying_log = false
+	GameState.set_carrying_log(false)
+	_show_carried_log(false)
+	return carried_log_tint
+
+func drop_log() -> void:
+	if not carrying_log:
+		return
+	var tint: Color = release_log()
+	var dropped: Node3D = log_pickup_scene.instantiate() as Node3D
+	dropped.set("tint", tint)
+	var host: Node = get_parent()
+	if host == null:
+		host = get_tree().current_scene
+	host.add_child(dropped)
+	# Set down just in front of you, lying across your facing.
+	var forward: Vector3 = -global_transform.basis.z
+	dropped.global_position = global_position + forward * 1.5 + Vector3(0, 0.35, 0)
+	dropped.rotation.y = rotation.y + deg_to_rad(90.0)
+	GameState.announce("Log set down.")
+
+func _show_carried_log(shown: bool) -> void:
+	if carried_log_node != null:
+		carried_log_node.queue_free()
+		carried_log_node = null
+	if not shown:
+		return
+	# Held across both shoulders, angled off to one side the way you would
+	# actually carry something this heavy.
+	var holder := Node3D.new()
+	holder.name = "CarriedLog"
+	# Low across the chest and pushed out, so it obstructs the bottom of the
+	# frame the way a log actually would without blocking where you are going.
+	holder.position = Vector3(0.02, -0.30, -0.74)
+	holder.rotation_degrees = Vector3(-5, 13, -8)
+	camera.add_child(holder)
+
+	var bark := StandardMaterial3D.new()
+	# Darkened a little: unlit flat colour reads much paler in full sun than
+	# the same tint does on the trunk it came off.
+	bark.albedo_color = carried_log_tint.darkened(0.18)
+	bark.roughness = 0.96
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.088
+	mesh.bottom_radius = 0.10
+	mesh.height = 1.5
+	mesh.radial_segments = 9
+	var trunk := MeshInstance3D.new()
+	trunk.name = "Trunk"
+	trunk.mesh = mesh
+	trunk.material_override = bark
+	trunk.rotation_degrees = Vector3(0, 0, 90)
+	holder.add_child(trunk)
+
+	var cut := StandardMaterial3D.new()
+	cut.albedo_color = Color(0.74, 0.62, 0.44)
+	cut.roughness = 0.9
+	for side in [-1.0, 1.0]:
+		var face := MeshInstance3D.new()
+		var disc := CylinderMesh.new()
+		disc.top_radius = 0.092
+		disc.bottom_radius = 0.092
+		disc.height = 0.02
+		disc.radial_segments = 9
+		face.mesh = disc
+		face.material_override = cut
+		face.rotation_degrees = Vector3(0, 0, 90)
+		face.position = Vector3(side * 0.75, 0, 0)
+		holder.add_child(face)
+
+	# A few ridges so the trunk is not a smooth tube in the light.
+	var ridge := StandardMaterial3D.new()
+	ridge.albedo_color = carried_log_tint.darkened(0.42)
+	ridge.roughness = 0.98
+	var ridge_box := BoxMesh.new()
+	ridge_box.size = Vector3.ONE
+	for i in 3:
+		var strip := MeshInstance3D.new()
+		var angle: float = deg_to_rad(-40.0 + i * 46.0)
+		strip.mesh = ridge_box
+		strip.material_override = ridge
+		strip.position = Vector3(-0.1 + i * 0.16, cos(angle) * 0.094, sin(angle) * 0.094)
+		strip.rotation = Vector3(angle, 0.0, 0.0)
+		strip.scale = Vector3(1.02, 0.012, 0.05)
+		holder.add_child(strip)
+
+	carried_log_node = holder
 
 func give_item(id: int) -> void:
 	if id < 0 or id >= owned.size() or owned[id]:
@@ -331,9 +465,14 @@ func _physics_process(delta: float) -> void:
 
 	var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	var wants_sprint: bool = Input.is_physical_key_pressed(KEY_SHIFT) and direction.length_squared() > 0.01
+	# A log on your shoulder is too heavy to run with.
+	if carrying_log:
+		wants_sprint = false
 	var speed: float = SPEED
 	if update_stamina(delta, wants_sprint):
 		speed = SPRINT_SPEED
+	if carrying_log:
+		speed *= LOG_CARRY_SPEED
 
 	if knife_cooldown_timer > 0.0:
 		knife_cooldown_timer = max(knife_cooldown_timer - delta, 0.0)
@@ -492,6 +631,9 @@ func primary_action() -> void:
 func start_melee() -> void:
 	if is_meleeing or is_switching:
 		return
+	if carrying_log:
+		GameState.announce("Both hands are full.")
+		return
 	var idx: int = current_weapon_index
 	if idx == WEAPON_KNIFE and knife_cooldown_timer > 0.0:
 		return
@@ -537,6 +679,15 @@ func perform_melee_hit() -> void:
 		return
 	var target: Object = result.collider
 
+	# The chopping block comes first: with a log on it, a swing here is what
+	# actually produces wood.
+	if idx == ITEM_AXE and target is Node and (target as Node).is_in_group("chopping_block"):
+		if int((target as Node).call("split", result.position)) > 0:
+			camera_kick += deg_to_rad(4.0)
+			chop_shake = 1.0
+			GameState.trigger_hit_marker()
+		return
+
 	# A tree is not a node of its own -- it is instances inside a MultiMesh --
 	# so resolve the shape we struck back to the trunk it belongs to.
 	if idx == ITEM_AXE and target is CollisionObject3D:
@@ -555,12 +706,10 @@ func perform_melee_hit() -> void:
 			chop_shake = 1.0
 			GameState.trigger_hit_marker()
 			if bool(outcome.get("felled", false)):
-				GameState.add_wood(4)
-				GameState.announce("Timber!")
+				GameState.announce("Timber! Carry the log to your block.")
 				Sound.play_3d("land", result.position, 2.0)
 				camera_kick += deg_to_rad(6.0)
-			else:
-				GameState.add_wood(1)
+				_drop_felled_log(outcome)
 			return
 
 	if idx == ITEM_HANDS and target is CollisionObject3D:
@@ -582,6 +731,25 @@ func perform_melee_hit() -> void:
 		Sound.play_3d("knife_hit", result.position, -2.0)
 		camera_kick += deg_to_rad(5.0)
 		GameState.trigger_hit_marker()
+
+# Leaves a carryable trunk where the tree came down.
+func _drop_felled_log(outcome: Dictionary) -> void:
+	var base: Vector3 = outcome.get("base", global_position)
+	var dropped: Node3D = log_pickup_scene.instantiate() as Node3D
+	if outcome.has("tint"):
+		dropped.set("tint", outcome["tint"])
+	var host: Node = get_parent()
+	if host == null:
+		host = get_tree().current_scene
+	host.add_child(dropped)
+	# Lying just clear of the stump, across the direction it fell.
+	var away: Vector3 = (base - global_position)
+	away.y = 0.0
+	if away.length() < 0.1:
+		away = Vector3(1, 0, 0)
+	away = away.normalized()
+	dropped.global_position = base + away * 1.6 + Vector3(0, 0.34, 0)
+	dropped.rotation.y = atan2(away.x, away.z)
 
 func shoot() -> void:
 	if not can_shoot or is_reloading:
@@ -659,29 +827,37 @@ func update_hands(delta: float) -> void:
 
 	if is_meleeing and idx == ITEM_AXE:
 		var at: float = clamp(melee_progress, 0.0, 1.0)
-		var drive: float = 0.0
+		var sweep: float = 0.0
 		if at < 0.30:
-			drive = -(at / 0.30) * 0.09
-		elif at < 0.52:
-			drive = lerp(-0.09, 0.20, (at - 0.30) / 0.22)
+			sweep = (at / 0.30) * 0.10
+		elif at < 0.56:
+			sweep = lerp(0.10, -0.16, (at - 0.30) / 0.26)
 		else:
-			drive = lerp(0.20, 0.0, (at - 0.52) / 0.48)
-		target_pos += Vector3(0.0, -drive * 0.5, -drive)
-		target_rot += Vector3(deg_to_rad(-drive * 40.0), 0.0, 0.0)
+			sweep = lerp(-0.16, 0.0, (at - 0.56) / 0.44)
+		target_pos += Vector3(sweep, -absf(sweep) * 0.28, -absf(sweep) * 0.5)
+		target_rot += Vector3(0.0, deg_to_rad(-sweep * 46.0), deg_to_rad(sweep * 22.0))
 
 	# A short jolt when the edge bites, so contact is felt in the arms too.
 	if chop_shake > 0.001:
 		var j: float = chop_shake * 0.03
 		target_pos += Vector3(randf_range(-j, j), randf_range(-j, j), 0.0)
 
-	hands.position = hands.position.lerp(target_pos, clampf(delta * 14.0, 0.0, 1.0))
-	hands.rotation = hands.rotation.lerp(target_rot, clampf(delta * 14.0, 0.0, 1.0))
+	var settle: float = 14.0
+	if carrying_log:
+		# Braced under the load: hands up and turned palm-up, and slower to
+		# settle so it trudges rather than bobbing.
+		target_pos += Vector3(0.0, 0.30, 0.16)
+		target_rot += Vector3(deg_to_rad(-34.0), 0.0, 0.0)
+		settle = 9.0
+
+	hands.position = hands.position.lerp(target_pos, clampf(delta * settle, 0.0, 1.0))
+	hands.rotation = hands.rotation.lerp(target_rot, clampf(delta * settle, 0.0, 1.0))
 
 	# With the axe out, both hands leave their resting pose and take hold of the
 	# haft. update_weapon_transform() has already placed the axe for this frame,
 	# so the grip points below are exactly where the wood is right now.
 	var want_grip: float = 0.0
-	if idx == ITEM_AXE:
+	if idx == ITEM_AXE and not carrying_log:
 		want_grip = 1.0
 	grip_blend = move_toward(grip_blend, want_grip, delta * 5.0)
 
@@ -744,32 +920,44 @@ func update_weapon_transform(delta: float) -> void:
 	var melee_offset := Vector3.ZERO
 	var melee_rot := Vector3.ZERO
 	if is_meleeing and idx == ITEM_AXE:
-		# Overhead chop: wind back over the shoulder, drive down through the
-		# cut, then a slow recover with the weight of the head carrying through.
+		# Horizontal felling stroke: cock back over the right shoulder, sweep
+		# across the body to the left through the cut, then drift back to
+		# guard. Yaw carries the arc; roll lays the bit over so the edge leads.
 		var at: float = clamp(melee_progress, 0.0, 1.0)
+		var yaw: float = 0.0
+		var roll: float = 0.0
 		var pitch: float = 0.0
-		var lift: float = 0.0
+		var across: float = 0.0
 		var reach: float = 0.0
 		if at < 0.30:
+			# Wind up, decelerating into the top of the backswing.
 			var w: float = at / 0.30
 			w = w * w * (3.0 - 2.0 * w)
-			pitch = lerp(0.0, 62.0, w)
-			lift = lerp(0.0, 0.12, w)
-			reach = lerp(0.0, 0.10, w)
-		elif at < 0.52:
-			var w2: float = (at - 0.30) / 0.22
+			yaw = lerp(0.0, -54.0, w)
+			roll = lerp(0.0, -34.0, w)
+			pitch = lerp(0.0, 16.0, w)
+			across = lerp(0.0, 0.18, w)
+			reach = lerp(0.0, 0.12, w)
+		elif at < 0.56:
+			# The stroke itself, accelerating right to left across the body.
+			var w2: float = (at - 0.30) / 0.26
 			w2 = w2 * w2
-			pitch = lerp(62.0, -74.0, w2)
-			lift = lerp(0.12, -0.16, w2)
-			reach = lerp(0.10, -0.26, w2)
+			yaw = lerp(-54.0, 76.0, w2)
+			roll = lerp(-34.0, 30.0, w2)
+			pitch = lerp(16.0, -12.0, w2)
+			across = lerp(0.18, -0.30, w2)
+			reach = lerp(0.12, -0.22, w2)
 		else:
-			var w3: float = (at - 0.52) / 0.48
+			# Follow through and recover.
+			var w3: float = (at - 0.56) / 0.44
 			w3 = w3 * w3 * (3.0 - 2.0 * w3)
-			pitch = lerp(-74.0, 0.0, w3)
-			lift = lerp(-0.16, 0.0, w3)
-			reach = lerp(-0.26, 0.0, w3)
-		melee_offset = Vector3(0.0, lift, reach)
-		melee_rot = Vector3(deg_to_rad(pitch), deg_to_rad(pitch * 0.10), deg_to_rad(-pitch * 0.16))
+			yaw = lerp(76.0, 0.0, w3)
+			roll = lerp(30.0, 0.0, w3)
+			pitch = lerp(-12.0, 0.0, w3)
+			across = lerp(-0.30, 0.0, w3)
+			reach = lerp(-0.22, 0.0, w3)
+		melee_offset = Vector3(across, -absf(yaw) * 0.0009, reach)
+		melee_rot = Vector3(deg_to_rad(pitch), deg_to_rad(yaw), deg_to_rad(roll))
 	elif is_meleeing:
 		var mt: float = clamp(melee_progress, 0.0, 1.0)
 		var swing_angle: float = 0.0
@@ -817,7 +1005,7 @@ func update_weapon_transform(delta: float) -> void:
 		var node: Node3D = weapon_nodes[i]
 		if i == ITEM_HANDS:
 			continue
-		node.visible = (i == idx) and not is_scoped
+		node.visible = (i == idx) and not is_scoped and not carrying_log
 
 	if idx == ITEM_HANDS:
 		# update_hands() owns the arms; writing here would just be overwritten.

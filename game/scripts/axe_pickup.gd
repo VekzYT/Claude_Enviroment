@@ -12,7 +12,7 @@ var base_roll := 0.0
 var t := 0.0
 
 func _ready() -> void:
-	add_to_group("pickup")
+	add_to_group("interactable")
 	base_y = position.y
 	# Sway around whatever lean the scene authored, so moving the axe in the
 	# editor does not get overwritten on the first frame.
@@ -25,6 +25,17 @@ func _process(delta: float) -> void:
 	# arcade token -- it is meant to look buried in the block.
 	t += delta
 	rotation.z = base_roll + deg_to_rad(sin(t * 1.1) * 1.4)
+
+func prompt_for(_player: Node) -> String:
+	if taken:
+		return ""
+	return "Pick up %s" % item_title
+
+func interact(player: Node) -> void:
+	if taken:
+		return
+	player.call("give_item", item_id)
+	consume()
 
 func consume() -> void:
 	if taken:

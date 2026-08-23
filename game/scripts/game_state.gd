@@ -13,8 +13,15 @@ signal interact_prompt_changed(text: String)
 signal wood_changed(amount: int)
 signal stamina_changed(fraction: float)
 signal announced(text: String)
+signal day_changed(day: int)
+signal time_changed(time_of_day: float)
+signal carry_changed(carrying: bool)
+signal map_visibility_changed(open: bool)
 
 const SUPPLIES_TOTAL := 8
+# The horde is not implemented yet, but everything counts down to it: the day
+# chip, the warnings, and the reason to go trade instead of sitting at home.
+const HORDE_DAY := 10
 
 var score := 0
 var player_health := 100
@@ -26,6 +33,11 @@ var held_item := "Bare hands"
 var interact_prompt := ""
 var wood := 0
 var stamina := 1.0
+var day := 1
+# 0 is midnight, 0.5 is noon. The clock starts a little after sunrise.
+var time_of_day := 0.30
+var carrying_log := false
+var map_open := false
 
 func add_point() -> void:
 	score += 1
@@ -74,6 +86,31 @@ func set_stamina(fraction: float) -> void:
 	stamina = f
 	stamina_changed.emit(stamina)
 
+func set_day(value: int) -> void:
+	if value == day:
+		return
+	day = value
+	day_changed.emit(day)
+
+func set_time_of_day(value: float) -> void:
+	time_of_day = value
+	time_changed.emit(time_of_day)
+
+func set_carrying_log(value: bool) -> void:
+	if value == carrying_log:
+		return
+	carrying_log = value
+	carry_changed.emit(carrying_log)
+
+func set_map_open(value: bool) -> void:
+	if value == map_open:
+		return
+	map_open = value
+	map_visibility_changed.emit(map_open)
+
+func days_until_horde() -> int:
+	return maxi(HORDE_DAY - day, 0)
+
 func add_wood(amount: int) -> void:
 	wood += amount
 	wood_changed.emit(wood)
@@ -87,6 +124,14 @@ func reset() -> void:
 	wood_changed.emit(wood)
 	stamina = 1.0
 	stamina_changed.emit(stamina)
+	day = 1
+	day_changed.emit(day)
+	time_of_day = 0.30
+	time_changed.emit(time_of_day)
+	carrying_log = false
+	carry_changed.emit(carrying_log)
+	map_open = false
+	map_visibility_changed.emit(map_open)
 	held_item = "Bare hands"
 	held_item_changed.emit(held_item)
 	interact_prompt = ""

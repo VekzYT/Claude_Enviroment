@@ -1,4 +1,4 @@
-[gd_scene load_steps=47 format=3]
+[gd_scene load_steps=51 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="2_hud"]
@@ -9,6 +9,10 @@
 [ext_resource type="Script" path="res://scripts/terrain.gd" id="27_terrain"]
 [ext_resource type="PackedScene" path="res://scenes/axe_pickup.tscn" id="28_axe"]
 [ext_resource type="Script" path="res://scripts/cabin_detail.gd" id="29_cabin"]
+[ext_resource type="Script" path="res://scripts/world_clock.gd" id="30_clock"]
+[ext_resource type="Script" path="res://scripts/chopping_block.gd" id="31_block"]
+[ext_resource type="Script" path="res://scripts/map_table.gd" id="32_maptable"]
+[ext_resource type="Script" path="res://scripts/map_screen.gd" id="33_mapscreen"]
 [ext_resource type="Script" path="res://scripts/landmarks.gd" id="7_landmarks"]
 [ext_resource type="Shader" path="res://shaders/ocean.gdshader" id="8_water"]
 [ext_resource type="Texture2D" path="res://textures/dirt_albedo.jpg" id="12_dirt_albedo"]
@@ -1434,6 +1438,26 @@ rotation_degrees = Vector3(90, 70, 0)
 scale = Vector3(0.11, 0.72, 0.11)
 mesh = SubResource("CylinderMesh_unit")
 surface_material_override/0 = SubResource("Mat_wood_dark")
+
+[node name="WorldClock" type="Node3D" parent="."]
+script = ExtResource("30_clock")
+sun_path = NodePath("../Sun")
+fill_path = NodePath("../SkyFill")
+environment_path = NodePath("../WorldEnvironment")
+lantern_paths = [NodePath("../HomeLight"), NodePath("../HomePorchLight"), NodePath("../CabinDetail/LanternLight")]
+
+[node name="ChoppingBlockArea" type="Area3D" parent="."]
+position = Vector3(-6.25, 0, 6.6)
+script = ExtResource("31_block")
+block_centre = Vector3(-6.25, 0, 6.6)
+
+[node name="MapTable" type="Area3D" parent="."]
+position = Vector3(-11.8, 0.88, 2)
+script = ExtResource("32_maptable")
+map_screen_path = NodePath("../MapScreen")
+
+[node name="MapScreen" type="CanvasLayer" parent="." groups=["map_screen"]]
+script = ExtResource("33_mapscreen")
 
 [node name="CabinDetail" type="Node3D" parent="."]
 script = ExtResource("29_cabin")

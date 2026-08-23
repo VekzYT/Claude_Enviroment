@@ -408,6 +408,7 @@ func _scatter_conifers() -> void:
 		pending.append({
 			"trunk": trunk_slot, "tiers": tier_slots, "cs": cs,
 			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
+			"tint": Color(0.42, 0.31, 0.20),
 		})
 
 	var trunk_mesh: CylinderMesh = _trunk_mesh()
@@ -511,6 +512,7 @@ func _scatter_broadleaf() -> void:
 		pending.append({
 			"trunk": trunk_slot, "blobs": blob_slots, "cs": cs,
 			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
+			"tint": Color(0.52, 0.43, 0.31),
 		})
 
 	var bark_mat: ShaderMaterial = _bark_material(Color(0.7, 0.66, 0.6, 1.0), Vector2(1.0, 2.2), 0.95)
@@ -569,6 +571,7 @@ func _scatter_dead_trees() -> void:
 		pending.append({
 			"trunk": trunk_slot, "branches": branch_slots, "cs": cs,
 			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
+			"tint": Color(0.45, 0.41, 0.34),
 		})
 
 	var dead_mat: ShaderMaterial = _bark_material(Color(0.5, 0.46, 0.4, 1.0), Vector2(1.0, 2.5), 1.0)
@@ -765,6 +768,9 @@ func _register_tree(rec: Dictionary, parts: Array) -> void:
 		"cs": rec["cs"],
 		"hp": TREE_BASE_HP + int(rec["height"] / 6.0),
 		"felled": false,
+		# Carried through to the log that drops, so a birch trunk stays pale
+		# and an oak stays dark all the way to the chopping block.
+		"tint": rec.get("tint", Color(0.46, 0.35, 0.23)),
 	}
 	trees.append(entry)
 	if rec["cs"] != null:
@@ -794,7 +800,7 @@ func chop(collision_shape: Node, damage: int) -> Dictionary:
 		_shake_tree(tree, 0.035)
 		return {"hit": true, "felled": false, "base": tree["base"]}
 	_fell_tree(tree)
-	return {"hit": true, "felled": true, "base": tree["base"]}
+	return {"hit": true, "felled": true, "base": tree["base"], "tint": tree["tint"]}
 
 func _shake_tree(tree: Dictionary, amount: float) -> void:
 	var axis := Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0))

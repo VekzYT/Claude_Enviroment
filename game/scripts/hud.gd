@@ -37,6 +37,9 @@ var compass_ticks: Array = []
 
 var supply_value: Label
 var wood_value: Label
+var day_value: Label
+var day_caption: Label
+var clock_hand: ColorRect
 
 var health_fill: ColorRect
 var health_lag: ColorRect
@@ -92,6 +95,9 @@ func _ready() -> void:
 	GameState.landmark_discovered.connect(_on_landmark_discovered)
 	GameState.supply_collected.connect(_on_supply_collected)
 	GameState.wood_changed.connect(_on_wood_changed)
+	GameState.day_changed.connect(_on_day_changed)
+	GameState.time_changed.connect(_on_time_changed)
+	GameState.carry_changed.connect(_on_carry_changed)
 	GameState.held_item_changed.connect(_on_held_item_changed)
 	GameState.interact_prompt_changed.connect(_on_prompt_changed)
 	GameState.announced.connect(show_toast)
@@ -105,6 +111,8 @@ func _ready() -> void:
 	_on_knife_cooldown_changed(GameState.knife_cooldown_fraction)
 	_on_supply_collected(GameState.supplies_collected, GameState.SUPPLIES_TOTAL)
 	_on_wood_changed(GameState.wood)
+	_on_day_changed(GameState.day)
+	_on_time_changed(GameState.time_of_day)
 	_on_held_item_changed(GameState.held_item)
 	_on_prompt_changed(GameState.interact_prompt)
 
@@ -291,6 +299,38 @@ func _build_chips() -> void:
 	column.name = "Chips"
 	column.position = Vector2(16, 16)
 	root.add_child(column)
+
+	# Day chip: the day number, the phase of the day, and a dial that goes round
+	# once per day so you can see dusk coming without reading anything.
+	var day_box: PanelContainer = _panel_box(UITheme.BG_DEEP, UITheme.ACCENT_DIM, 2)
+	column.add_child(day_box)
+	var day_row: HBoxContainer = _row(9)
+	day_box.add_child(day_row)
+
+	var dial := Control.new()
+	dial.custom_minimum_size = Vector2(18, 18)
+	dial.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	day_row.add_child(dial)
+	var face := Panel.new()
+	var face_style := StyleBoxFlat.new()
+	face_style.bg_color = Color(0.03, 0.035, 0.03, 0.9)
+	face_style.border_color = UITheme.LINE_SOFT
+	face_style.set_border_width_all(1)
+	face_style.set_corner_radius_all(9)
+	face.add_theme_stylebox_override("panel", face_style)
+	face.set_anchors_preset(Control.PRESET_FULL_RECT)
+	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dial.add_child(face)
+	clock_hand = _rect(UITheme.ACCENT, Vector2(1.5, 7))
+	clock_hand.pivot_offset = Vector2(0.75, 7)
+	clock_hand.position = Vector2(8.25, 2)
+	dial.add_child(clock_hand)
+
+	day_value = _label("DAY 1", UITheme.body_bold(), 16, UITheme.TEXT)
+	day_row.add_child(day_value)
+	day_caption = _label("Dawn", UITheme.body_light(), 14, UITheme.TEXT_DIM, HORIZONTAL_ALIGNMENT_RIGHT)
+	day_caption.custom_minimum_size = Vector2(112, 0)
+	day_row.add_child(day_caption)
 
 	var supplies: Array = _chip(UITheme.GOOD, "SUPPLIES")
 	column.add_child(supplies[0])
@@ -576,7 +616,57 @@ func _on_supply_collected(count: int, total: int) -> void:
 func _on_wood_changed(amount: int) -> void:
 	wood_value.text = "%d" % amount
 
+func _on_day_changed(day: int) -> void:
+	day_value.text = "DAY %d" % day
+	var left: int = GameState.days_until_horde()
+	# The chip turns red inside the last three days, so the deadline is visible
+	# in peripheral vision rather than only in the toast that already went.
+	if left <= 0:
+		day_value.add_theme_color_override("font_color", UITheme.BAD)
+	elif left <= 3:
+		day_value.add_theme_color_override("font_color", UITheme.WARN)
+	else:
+		day_value.add_theme_color_override("font_color", UITheme.TEXT)
+
+func _on_time_changed(t: float) -> void:
+	# Midnight at the top, noon at the bottom: one turn per day.
+	clock_hand.rotation = t * TAU
+	var left: int = GameState.days_until_horde()
+	var phase: String = _phase_name(t)
+	if left <= 0:
+		day_caption.text = "%s · they are here" % phase
+	elif left <= 3:
+		day_caption.text = "%s · %dd left" % [phase, left]
+	else:
+		day_caption.text = phase
+
+func _phase_name(t: float) -> String:
+	if t < 0.22:
+		return "Night"
+	if t < 0.32:
+		return "Dawn"
+	if t < 0.46:
+		return "Morning"
+	if t < 0.56:
+		return "Midday"
+	if t < 0.70:
+		return "Afternoon"
+	if t < 0.82:
+		return "Dusk"
+	return "Night"
+
+func _on_carry_changed(carrying: bool) -> void:
+	if carrying:
+		item_name.text = "Log (both hands)"
+		item_icon.add_theme_stylebox_override("panel",
+			UITheme.panel(UITheme.WOOD.darkened(0.6), UITheme.WOOD, 2))
+	else:
+		_on_held_item_changed(GameState.held_item)
+		_on_weapon_changed(GameState.current_weapon)
+
 func _on_held_item_changed(title: String) -> void:
+	if GameState.carrying_log:
+		return
 	item_name.text = title
 	if item_tween != null and item_tween.is_valid():
 		item_tween.kill()
