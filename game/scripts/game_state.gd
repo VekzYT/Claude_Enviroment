@@ -21,6 +21,10 @@ signal inventory_visibility_changed(open: bool)
 signal hunger_changed(fraction: float)
 signal apples_changed(count: int)
 signal map_known_changed(known: bool)
+signal objective_changed(text: String, hint: String, index: int, total: int)
+signal objective_completed(text: String)
+signal meat_changed(raw: int, cooked: int)
+signal tree_felled
 
 const SUPPLIES_TOTAL := 8
 # The horde is not implemented yet, but everything counts down to it: the day
@@ -49,6 +53,8 @@ var apples := 0
 # Set the first time the chart on the cabin table is read; after that the map
 # can be opened from anywhere.
 var map_known := false
+var raw_meat := 0
+var cooked_meat := 0
 
 func add_point() -> void:
 	score += 1
@@ -136,6 +142,17 @@ func add_apples(count: int) -> void:
 	apples = maxi(apples + count, 0)
 	apples_changed.emit(apples)
 
+func add_raw_meat(count: int) -> void:
+	raw_meat = maxi(raw_meat + count, 0)
+	meat_changed.emit(raw_meat, cooked_meat)
+
+func add_cooked_meat(count: int) -> void:
+	cooked_meat = maxi(cooked_meat + count, 0)
+	meat_changed.emit(raw_meat, cooked_meat)
+
+func report_tree_felled() -> void:
+	tree_felled.emit()
+
 func learn_map() -> void:
 	if map_known:
 		return
@@ -174,6 +191,9 @@ func reset() -> void:
 	apples_changed.emit(apples)
 	map_known = false
 	map_known_changed.emit(map_known)
+	raw_meat = 0
+	cooked_meat = 0
+	meat_changed.emit(raw_meat, cooked_meat)
 	held_item = "Bare hands"
 	held_item_changed.emit(held_item)
 	interact_prompt = ""

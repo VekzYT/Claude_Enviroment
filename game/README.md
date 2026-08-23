@@ -1,4 +1,4 @@
-# Syfon v2.6 — Provisions
+# Syfon v2.7 — Quarry
 
 A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release gives it a clock and a reason to hurry.
 
@@ -7,6 +7,48 @@ You wake outside a log cabin in a forest of rolling hills and four mountain mass
 There is a map on the cabin table showing the whole valley, including the three places where people are still living and still trading. The sun rises and sets, the days count up, and **on day 10 they come**.
 
 **Zombies are not in yet** — the countdown is real, the horde is not there to meet it. Everything else is built around its arrival.
+
+## What's new in v2.7
+
+### Fixed: the map still could not be opened
+
+The trigger fix in v2.6 was not enough. A raycast alone is unforgiving for something flat on a table: it only connects at one precise combination of distance and pitch, and every other stance sails over it into the floor. Tested across eight realistic stances, **all eight missed**.
+
+Interaction now falls back to a **cone** when the ray finds nothing — the nearest interactable within 2.6 m and about 40° of where you are looking, preferring whatever is closest to straight ahead. Seven of those eight stances now work (the eighth is out of reach and aimed above the table). Logs, apples, the chopping block and the fire all became easier to grab as a side effect.
+
+Pressing **M** without a map now tells you where one is instead of just refusing.
+
+### A guide that walks you through it
+
+Ten steps, in the order you would naturally do them, shown in a panel at the top right with the step number and a line of *how*:
+
+1. Take the axe from the chopping block
+2. Fell a tree
+3. Shoulder the log it leaves
+4. Carry it to your chopping block
+5. Split the log for firewood
+6. Read the map on the cabin table
+7. Hunt an animal
+8. Cook the meat on a campfire
+9. Eat, and keep eating
+10. Stock up before day 10
+
+Each one completes on the real game condition rather than on a scripted trigger, banners "Done · …", and the panel fades away for good once the last is finished.
+
+### Animals
+
+**14 deer and 8 boar** wander the forest, placed with the same slope and clearing tests the trees use, so the herds are where the woodland is.
+
+- They graze with their heads down, pick a new spot every few seconds and walk to it, turn to face where they are going, and swing their legs in diagonal pairs — which is what makes a four-legged walk read as a walk.
+- They notice you at close range and bolt, and they bolt when hit.
+- Deer carry antlers and a pale tail; boar are lower, darker, tusked and have a bristly ridge.
+- Two or three axe blows kill one. It topples onto its side and leaves **2 meat** (deer) or **3** (boar) where it dropped. Nothing player-side had to change to make them killable — the melee code already damages anything with a `hit()` method.
+
+### Cooking
+
+The campfire is interactable. Walk up with raw meat and press **E**: a spit goes up over the coals with a cut on it for each piece, and over **14 seconds** the cuts darken and shrink so you can see them cooking from across the camp. Press **E** again to take them.
+
+Food is now ranked, and **F** eats the best thing you have: cooked meat (42% of a full stomach), then an apple (22%), then raw meat as a last resort (8%, and it is not pleasant). A new **MEAT** chip on the HUD reads cooked over raw.
 
 ## What's new in v2.6
 
@@ -318,7 +360,11 @@ game/
     map_table.gd                  # the chart on the cabin table that opens it
     inventory_screen.gd            # the pack: what you carry, your materials, hunger and health
     apple_pickup.gd                 # fruit shaken out of a broadleaf canopy when it comes down
-    campfire.gd                      # stone ring, tepee logs, embers, flame and smoke, and a light that flickers
+    campfire.gd                      # stone ring, tepee logs, embers, flame and smoke, a flickering light, and cooking
+    objectives.gd                     # the ten-step opening guide, each step checked against real game state
+    animal.gd                          # a grazing deer or boar: wander, graze, notice, flee, die and leave meat
+    wildlife.gd                         # scatters the herds using the same slope and clearing tests as the trees
+    meat_pickup.gd                       # a cut off a downed animal, raw or cooked
     forest_scatter.gd         # the forest itself, and the chop registry: every tree keyed by its own collision shape, fell animation, stump pool
     target.gd                # hit/respawn logic
     bot.gd                    # patrol/chase/attack AI state machine (obstacle avoidance + combat strafing), hitscan weapon, health/respawn, sound triggers

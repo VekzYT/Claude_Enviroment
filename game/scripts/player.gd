@@ -35,6 +35,8 @@ const HUNGER_DRAIN := 1.0 / (3.0 * 480.0)
 const HUNGER_SPRINT_EXTRA := 2.2
 const HUNGER_STARVE_DAMAGE := 2.0
 const APPLE_RESTORE := 0.22
+const COOKED_RESTORE := 0.42
+const RAW_RESTORE := 0.08
 
 # How hard the ground pulls you to a stop. The old code fed `speed` straight to
 # move_toward(), which is a per-call step, not a rate -- so you stopped dead in
@@ -52,6 +54,10 @@ const AXE_SWING_DURATION := 0.62
 const HAND_SWING_DURATION := 0.34
 const AXE_CHOP_DAMAGE := 1
 const INTERACT_RANGE := 3.2
+# The forgiving fallback: a little shorter than the ray, and about 40 degrees
+# off centre.
+const INTERACT_REACH := 2.6
+const INTERACT_COS := 0.76
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -304,11 +310,53 @@ func update_interaction() -> void:
 				skip.append((hit as CollisionObject3D).get_rid())
 				continue
 		break
+	# A ray alone is unforgiving: a flat thing on a table has to be hit at one
+	# precise distance-and-pitch combination, and every other stance sails over
+	# it into the floor. If the ray found nothing, fall back to whatever is
+	# nearby and roughly in front of you.
+	if found == null:
+		var near: Array = _interactable_in_view(from, -camera.global_transform.basis.z)
+		if not near.is_empty():
+			found = near[0]
+			prompt = String(near[1])
+
 	interact_target = found
 	if prompt == "":
 		GameState.set_interact_prompt("")
 	else:
 		GameState.set_interact_prompt("[E]  %s" % prompt)
+
+# Picks the interactable that is closest to straight ahead, within reach and
+# within a generous cone. Returns [node, prompt] or an empty array.
+func _interactable_in_view(from: Vector3, facing: Vector3) -> Array:
+	var best: Node = null
+	var best_prompt := ""
+	var best_score := -1.0
+	for node in get_tree().get_nodes_in_group("interactable"):
+		var body := node as Node3D
+		if body == null or not is_instance_valid(body):
+			continue
+		var to_it: Vector3 = body.global_position - from
+		var away: float = to_it.length()
+		if away > INTERACT_REACH or away < 0.05:
+			continue
+		var aim: float = facing.dot(to_it / away)
+		if aim < INTERACT_COS:
+			continue
+		if not body.has_method("prompt_for"):
+			continue
+		var text: String = String(body.call("prompt_for", self))
+		if text == "":
+			continue
+		# Prefer things you are looking straight at, then things that are close.
+		var score: float = aim - away * 0.06
+		if score > best_score:
+			best_score = score
+			best = body
+			best_prompt = text
+	if best == null:
+		return []
+	return [best, best_prompt]
 
 func try_interact() -> void:
 	if is_dead:
@@ -436,7 +484,7 @@ func give_item(id: int) -> void:
 # Once the chart on the cabin table has been read, the map travels with you.
 func open_map_screen() -> void:
 	if not GameState.map_known:
-		GameState.announce("You have not seen a map of the valley yet.")
+		GameState.announce("No map yet. There is a chart on the table inside the cabin.")
 		return
 	var screen: Node = get_tree().get_first_node_in_group("map_screen")
 	if screen != null:
@@ -568,16 +616,32 @@ func update_hunger(delta: float, sprinting: bool) -> void:
 		take_damage(int(HUNGER_STARVE_DAMAGE))
 		GameState.announce("You are starving.")
 
+# Eats the best thing in the pack: cooked meat first, then fruit, and raw meat
+# only as a last resort -- it barely helps and it is not pleasant.
 func eat_apple() -> bool:
-	if GameState.apples <= 0:
-		GameState.announce("No food in your pack.")
-		return false
-	GameState.add_apples(-1)
-	hunger = minf(hunger + APPLE_RESTORE, 1.0)
+	if GameState.cooked_meat > 0:
+		GameState.add_cooked_meat(-1)
+		_feed(COOKED_RESTORE, "You eat the cooked meat.")
+		return true
+	if GameState.apples > 0:
+		GameState.add_apples(-1)
+		_feed(APPLE_RESTORE, "You eat an apple.")
+		return true
+	if GameState.raw_meat > 0:
+		GameState.add_raw_meat(-1)
+		_feed(RAW_RESTORE, "You force down the raw meat.")
+		return true
+	GameState.announce("No food in your pack.")
+	return false
+
+func _feed(amount: float, message: String) -> void:
+	hunger = minf(hunger + amount, 1.0)
 	GameState.set_hunger(hunger)
-	GameState.announce("You eat an apple.")
+	GameState.announce(message)
 	Sound.play_ui("weapon_switch", -12.0)
-	return true
+	var guide: Node = get_tree().get_first_node_in_group("objectives")
+	if guide != null:
+		guide.call("note_ate")
 
 func update_view_bob(delta: float, moving: bool, horizontal_speed: float, strafe_axis: float) -> void:
 	if moving:
@@ -757,6 +821,7 @@ func perform_melee_hit() -> void:
 			chop_shake = 1.0
 			GameState.trigger_hit_marker()
 			if bool(outcome.get("felled", false)):
+				GameState.report_tree_felled()
 				GameState.announce("Timber! Carry the log to your block.")
 				Sound.play_3d("land", result.position, 2.0)
 				camera_kick += deg_to_rad(6.0)

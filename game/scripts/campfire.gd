@@ -18,7 +18,16 @@ var flicker := 0.0
 var base_energy := 2.1
 var rng := RandomNumberGenerator.new()
 
+const COOK_TIME := 14.0
+
+var cooking := 0
+var cook_progress := 0.0
+var ready_meat := 0
+var spit: Node3D = null
+
 func _ready() -> void:
+	add_to_group("interactable")
+	add_to_group("campfire")
 	rng.seed = 4242
 	_build_stones()
 	_build_ash()
@@ -250,3 +259,102 @@ func _process(delta: float) -> void:
 		light.light_energy = base_energy * (1.0 + wobble)
 	if ember_material != null:
 		ember_material.emission_energy_multiplier = 1.5 * (1.0 + wobble * 0.7)
+	_cook(delta)
+
+# --- cooking -----------------------------------------------------------------
+
+func prompt_for(_player: Node) -> String:
+	if ready_meat > 0:
+		return "Take the cooked meat (%d)" % ready_meat
+	if cooking > 0:
+		return ""
+	if GameState.raw_meat > 0:
+		return "Cook the meat (%d)" % GameState.raw_meat
+	return ""
+
+func interact(_player: Node) -> void:
+	if ready_meat > 0:
+		GameState.add_cooked_meat(ready_meat)
+		GameState.announce("%d cooked meat taken." % ready_meat)
+		ready_meat = 0
+		_clear_spit()
+		Sound.play_ui("weapon_switch", -8.0)
+		return
+	if cooking > 0 or GameState.raw_meat <= 0:
+		return
+	cooking = GameState.raw_meat
+	GameState.add_raw_meat(-cooking)
+	cook_progress = 0.0
+	_build_spit()
+	GameState.announce("Meat on the fire. Give it a minute.")
+
+func _build_spit() -> void:
+	_clear_spit()
+	spit = Node3D.new()
+	spit.name = "Spit"
+	spit.position = Vector3(0, 0.62, 0)
+	add_child(spit)
+
+	var iron: StandardMaterial3D = _material(Color(0.13, 0.13, 0.14), 0.6)
+	var stake := CylinderMesh.new()
+	stake.top_radius = 0.018
+	stake.bottom_radius = 0.018
+	stake.height = 1.3
+	stake.radial_segments = 6
+	var bar := MeshInstance3D.new()
+	bar.mesh = stake
+	bar.material_override = iron
+	bar.rotation_degrees = Vector3(0, 0, 90)
+	spit.add_child(bar)
+	# Two uprights holding the bar over the coals.
+	for side in [-1.0, 1.0]:
+		var post := MeshInstance3D.new()
+		var post_mesh := CylinderMesh.new()
+		post_mesh.top_radius = 0.02
+		post_mesh.bottom_radius = 0.025
+		post_mesh.height = 0.62
+		post_mesh.radial_segments = 6
+		post.mesh = post_mesh
+		post.material_override = iron
+		post.position = Vector3(0.56 * side, -0.31, 0)
+		spit.add_child(post)
+
+	var raw: StandardMaterial3D = _material(Color(0.60, 0.22, 0.20), 0.72)
+	for i in cooking:
+		var cut := MeshInstance3D.new()
+		cut.name = "Cut%d" % i
+		var box := BoxMesh.new()
+		box.size = Vector3.ONE
+		cut.mesh = box
+		cut.material_override = raw
+		cut.position = Vector3(-0.3 + float(i) * 0.3, -0.07, 0)
+		cut.scale = Vector3(0.2, 0.13, 0.14)
+		spit.add_child(cut)
+
+func _clear_spit() -> void:
+	if spit != null:
+		spit.queue_free()
+		spit = null
+
+func _cook(delta: float) -> void:
+	if cooking <= 0:
+		return
+	cook_progress += delta
+	var done: float = clampf(cook_progress / COOK_TIME, 0.0, 1.0)
+	# The cuts darken and shrink as they cook, so progress is visible from the
+	# fire rather than only in a message.
+	if spit != null:
+		for child in spit.get_children():
+			var cut := child as MeshInstance3D
+			if cut == null or not cut.name.begins_with("Cut"):
+				continue
+			var mat := cut.material_override as StandardMaterial3D
+			if mat != null:
+				mat.albedo_color = Color(0.60, 0.22, 0.20).lerp(Color(0.32, 0.18, 0.10), done)
+			cut.scale = Vector3(0.2, 0.13, 0.14) * (1.0 - done * 0.22)
+			cut.rotation.x = sin(flicker * 1.2) * 0.1
+	if done >= 1.0:
+		ready_meat = cooking
+		cooking = 0
+		GameState.announce("The meat is done.")
+		Sound.play_ui("ui_toggle", -8.0)

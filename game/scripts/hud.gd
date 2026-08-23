@@ -37,6 +37,7 @@ var compass_ticks: Array = []
 
 var supply_value: Label
 var wood_value: Label
+var meat_value: Label
 var day_value: Label
 var day_caption: Label
 var clock_hand: ColorRect
@@ -59,6 +60,11 @@ var toast_box: PanelContainer
 var toast_label: Label
 
 var hint_label: Label
+var objective_box: PanelContainer
+var objective_text: Label
+var objective_hint: Label
+var objective_step: Label
+var objective_tween: Tween = null
 
 var knife_bar: Control
 var knife_fill: ColorRect
@@ -103,6 +109,9 @@ func _ready() -> void:
 	GameState.held_item_changed.connect(_on_held_item_changed)
 	GameState.interact_prompt_changed.connect(_on_prompt_changed)
 	GameState.announced.connect(show_toast)
+	GameState.objective_changed.connect(_on_objective_changed)
+	GameState.objective_completed.connect(_on_objective_completed)
+	GameState.meat_changed.connect(_on_meat_changed)
 
 	last_health = GameState.player_health
 	health_lag_value = float(last_health)
@@ -114,10 +123,23 @@ func _ready() -> void:
 	_on_knife_cooldown_changed(GameState.knife_cooldown_fraction)
 	_on_supply_collected(GameState.supplies_collected, GameState.SUPPLIES_TOTAL)
 	_on_wood_changed(GameState.wood)
+	_on_meat_changed(GameState.raw_meat, GameState.cooked_meat)
 	_on_day_changed(GameState.day)
 	_on_time_changed(GameState.time_of_day)
 	_on_held_item_changed(GameState.held_item)
 	_on_prompt_changed(GameState.interact_prompt)
+	_pull_objective()
+
+# The guide may have been ready before this panel existed, so ask it directly
+# rather than waiting for an emit that has already happened.
+func _pull_objective() -> void:
+	var guide: Node = get_tree().get_first_node_in_group("objectives")
+	if guide == null or not guide.has_method("current"):
+		return
+	var step: Array = guide.call("current")
+	if step.is_empty():
+		return
+	_on_objective_changed(String(step[0]), String(step[1]), int(step[2]), int(step[3]))
 
 # --- construction ------------------------------------------------------------
 
@@ -193,6 +215,7 @@ func _build() -> void:
 	_build_prompt()
 	_build_toast()
 	_build_hints()
+	_build_objective()
 	_build_scope()
 
 func _build_crosshair() -> void:
@@ -343,6 +366,11 @@ func _build_chips() -> void:
 	column.add_child(wood[0])
 	wood_value = wood[1]
 
+	# Cooked over raw, because cooked is the number that matters.
+	var meat: Array = _chip(Color(0.62, 0.22, 0.20), "MEAT")
+	column.add_child(meat[0])
+	meat_value = meat[1]
+
 func _bar(width: float, height: float, fill_colour: Color) -> Array:
 	var holder := Control.new()
 	holder.custom_minimum_size = Vector2(width, height)
@@ -469,6 +497,74 @@ func _build_hints() -> void:
 	hint_label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	hint_label.position = Vector2(0, -28)
 	root.add_child(hint_label)
+
+# The guide panel: what to do next, and how. Sits top-right, out of the way of
+# the compass and the crosshair.
+func _build_objective() -> void:
+	objective_box = _panel_box(UITheme.BG_DEEP, UITheme.ACCENT_DIM, 3)
+	objective_box.name = "Objective"
+	# Anchored to the right edge and positioned with offsets, not with
+	# `position`: on an anchored Control `position` is absolute in parent space,
+	# so writing it at runtime (as the slide-in below does) throws the panel off
+	# the far side of the screen.
+	objective_box.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	objective_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	objective_box.grow_vertical = Control.GROW_DIRECTION_END
+	objective_box.offset_left = -322.0
+	objective_box.offset_right = -16.0
+	objective_box.offset_top = 16.0
+	objective_box.offset_bottom = 16.0
+	objective_box.custom_minimum_size = Vector2(306, 0)
+	objective_box.visible = false
+	root.add_child(objective_box)
+
+	var column: VBoxContainer = _column(2)
+	objective_box.add_child(column)
+
+	var header: HBoxContainer = _row(0)
+	column.add_child(header)
+	var caption: Label = _label("NEXT", UITheme.body_light(), 12, UITheme.TEXT_FAINT)
+	caption.custom_minimum_size = Vector2(200, 0)
+	header.add_child(caption)
+	objective_step = _label("", UITheme.body_light(), 12, UITheme.TEXT_FAINT, HORIZONTAL_ALIGNMENT_RIGHT)
+	objective_step.custom_minimum_size = Vector2(86, 0)
+	header.add_child(objective_step)
+
+	objective_text = _label("", UITheme.display(), 18, UITheme.TEXT)
+	objective_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_text.custom_minimum_size = Vector2(286, 0)
+	column.add_child(objective_text)
+
+	objective_hint = _label("", UITheme.body_light(), 14, UITheme.TEXT_DIM)
+	objective_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_hint.custom_minimum_size = Vector2(286, 0)
+	column.add_child(objective_hint)
+
+func _on_objective_changed(text: String, hint: String, index: int, total: int) -> void:
+	if text == "":
+		# Guide finished: fade the panel out rather than leaving it blank.
+		var done_tween: Tween = create_tween()
+		done_tween.tween_property(objective_box, "modulate:a", 0.0, 0.6)
+		done_tween.tween_callback(func() -> void:
+			objective_box.visible = false
+		)
+		return
+	objective_box.visible = true
+	objective_box.modulate.a = 1.0
+	objective_text.text = text
+	objective_hint.text = hint
+	objective_step.text = "%d / %d" % [index + 1, total]
+	if objective_tween != null and objective_tween.is_valid():
+		objective_tween.kill()
+	objective_box.offset_left = -312.0
+	objective_tween = create_tween()
+	objective_tween.tween_property(objective_box, "offset_left", -322.0, 0.24).set_ease(Tween.EASE_OUT)
+
+func _on_objective_completed(text: String) -> void:
+	show_toast("Done  ·  %s" % text)
+
+func _on_meat_changed(raw: int, cooked: int) -> void:
+	meat_value.text = "%d / %d" % [cooked, raw]
 
 func _build_scope() -> void:
 	scope_overlay = _full_screen(_build_scope_mask_texture())
