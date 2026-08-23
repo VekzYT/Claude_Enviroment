@@ -1,0 +1,62 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/axe_pickup.gd" id="1_axe"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_unit"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_haft"]
+albedo_color = Color(0.44, 0.31, 0.18, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="Mat_head"]
+albedo_color = Color(0.34, 0.35, 0.37, 1)
+metallic = 0.8
+roughness = 0.45
+
+[sub_resource type="StandardMaterial3D" id="Mat_edge"]
+albedo_color = Color(0.74, 0.75, 0.78, 1)
+metallic = 0.9
+roughness = 0.18
+
+[sub_resource type="BoxShape3D" id="Shape_axe"]
+size = Vector3(1.1, 1.3, 0.6)
+
+[node name="AxePickup" type="Area3D"]
+rotation_degrees = Vector3(0, 0, -58)
+script = ExtResource("1_axe")
+
+[node name="Interact" type="CollisionShape3D" parent="."]
+shape = SubResource("Shape_axe")
+
+[node name="Haft" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.06, 0)
+scale = Vector3(0.06, 0.98, 0.05)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("Mat_haft")
+
+[node name="HeadBody" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.44, 0)
+scale = Vector3(0.09, 0.2, 0.08)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("Mat_head")
+
+[node name="HeadBlade" type="MeshInstance3D" parent="."]
+position = Vector3(-0.13, 0.45, 0)
+rotation_degrees = Vector3(0, 0, 12)
+scale = Vector3(0.19, 0.27, 0.035)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("Mat_head")
+
+[node name="HeadEdge" type="MeshInstance3D" parent="."]
+position = Vector3(-0.222, 0.455, 0)
+rotation_degrees = Vector3(0, 0, 12)
+scale = Vector3(0.03, 0.28, 0.016)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("Mat_edge")
+
+[node name="HeadPoll" type="MeshInstance3D" parent="."]
+position = Vector3(0.072, 0.44, 0)
+scale = Vector3(0.08, 0.14, 0.072)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("Mat_head")

@@ -26,10 +26,13 @@ const KNIFE_WEAPON_INDEX := 2
 @onready var compass_label: Label = $CompassLabel
 @onready var supply_label: Label = $SupplyLabel
 @onready var toast_label: Label = $ToastLabel
+@onready var wood_label: Label = $WoodLabel
+@onready var held_label: Label = $HeldLabel
+@onready var prompt_label: Label = $PromptLabel
 
 var last_health := 100
 var current_weapon_index := 1
-var weapon_names: Array = ["Sniper", "Handgun", "Knife"]
+var weapon_names: Array = ["Sniper", "Handgun", "Knife", "Bare hands", "Axe"]
 var pulse_time := 0.0
 var player: Node3D = null
 var toast_tween: Tween = null
@@ -46,6 +49,10 @@ func _ready() -> void:
 	GameState.hit_marker_triggered.connect(_on_hit_marker_triggered)
 	GameState.landmark_discovered.connect(_on_landmark_discovered)
 	GameState.supply_collected.connect(_on_supply_collected)
+	GameState.wood_changed.connect(_on_wood_changed)
+	GameState.held_item_changed.connect(_on_held_item_changed)
+	GameState.interact_prompt_changed.connect(_on_prompt_changed)
+	GameState.announced.connect(show_toast)
 
 	_on_score_changed(GameState.score)
 	last_health = GameState.player_health
@@ -55,6 +62,9 @@ func _ready() -> void:
 	_on_scope_active_changed(GameState.scope_active)
 	_on_knife_cooldown_changed(GameState.knife_cooldown_fraction)
 	supply_label.text = "Supplies: %d / %d" % [GameState.supplies_collected, GameState.SUPPLIES_TOTAL]
+	_on_wood_changed(GameState.wood)
+	_on_held_item_changed(GameState.held_item)
+	_on_prompt_changed(GameState.interact_prompt)
 
 	hit_marker.visible = false
 	toast_label.visible = false
@@ -88,6 +98,16 @@ func _on_landmark_discovered(landmark_name: String) -> void:
 func _on_supply_collected(count: int, total: int) -> void:
 	supply_label.text = "Supplies: %d / %d" % [count, total]
 	show_toast("Supplies recovered  (%d/%d)" % [count, total])
+
+func _on_wood_changed(amount: int) -> void:
+	wood_label.text = "Wood: %d" % amount
+
+func _on_held_item_changed(title: String) -> void:
+	held_label.text = title
+
+func _on_prompt_changed(text: String) -> void:
+	prompt_label.text = text
+	prompt_label.visible = text != ""
 
 func show_toast(text: String) -> void:
 	if toast_tween != null and toast_tween.is_valid():

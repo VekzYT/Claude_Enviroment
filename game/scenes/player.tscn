@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
 
@@ -47,6 +47,23 @@ roughness = 0.1
 albedo_color = Color(0.75, 0.76, 0.78, 1)
 metallic = 0.9
 roughness = 0.15
+
+[sub_resource type="StandardMaterial3D" id="StdMat_skin"]
+albedo_color = Color(0.72, 0.55, 0.43, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="StdMat_sleeve"]
+albedo_color = Color(0.27, 0.30, 0.24, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StdMat_haft"]
+albedo_color = Color(0.44, 0.31, 0.18, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StdMat_axehead"]
+albedo_color = Color(0.46, 0.47, 0.49, 1)
+metallic = 0.8
+roughness = 0.42
 
 [sub_resource type="StandardMaterial3D" id="StdMat_muzzleflash"]
 albedo_color = Color(1, 0.85, 0.3, 1)
@@ -253,3 +270,175 @@ position = Vector3(0, 0, 0.13)
 scale = Vector3(0.03, 0.03, 0.03)
 mesh = SubResource("SphereMesh_unit")
 surface_material_override/0 = SubResource("StdMat_gunmetal")
+
+[node name="Hands" type="Node3D" parent="Head/Camera3D"]
+
+[node name="LeftArm" type="Node3D" parent="Head/Camera3D/Hands"]
+position = Vector3(-0.27, -0.47, -0.3)
+rotation_degrees = Vector3(11, 8, 6)
+
+[node name="Sleeve" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
+position = Vector3(0, 0, -0.115)
+scale = Vector3(0.07, 0.072, 0.23)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_sleeve")
+
+[node name="Cuff" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
+position = Vector3(0, 0, -0.232)
+scale = Vector3(0.078, 0.08, 0.03)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_sleeve")
+
+[node name="Forearm" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
+position = Vector3(0, 0.002, -0.3)
+scale = Vector3(0.058, 0.055, 0.115)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Palm" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
+position = Vector3(0, 0.002, -0.392)
+scale = Vector3(0.062, 0.043, 0.078)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Knuckles" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
+position = Vector3(0, 0.006, -0.434)
+scale = Vector3(0.066, 0.046, 0.02)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Finger1" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
+position = Vector3(-0.024, -0.012, -0.47)
+rotation_degrees = Vector3(-28, 0, 0)
+scale = Vector3(0.021, 0.038, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Finger2" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
+position = Vector3(0, -0.013, -0.472)
+rotation_degrees = Vector3(-30, 0, 0)
+scale = Vector3(0.021, 0.04, 0.064)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Finger3" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
+position = Vector3(0.024, -0.011, -0.468)
+rotation_degrees = Vector3(-26, 0, 0)
+scale = Vector3(0.02, 0.036, 0.056)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Thumb" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
+position = Vector3(0.032, 0.01, -0.418)
+rotation_degrees = Vector3(-12, -26, 0)
+scale = Vector3(0.026, 0.03, 0.062)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="RightArm" type="Node3D" parent="Head/Camera3D/Hands"]
+position = Vector3(0.245, -0.445, -0.29)
+rotation_degrees = Vector3(10, -9, -7)
+
+[node name="Sleeve" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
+position = Vector3(0, 0, -0.115)
+scale = Vector3(0.07, 0.072, 0.23)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_sleeve")
+
+[node name="Cuff" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
+position = Vector3(0, 0, -0.232)
+scale = Vector3(0.078, 0.08, 0.03)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_sleeve")
+
+[node name="Forearm" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
+position = Vector3(0, 0.002, -0.3)
+scale = Vector3(0.058, 0.055, 0.115)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Palm" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
+position = Vector3(0, 0.002, -0.392)
+scale = Vector3(0.062, 0.043, 0.078)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Knuckles" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
+position = Vector3(0, 0.006, -0.434)
+scale = Vector3(0.066, 0.046, 0.02)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Finger1" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
+position = Vector3(0.024, -0.012, -0.47)
+rotation_degrees = Vector3(-28, 0, 0)
+scale = Vector3(0.021, 0.038, 0.06)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Finger2" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
+position = Vector3(0, -0.013, -0.472)
+rotation_degrees = Vector3(-30, 0, 0)
+scale = Vector3(0.021, 0.04, 0.064)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Finger3" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
+position = Vector3(-0.024, -0.011, -0.468)
+rotation_degrees = Vector3(-26, 0, 0)
+scale = Vector3(0.02, 0.036, 0.056)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="Thumb" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
+position = Vector3(-0.032, 0.01, -0.418)
+rotation_degrees = Vector3(-12, 26, 0)
+scale = Vector3(0.026, 0.03, 0.062)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_skin")
+
+[node name="WeaponAxe" type="Node3D" parent="Head/Camera3D"]
+position = Vector3(0.24, -0.4, -0.52)
+rotation_degrees = Vector3(-6, -26, 34)
+
+[node name="Haft" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(0, 0.135, 0)
+scale = Vector3(0.027, 0.47, 0.023)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_haft")
+
+[node name="HaftGrip" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(0, -0.045, 0)
+scale = Vector3(0.034, 0.15, 0.03)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_polymer_black")
+
+[node name="HaftKnob" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(0, -0.128, 0)
+scale = Vector3(0.038, 0.032, 0.034)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_haft")
+
+[node name="HeadBody" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(0, 0.352, 0)
+scale = Vector3(0.044, 0.088, 0.04)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_axehead")
+
+[node name="HeadCheek" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(-0.048, 0.354, 0)
+scale = Vector3(0.078, 0.115, 0.03)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_axehead")
+
+[node name="HeadEdge" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(-0.093, 0.355, 0)
+scale = Vector3(0.013, 0.118, 0.014)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_blade")
+
+[node name="HeadPoll" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(0.034, 0.35, 0)
+scale = Vector3(0.038, 0.07, 0.036)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_axehead")

@@ -1,10 +1,31 @@
-# Syfon v2.2 — Dead Woods
+# Syfon v2.3 — First Light
 
-A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release is the world build: a **huge, dense forest** you can get genuinely lost in.
+A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release gives you a home and something to do with your hands.
 
-Starts at a real main menu with settings, then drops you into an abandoned survivor camp in a forest of rolling hills and four mountain massifs — around 1,400 trees across four species, deadfall, bushes, ferns, wildflowers, boulders and 18,000 blades of undergrowth, all swaying in the wind under a cold overcast sky. Dirt tracks wind out of camp to eight other locations to find. A compass, a landmark-discovery system and eight supply caches guide the exploring.
+You wake outside a small log cabin in a forest of rolling hills and four mountain massifs — around 1,400 trees across four species, deadfall, bushes, ferns, wildflowers, boulders and 18,000 blades of undergrowth, all swaying in the wind under a cold overcast sky. Your inventory is empty; you have nothing but your own two hands. An axe is buried in the chopping block on the porch. Take it, and the forest becomes a resource.
 
 **Zombies are not in yet** — this release intentionally clears out the old human soldier bots so the world can be built first.
+
+## What's new in v2.3
+
+**A starter cabin.** A proper log home at the edge of the woods — plank walls, a pitched shingle roof with a ridge beam and exposed rafters, a stone chimney, a covered porch on posts with a rail, a bunk and a table inside, and a warm lamp burning through the window. You spawn just outside its door.
+
+**You can see your hands.** Both arms are on screen at all times, with forearm, palm, knuckles, three curled fingers and a thumb each. They breathe when you stand still, bob when you walk, drift with your mouse, and jolt when the axe bites.
+
+**A starter axe, outside, in the chopping block.** It sits in the block on the porch, tilting gently, with a "Hold **E** — Axe" prompt when you look at it. **You start with nothing in your inventory** — the sniper, handgun and knife are all gone from the loadout. Bare hands is slot one and the axe is the first thing you'll own.
+
+**The arms actually grip the axe.** When the axe is out, both hands leave their resting pose and reach for the haft — the right hand high near the head, the left low on the grip — solved every frame against wherever the swing animation has thrown the weapon. So the grip holds through the whole arc instead of the axe floating between two static hands.
+
+**Chopping down trees.** Every one of the ~1,400 trees is registered against its own collision shape, so a raycast that hits a trunk resolves to *that* tree. Five bites of the axe fells one:
+- Each non-lethal hit shakes the whole tree — trunk and every canopy tier together — and throws wood chips off the cut.
+- The fifth drops it. The tree rotates rigidly about its base through a two-stage eased fall, over-swings slightly at the end and settles with a bounce, and a stump is revealed at the stump line from a pooled `MultiMesh`.
+- Felling banks **4 wood** (1 per bite), tracked on a new HUD counter, and announces "Timber!".
+
+**Swing animation.** The overhead chop winds back 62° over the shoulder, drives down through −74° with a quadratic (accelerating) fall so the head has weight, then eases back to guard over the longer half of the cycle. The arms drive forward through the strike and the whole thing shakes on contact.
+
+**Fixed: 3D effects could crash during a scene change.** `Effects` parented particles to `get_tree().current_scene`, which is null mid-transition — the same latent bug already fixed in `Sound`. Both now fall back to the always-present autoload.
+
+Verified by running the engine, not by reading the code: a headless Godot 4.3 build imports the project, drives the character into a tree and swings until it falls (`swings=8, wood 0 → 11, felled=true, stumps=1`), and renders the screenshots this release was tuned against.
 
 ## What's new in v2.2
 
@@ -127,9 +148,11 @@ Godot is free, open-source, and its projects are plain text files, which is what
   - **Left Click** — fire (guns) or dash-slash (knife), with a visible tracer on gunfire and a hit marker on a landed hit
   - **Right Click (hold)** — aim (guns only) — the sniper's aim covers the screen with a real scope overlay
   - **R** — reload (guns only; magazine drops out and slides back in)
-  - **Mouse Wheel / 1, 2, 3** — switch weapons, with a draw/holster dip animation
-  - **E** — toggle the weapon list panel (top-right), highlighting your current weapon
+  - **Mouse Wheel** — cycle through what you're actually carrying, with a draw/holster dip animation
+  - **E** — pick up the thing you're looking at (the prompt appears under the crosshair when something is in reach)
   - **Esc** — pause (freezes the game, opens Resume / Settings / Quit to Main Menu)
+
+You start with an empty inventory. The axe on the chopping block outside the cabin is the first thing you can own — walk up to it, press **E**, then left-click to swing. Five bites drop a tree; each bite banks a wood.
 
 Shoot or slash the red cylinder targets and robots for points — the robots (patrolling near their spawn point) will chase you down and shoot back once they spot you, firing their own red tracers. Getting shot costs health, shown as a bar at the bottom of the screen with a red flash (and a pulsing screen warning under 25 HP); at 0 you respawn after a couple of seconds.
 
@@ -155,11 +178,14 @@ game/
     target.tscn             # shootable static target
     bot.tscn                 # robotic enemy: detailed kitbashed body + AI script
     settings_panel.tscn       # reusable volume/sensitivity panel, instanced into both the main menu and the pause menu
+    axe_pickup.tscn            # the starter axe in the chopping block: Area3D in the "pickup" group, tilts as it waits
   scripts/
     main_menu.gd             # main menu button wiring
     pause_menu.gd             # in-game pause menu (attached to main.tscn's PauseMenu node): freezes the tree, Resume/Settings/Quit
     settings_panel.gd          # slider <-> Settings autoload wiring, shared by both menus
-    player.gd               # movement, mouse-look, weapon switching/aim/reload/melee (incl. knife dash+cooldown), health/death, sound triggers
+    player.gd               # movement, mouse-look, inventory + pickups, hand/arm posing and axe grip solve, swinging and chopping, health/death, sound triggers
+    axe_pickup.gd            # the world axe: idle tilt, "Hold E" prompt, hands the item to the player and sinks away
+    forest_scatter.gd         # the forest itself, and the chop registry: every tree keyed by its own collision shape, fell animation, stump pool
     target.gd                # hit/respawn logic
     bot.gd                    # patrol/chase/attack AI state machine (obstacle avoidance + combat strafing), hitscan weapon, health/respawn, sound triggers
     game_state.gd             # autoload singleton: score, player health, active weapon, weapon-panel/scope/knife-cooldown UI state, hit-marker event, reset()

@@ -9,6 +9,10 @@ signal knife_cooldown_changed(fraction: float)
 signal hit_marker_triggered
 signal landmark_discovered(landmark_name: String)
 signal supply_collected(count: int, total: int)
+signal held_item_changed(title: String)
+signal interact_prompt_changed(text: String)
+signal wood_changed(amount: int)
+signal announced(text: String)
 
 const SUPPLIES_TOTAL := 8
 
@@ -19,6 +23,9 @@ var weapon_panel_open := false
 var scope_active := false
 var knife_cooldown_fraction := 0.0
 var supplies_collected := 0
+var held_item := "Bare hands"
+var interact_prompt := ""
+var wood := 0
 
 func add_point() -> void:
 	score += 1
@@ -54,8 +61,31 @@ func collect_supply() -> void:
 	supplies_collected += 1
 	supply_collected.emit(supplies_collected, SUPPLIES_TOTAL)
 
+func set_held_item(title: String) -> void:
+	held_item = title
+	held_item_changed.emit(held_item)
+
+func set_interact_prompt(text: String) -> void:
+	if text == interact_prompt:
+		return
+	interact_prompt = text
+	interact_prompt_changed.emit(interact_prompt)
+
+func add_wood(amount: int) -> void:
+	wood += amount
+	wood_changed.emit(wood)
+
+func announce(text: String) -> void:
+	announced.emit(text)
+
 func reset() -> void:
 	supplies_collected = 0
+	wood = 0
+	wood_changed.emit(wood)
+	held_item = "Bare hands"
+	held_item_changed.emit(held_item)
+	interact_prompt = ""
+	interact_prompt_changed.emit(interact_prompt)
 	score = 0
 	score_changed.emit(score)
 	player_health = 100

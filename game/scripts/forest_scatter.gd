@@ -55,6 +55,16 @@ var tree_collision_body: StaticBody3D = null
 var rock_collision_body: StaticBody3D = null
 var bucket_shapes: Array[BoxShape3D] = []
 
+# Chopping. Each felled-able tree records every MultiMesh instance it owns
+# (trunk plus every canopy tier) so the whole thing can be rotated as one rigid
+# body about its base. tree_by_shape maps the CollisionShape3D the axe ray hit
+# back to that record, which is how a batched instance becomes addressable.
+var trees: Array = []
+var tree_by_shape: Dictionary = {}
+var falling: Array = []
+var stump_mm: MultiMesh = null
+var stumps_used: int = 0
+
 # Basis.scaled() multiplies scale in on the left, which shears a mesh whose
 # rotation mixes the unevenly scaled axes. Composing on the right scales along
 # the mesh's own axes, which is what tilted trunks and branches need.
@@ -62,6 +72,7 @@ func _local_scale(rot: Basis, s: Vector3) -> Basis:
 	return rot * Basis.IDENTITY.scaled(s)
 
 func _ready() -> void:
+	add_to_group("forest")
 	rng.seed = 20260822
 	terrain = get_node_or_null(terrain_path) as TerrainGrid
 	if terrain == null:
@@ -72,6 +83,7 @@ func _ready() -> void:
 	terrain.ensure_built()
 
 	_setup_collision_bodies()
+	_build_stump_pool()
 	_scatter_conifers()
 	_scatter_broadleaf()
 	_scatter_dead_trees()
@@ -285,9 +297,9 @@ func _rock_material() -> StandardMaterial3D:
 # ---------------------------------------------------------------- multimesh
 
 func _add_multimesh(mesh_name: String, mesh: Mesh, material: Material,
-		transforms: Array[Transform3D], colors: Array[Color], cast_shadow: bool) -> void:
+		transforms: Array[Transform3D], colors: Array[Color], cast_shadow: bool) -> MultiMesh:
 	if transforms.is_empty():
-		return
+		return null
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = true
@@ -303,6 +315,7 @@ func _add_multimesh(mesh_name: String, mesh: Mesh, material: Material,
 	if not cast_shadow:
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mmi)
+	return mm
 
 # ---------------------------------------------------------------- collision
 
@@ -320,7 +333,7 @@ func _setup_collision_bodies() -> void:
 		shape.size = Vector3(r * 1.6, 34.0, r * 1.6)
 		bucket_shapes.append(shape)
 
-func _add_trunk_collision(pos: Vector2, ground_y: float, radius: float) -> void:
+func _add_trunk_collision(pos: Vector2, ground_y: float, radius: float) -> CollisionShape3D:
 	var best: int = 0
 	var best_diff: float = absf(TRUNK_RADIUS_BUCKETS[0] - radius)
 	for i in TRUNK_RADIUS_BUCKETS.size():
@@ -332,6 +345,7 @@ func _add_trunk_collision(pos: Vector2, ground_y: float, radius: float) -> void:
 	cs.shape = bucket_shapes[best]
 	cs.position = Vector3(pos.x, ground_y + 12.0, pos.y)
 	tree_collision_body.add_child(cs)
+	return cs
 
 # ---------------------------------------------------------------- conifers
 
@@ -342,6 +356,7 @@ func _scatter_conifers() -> void:
 	var trunk_col: Array[Color] = []
 	var tier_xf: Array[Array] = [[], [], [], []]
 	var tier_col: Array[Array] = [[], [], [], []]
+	var pending: Array = []
 
 	for p in points:
 		var gy: float = _ground(p.x, p.y)
@@ -353,6 +368,8 @@ func _scatter_conifers() -> void:
 		var tilt_dir: float = rng.randf_range(0.0, TAU)
 		var rot: Basis = Basis(Vector3(cos(tilt_dir), 0.0, sin(tilt_dir)), tilt) * Basis(Vector3.UP, yaw)
 
+		var trunk_slot: int = trunk_xf.size()
+		var tier_slots: Array = []
 		trunk_xf.append(Transform3D(_local_scale(rot, Vector3(radius, h, radius)),
 			Vector3(p.x, gy + h * 0.5, p.y)))
 		var bark: float = rng.randf_range(0.72, 1.16)
@@ -383,19 +400,25 @@ func _scatter_conifers() -> void:
 			var fh: float = h * t.z
 			var xf := Transform3D(_local_scale(rot, Vector3(fw, fh, fw)),
 				Vector3(p.x, gy + h * t.x, p.y))
+			tier_slots.append(Vector2i(i, tier_xf[i].size()))
 			tier_xf[i].append(xf)
 			tier_col[i].append(leaf_color)
 
-		_add_trunk_collision(p, gy, radius)
+		var cs: CollisionShape3D = _add_trunk_collision(p, gy, radius)
+		pending.append({
+			"trunk": trunk_slot, "tiers": tier_slots, "cs": cs,
+			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
+		})
 
 	var trunk_mesh: CylinderMesh = _trunk_mesh()
 	var bark_mat: ShaderMaterial = _bark_material(Color(0.68, 0.62, 0.55, 1.0), Vector2(1.0, 3.0), 0.95)
-	_add_multimesh("ConiferTrunks", trunk_mesh, bark_mat, trunk_xf, trunk_col, true)
+	var trunk_mm: MultiMesh = _add_multimesh("ConiferTrunks", trunk_mesh, bark_mat, trunk_xf, trunk_col, true)
 
 	# Two differently deformed cones alternate between tiers so the canopy
 	# silhouette never repeats exactly.
 	var cone_a: ArrayMesh = _deform(_cone_source(), 0.26, 1.6, 3311, 1.0)
 	var cone_b: ArrayMesh = _deform(_cone_source(), 0.30, 2.1, 7742, 1.0)
+	var tier_mms: Array = []
 	var tier_names: Array[String] = ["ConiferCanopy1", "ConiferCanopy2", "ConiferCanopy3", "ConiferCanopy4"]
 	var bases: Array[Color] = [
 		Color(0.075, 0.135, 0.075, 1.0), Color(0.085, 0.150, 0.082, 1.0),
@@ -415,9 +438,15 @@ func _scatter_conifers() -> void:
 		var tier_mesh: ArrayMesh = cone_a
 		if i % 2 == 1:
 			tier_mesh = cone_b
-		_add_multimesh(tier_names[i], tier_mesh,
+		tier_mms.append(_add_multimesh(tier_names[i], tier_mesh,
 			_foliage_material(bases[i], tips[i], 1.0, 0.05 + float(i) * 0.02, 0.9 + float(i) * 0.08),
-			xf_list, col_list, i < 3)
+			xf_list, col_list, i < 3))
+
+	for rec in pending:
+		var parts: Array = [{"mm": trunk_mm, "i": rec["trunk"], "rest": trunk_xf[rec["trunk"]]}]
+		for slot in rec["tiers"]:
+			parts.append({"mm": tier_mms[slot.x], "i": slot.y, "rest": tier_xf[slot.x][slot.y]})
+		_register_tree(rec, parts)
 
 # ---------------------------------------------------------------- broadleaf
 
@@ -428,6 +457,7 @@ func _scatter_broadleaf() -> void:
 	var trunk_col: Array[Color] = []
 	var blob_xf: Array[Transform3D] = []
 	var blob_col: Array[Color] = []
+	var pending: Array = []
 
 	for p in points:
 		var gy: float = _ground(p.x, p.y)
@@ -444,6 +474,8 @@ func _scatter_broadleaf() -> void:
 		if is_birch:
 			trunk_ratio = 0.62
 		var trunk_h: float = h * trunk_ratio
+		var trunk_slot: int = trunk_xf.size()
+		var blob_slots: Array = []
 		trunk_xf.append(Transform3D(_local_scale(rot, Vector3(radius, trunk_h, radius)),
 			Vector3(p.x, gy + trunk_h * 0.5, p.y)))
 		var shade: float = rng.randf_range(0.5, 0.8)
@@ -470,18 +502,28 @@ func _scatter_broadleaf() -> void:
 				blob_scale = rng.randf_range(0.55, 0.8)
 			var s: float = crown_r * blob_scale
 			var b := Basis(Vector3.UP, rng.randf_range(0.0, TAU))
+			blob_slots.append(blob_xf.size())
 			blob_xf.append(Transform3D(_local_scale(b, Vector3(s * 1.15, s * 0.9, s * 1.15)),
 				Vector3(p.x + cos(ang) * off, crown_y + rng.randf_range(-0.1, 0.3) * crown_r, p.y + sin(ang) * off)))
 			blob_col.append(leaf_color)
 
-		_add_trunk_collision(p, gy, radius)
+		var cs: CollisionShape3D = _add_trunk_collision(p, gy, radius)
+		pending.append({
+			"trunk": trunk_slot, "blobs": blob_slots, "cs": cs,
+			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
+		})
 
 	var bark_mat: ShaderMaterial = _bark_material(Color(0.7, 0.66, 0.6, 1.0), Vector2(1.0, 2.2), 0.95)
-	_add_multimesh("BroadleafTrunks", _trunk_mesh(), bark_mat, trunk_xf, trunk_col, true)
+	var trunk_mm: MultiMesh = _add_multimesh("BroadleafTrunks", _trunk_mesh(), bark_mat, trunk_xf, trunk_col, true)
 	var blob: ArrayMesh = _deform(_sphere_source(12, 7), 0.30, 1.4, 5150, 0.95)
-	_add_multimesh("BroadleafCanopy", blob,
+	var blob_mm: MultiMesh = _add_multimesh("BroadleafCanopy", blob,
 		_foliage_material(Color(0.115, 0.175, 0.085, 1.0), Color(0.235, 0.315, 0.135, 1.0), 1.2, 0.09, 1.15),
 		blob_xf, blob_col, true)
+	for rec in pending:
+		var parts: Array = [{"mm": trunk_mm, "i": rec["trunk"], "rest": trunk_xf[rec["trunk"]]}]
+		for bi in rec["blobs"]:
+			parts.append({"mm": blob_mm, "i": bi, "rest": blob_xf[bi]})
+		_register_tree(rec, parts)
 
 # ---------------------------------------------------------------- deadfall
 
@@ -492,6 +534,7 @@ func _scatter_dead_trees() -> void:
 	var trunk_col: Array[Color] = []
 	var branch_xf: Array[Transform3D] = []
 	var branch_col: Array[Color] = []
+	var pending: Array = []
 
 	for p in points:
 		var gy: float = _ground(p.x, p.y)
@@ -502,6 +545,8 @@ func _scatter_dead_trees() -> void:
 		var lean_dir: float = rng.randf_range(0.0, TAU)
 		var rot: Basis = Basis(Vector3(cos(lean_dir), 0.0, sin(lean_dir)), lean) * Basis(Vector3.UP, yaw)
 
+		var trunk_slot: int = trunk_xf.size()
+		var branch_slots: Array = []
 		trunk_xf.append(Transform3D(_local_scale(rot, Vector3(radius, h, radius)),
 			Vector3(p.x, gy + h * 0.5, p.y)))
 		var shade: float = rng.randf_range(0.40, 0.66)
@@ -515,15 +560,25 @@ func _scatter_dead_trees() -> void:
 			var bpitch: float = rng.randf_range(0.85, 1.55)
 			var b_rot: Basis = Basis(Vector3.UP, byaw) * Basis(Vector3.RIGHT, bpitch)
 			var offset := Vector3(cos(byaw), 0.0, sin(byaw)) * blen * 0.35
+			branch_slots.append(branch_xf.size())
 			branch_xf.append(Transform3D(_local_scale(b_rot, Vector3(brad, blen, brad)),
 				Vector3(p.x, gy + by, p.y) + offset))
 			branch_col.append(Color(shade * 0.9, shade * 0.85, shade * 0.78, 1.0))
 
-		_add_trunk_collision(p, gy, radius)
+		var cs: CollisionShape3D = _add_trunk_collision(p, gy, radius)
+		pending.append({
+			"trunk": trunk_slot, "branches": branch_slots, "cs": cs,
+			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
+		})
 
 	var dead_mat: ShaderMaterial = _bark_material(Color(0.5, 0.46, 0.4, 1.0), Vector2(1.0, 2.5), 1.0)
-	_add_multimesh("DeadTrunks", _trunk_mesh(), dead_mat, trunk_xf, trunk_col, true)
-	_add_multimesh("DeadBranches", _trunk_mesh(), dead_mat, branch_xf, branch_col, false)
+	var trunk_mm: MultiMesh = _add_multimesh("DeadTrunks", _trunk_mesh(), dead_mat, trunk_xf, trunk_col, true)
+	var branch_mm: MultiMesh = _add_multimesh("DeadBranches", _trunk_mesh(), dead_mat, branch_xf, branch_col, false)
+	for rec in pending:
+		var parts: Array = [{"mm": trunk_mm, "i": rec["trunk"], "rest": trunk_xf[rec["trunk"]]}]
+		for bi in rec["branches"]:
+			parts.append({"mm": branch_mm, "i": bi, "rest": branch_xf[bi]})
+		_register_tree(rec, parts)
 
 # ---------------------------------------------------------------- undergrowth
 
@@ -687,3 +742,142 @@ func _place_model(path: String, prefix: String, count: int,
 		instance.rotation.y = rng.randf_range(0.0, TAU)
 		var s: float = rng.randf_range(min_scale, max_scale)
 		instance.scale = Vector3(s, s, s)
+
+# ==================================================================== chopping
+#
+# A tree lives as instances spread across several MultiMeshes, so it has no node
+# of its own to hit. The registry below closes that gap: the axe raycast lands on
+# one of the trunk collision shapes, that shape maps to a record, and the record
+# knows every instance the tree owns. Felling then rotates all of them together
+# about the trunk base, which is what makes a batched tree behave like a solid
+# object.
+
+const TREE_BASE_HP := 5
+const FALL_DURATION := 2.1
+const STUMP_HEIGHT := 0.42
+
+func _register_tree(rec: Dictionary, parts: Array) -> void:
+	var entry: Dictionary = {
+		"parts": parts,
+		"base": rec["base"],
+		"radius": rec["radius"],
+		"height": rec["height"],
+		"cs": rec["cs"],
+		"hp": TREE_BASE_HP + int(rec["height"] / 6.0),
+		"felled": false,
+	}
+	trees.append(entry)
+	if rec["cs"] != null:
+		tree_by_shape[rec["cs"]] = entry
+
+# Called by the axe. Returns what happened so the player can react without
+# knowing anything about how the forest is stored.
+func chop(collision_shape: Node, damage: int) -> Dictionary:
+	var entry: Variant = tree_by_shape.get(collision_shape)
+	if entry == null:
+		return {"hit": false}
+	var tree: Dictionary = entry
+	if tree["felled"]:
+		return {"hit": false}
+	tree["hp"] = int(tree["hp"]) - damage
+	if int(tree["hp"]) > 0:
+		# Shudder on a glancing blow so every swing reads as connecting.
+		_shake_tree(tree, 0.035)
+		return {"hit": true, "felled": false, "base": tree["base"]}
+	_fell_tree(tree)
+	return {"hit": true, "felled": true, "base": tree["base"]}
+
+func _shake_tree(tree: Dictionary, amount: float) -> void:
+	var axis := Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0))
+	if axis.length_squared() < 0.001:
+		axis = Vector3.RIGHT
+	falling.append({
+		"tree": tree, "t": 0.0, "dur": 0.28, "angle": amount,
+		"axis": axis.normalized(), "shake": true,
+	})
+
+func _fell_tree(tree: Dictionary) -> void:
+	tree["felled"] = true
+	var cs: Variant = tree["cs"]
+	if cs != null:
+		# Let the player walk over what they just dropped.
+		(cs as CollisionShape3D).set_deferred("disabled", true)
+	var dir: float = rng.randf_range(0.0, TAU)
+	falling.append({
+		"tree": tree, "t": 0.0, "dur": FALL_DURATION,
+		"angle": PI * 0.5, "axis": Vector3(cos(dir), 0.0, sin(dir)), "shake": false,
+	})
+	_place_stump(tree)
+
+func _place_stump(tree: Dictionary) -> void:
+	if stump_mm == null or stumps_used >= stump_mm.instance_count:
+		return
+	var base: Vector3 = tree["base"]
+	var r: float = float(tree["radius"]) * 1.12
+	var xf := Transform3D(
+		Basis(Vector3.UP, rng.randf_range(0.0, TAU)).scaled(Vector3(r, STUMP_HEIGHT, r)),
+		base + Vector3(0.0, STUMP_HEIGHT * 0.45, 0.0))
+	stump_mm.set_instance_transform(stumps_used, xf)
+	stump_mm.set_instance_color(stumps_used, Color(0.85, 0.78, 0.62, 1.0))
+	stumps_used += 1
+	stump_mm.visible_instance_count = stumps_used
+
+func _build_stump_pool() -> void:
+	var cap: int = CONIFER_COUNT + BROADLEAF_COUNT + DEAD_TREE_COUNT
+	var m := CylinderMesh.new()
+	m.top_radius = 1.0
+	m.bottom_radius = 1.12
+	m.height = 1.0
+	m.radial_segments = 10
+	m.rings = 1
+	stump_mm = MultiMesh.new()
+	stump_mm.transform_format = MultiMesh.TRANSFORM_3D
+	stump_mm.use_colors = true
+	stump_mm.mesh = m
+	stump_mm.instance_count = cap
+	# Nothing is drawn until a tree actually comes down.
+	stump_mm.visible_instance_count = 0
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "Stumps"
+	mmi.multimesh = stump_mm
+	mmi.material_override = _bark_material(Color(0.82, 0.74, 0.6, 1.0), Vector2(1.0, 1.0), 0.95)
+	add_child(mmi)
+
+func _process(delta: float) -> void:
+	if falling.is_empty():
+		return
+	var still_going: Array = []
+	for anim in falling:
+		var a: Dictionary = anim
+		a["t"] = float(a["t"]) + delta
+		var t: float = clampf(float(a["t"]) / float(a["dur"]), 0.0, 1.0)
+		var angle: float = 0.0
+		if bool(a["shake"]):
+			# A quick there-and-back wobble.
+			angle = sin(t * PI) * float(a["angle"])
+		else:
+			# Timber: slow to start, then accelerating like it is hinging on the
+			# stump, with a small bounce as it settles.
+			var e: float = t * t * (3.0 - 2.0 * t)
+			e = e * e
+			angle = float(a["angle"]) * e
+			if t > 0.92:
+				angle -= sin((t - 0.92) / 0.08 * PI) * 0.05
+		_apply_tree_rotation(a["tree"], a["axis"], angle)
+		if t < 1.0:
+			still_going.append(a)
+	falling = still_going
+
+func _apply_tree_rotation(tree: Dictionary, axis: Vector3, angle: float) -> void:
+	var base: Vector3 = tree["base"]
+	var rot := Basis(axis, angle)
+	for part in tree["parts"]:
+		var mm: MultiMesh = part["mm"]
+		if mm == null:
+			continue
+		var idx: int = part["i"]
+		# rest was captured at build time; never read back off the MultiMesh.
+		var rest: Transform3D = part["rest"]
+		# Rigid rotation about the trunk base, so trunk and canopy stay welded.
+		mm.set_instance_transform(idx, Transform3D(
+			rot * rest.basis, base + rot * (rest.origin - base)))

@@ -25,6 +25,12 @@ const RESPAWN_DELAY := 2.0
 const WEAPON_SNIPER := 0
 const WEAPON_HANDGUN := 1
 const WEAPON_KNIFE := 2
+const ITEM_HANDS := 3
+const ITEM_AXE := 4
+
+const AXE_SWING_DURATION := 0.62
+const AXE_CHOP_DAMAGE := 1
+const INTERACT_RANGE := 3.2
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -33,6 +39,10 @@ const WEAPON_KNIFE := 2
 @onready var weapon_sniper: Node3D = $Head/Camera3D/WeaponSniper
 @onready var weapon_handgun: Node3D = $Head/Camera3D/WeaponHandgun
 @onready var weapon_knife: Node3D = $Head/Camera3D/WeaponKnife
+@onready var hands: Node3D = $Head/Camera3D/Hands
+@onready var arm_left: Node3D = $Head/Camera3D/Hands/LeftArm
+@onready var arm_right: Node3D = $Head/Camera3D/Hands/RightArm
+@onready var weapon_axe: Node3D = $Head/Camera3D/WeaponAxe
 
 @onready var sniper_muzzle: MeshInstance3D = $Head/Camera3D/WeaponSniper/MuzzleFlash
 @onready var sniper_magazine: MeshInstance3D = $Head/Camera3D/WeaponSniper/Magazine
@@ -48,17 +58,21 @@ var weapon_hip_positions: Array = []
 var weapon_hip_rotations: Array = []
 var magazine_base_positions: Array = []
 
-var weapon_damage: Array = [100, 25, 999]
-var weapon_fire_cooldown: Array = [1.3, 0.28, 0.45]
-var weapon_reload_time: Array = [2.4, 1.0, 0.0]
-var weapon_is_melee: Array = [false, false, true]
-var weapon_full_scope: Array = [true, false, false]
-var weapon_ads_fov: Array = [16.0, 55.0, 75.0]
-var weapon_melee_range: Array = [0.0, 0.0, 2.2]
+var weapon_damage: Array = [100, 25, 999, 0, 40]
+var weapon_fire_cooldown: Array = [1.3, 0.28, 0.45, 0.5, 0.62]
+var weapon_reload_time: Array = [2.4, 1.0, 0.0, 0.0, 0.0]
+var weapon_is_melee: Array = [false, false, true, true, true]
+var weapon_full_scope: Array = [true, false, false, false, false]
+var weapon_ads_fov: Array = [16.0, 55.0, 75.0, 75.0, 75.0]
+var weapon_melee_range: Array = [0.0, 0.0, 2.2, 1.5, 3.1]
+var weapon_titles: Array = ["Sniper", "Handgun", "Knife", "Bare hands", "Axe"]
 
-var current_weapon_index := WEAPON_HANDGUN
-var switch_out_index := WEAPON_HANDGUN
-var switch_in_index := WEAPON_HANDGUN
+# You start with nothing but your hands. Everything else has to be found.
+var owned: Array[bool] = [false, false, false, true, false]
+
+var current_weapon_index := ITEM_HANDS
+var switch_out_index := ITEM_HANDS
+var switch_in_index := ITEM_HANDS
 var is_switching := false
 var switch_progress := 1.0
 var weapon_panel_visible := false
@@ -92,6 +106,25 @@ var recoil_kick := 0.0
 var aim_blend := 0.0
 var is_scoped := false
 
+var forest: Node = null
+var interact_target: Node = null
+var hands_base_position: Vector3
+var hands_base_rotation: Vector3
+var chop_shake := 0.0
+
+# Where the palm sits inside an arm pivot's own space, and the two points on
+# the haft the hands close around. Together these let the arms reach for the
+# axe wherever the swing animation has thrown it.
+const ARM_HAND_LOCAL := Vector3(0.0, 0.002, -0.42)
+const GRIP_HIGH := Vector3(0.0, 0.23, 0.0)
+const GRIP_LOW := Vector3(0.0, -0.06, 0.0)
+const ARM_TWIST_L := 52.0
+const ARM_TWIST_R := -52.0
+
+var arm_left_rest: Transform3D
+var arm_right_rest: Transform3D
+var grip_blend := 0.0
+
 var health := MAX_HEALTH
 var is_dead := false
 var spawn_position: Vector3
@@ -100,9 +133,9 @@ func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	add_to_group("player")
 
-	weapon_nodes = [weapon_sniper, weapon_handgun, weapon_knife]
-	weapon_muzzles = [sniper_muzzle, handgun_muzzle, null]
-	weapon_magazines = [sniper_magazine, handgun_magazine, null]
+	weapon_nodes = [weapon_sniper, weapon_handgun, weapon_knife, hands, weapon_axe]
+	weapon_muzzles = [sniper_muzzle, handgun_muzzle, null, null, null]
+	weapon_magazines = [sniper_magazine, handgun_magazine, null, null, null]
 
 	for i in weapon_nodes.size():
 		var node: Node3D = weapon_nodes[i]
@@ -117,12 +150,21 @@ func _ready() -> void:
 		else:
 			magazine_base_positions.append(Vector3.ZERO)
 
+	hands_base_position = hands.position
+	hands_base_rotation = hands.rotation
+	arm_left_rest = arm_left.transform
+	arm_right_rest = arm_right.transform
+	# Hands are always on screen; the "hands" slot just means nothing is held.
+	hands.visible = true
+	forest = get_tree().get_first_node_in_group("forest")
+
 	camera_base_position = camera.position
 	sniper_bolt_base_position = sniper_bolt.position
 	handgun_slide_base_position = handgun_slide.position
 	spawn_position = global_position
 	GameState.set_player_health(health)
 	GameState.set_current_weapon(current_weapon_index)
+	GameState.set_held_item(weapon_titles[current_weapon_index])
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
@@ -136,7 +178,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_R:
 			start_reload()
 		elif event.keycode == KEY_E:
-			toggle_weapon_panel()
+			try_interact()
 		elif event.keycode == KEY_1:
 			request_switch(WEAPON_SNIPER)
 		elif event.keycode == KEY_2:
@@ -151,19 +193,39 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				primary_action()
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			request_switch(current_weapon_index - 1)
+			cycle_item(-1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			request_switch(current_weapon_index + 1)
+			cycle_item(1)
 
 func toggle_weapon_panel() -> void:
 	weapon_panel_visible = not weapon_panel_visible
 	GameState.set_weapon_panel_open(weapon_panel_visible)
 	Sound.play_ui("ui_toggle", -8.0)
 
+# Scrolling walks the carried items only, so an empty pack never cycles through
+# guns the player has not found.
+func carried() -> Array[int]:
+	var list: Array[int] = []
+	for i in owned.size():
+		if owned[i]:
+			list.append(i)
+	return list
+
+func cycle_item(step: int) -> void:
+	var list: Array[int] = carried()
+	if list.size() <= 1:
+		return
+	var at: int = list.find(current_weapon_index)
+	if at < 0:
+		at = 0
+	request_switch(list[wrapi(at + step, 0, list.size())])
+
 func request_switch(new_index: int) -> void:
 	if is_dead:
 		return
 	var wrapped: int = wrapi(new_index, 0, weapon_nodes.size())
+	if not owned[wrapped]:
+		return
 	if wrapped == current_weapon_index or is_switching:
 		return
 	switch_out_index = current_weapon_index
@@ -174,7 +236,47 @@ func request_switch(new_index: int) -> void:
 	is_meleeing = false
 	can_shoot = false
 	GameState.set_current_weapon(wrapped)
+	GameState.set_held_item(weapon_titles[wrapped])
 	Sound.play_ui("weapon_switch", -6.0)
+
+# Looks for a pickup under the crosshair each frame and reports it to the HUD.
+func update_interaction() -> void:
+	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	var from: Vector3 = camera.global_position
+	var to: Vector3 = from + (-camera.global_transform.basis.z) * INTERACT_RANGE
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
+	query.exclude = [get_rid()]
+	query.collide_with_areas = true
+	var result: Dictionary = space.intersect_ray(query)
+	var found: Node = null
+	if not result.is_empty():
+		var hit: Object = result.collider
+		if hit is Node and (hit as Node).is_in_group("pickup"):
+			found = hit as Node
+	if found != interact_target:
+		interact_target = found
+		if found == null:
+			GameState.set_interact_prompt("")
+		else:
+			GameState.set_interact_prompt("[E]  Pick up %s" % String(found.get("item_title")))
+
+func try_interact() -> void:
+	if is_dead or interact_target == null:
+		return
+	var id: int = int(interact_target.get("item_id"))
+	give_item(id)
+	if interact_target.has_method("consume"):
+		interact_target.call("consume")
+	interact_target = null
+	GameState.set_interact_prompt("")
+
+func give_item(id: int) -> void:
+	if id < 0 or id >= owned.size() or owned[id]:
+		return
+	owned[id] = true
+	GameState.announce("Picked up: %s" % weapon_titles[id])
+	Sound.play_ui("weapon_switch", -4.0)
+	request_switch(id)
 
 func active_weapon_index() -> int:
 	if is_switching:
@@ -234,12 +336,14 @@ func _physics_process(delta: float) -> void:
 	var horizontal_speed := Vector2(velocity.x, velocity.z).length()
 	var moving := is_on_floor() and horizontal_speed > 0.3
 
+	update_interaction()
 	update_view_bob(delta, moving, horizontal_speed, input_dir.x)
 	update_switch(delta)
 	update_aim(delta)
 	update_reload(delta)
 	update_melee(delta)
 	update_weapon_transform(delta)
+	update_hands(delta)
 
 	mouse_delta = Vector2.ZERO
 
@@ -344,21 +448,35 @@ func primary_action() -> void:
 		shoot()
 
 func start_melee() -> void:
-	if is_meleeing or is_switching or knife_cooldown_timer > 0.0:
+	if is_meleeing or is_switching:
+		return
+	var idx: int = current_weapon_index
+	if idx == ITEM_HANDS:
+		return
+	if idx == WEAPON_KNIFE and knife_cooldown_timer > 0.0:
 		return
 	is_meleeing = true
 	melee_progress = 0.0
 	melee_hit_done = false
-	knife_dash_timer = KNIFE_DASH_DURATION
-	knife_dash_direction = -transform.basis.z
-	knife_cooldown_timer = KNIFE_COOLDOWN
+	if idx == WEAPON_KNIFE:
+		# Only the knife lunges; an axe swing plants your feet.
+		knife_dash_timer = KNIFE_DASH_DURATION
+		knife_dash_direction = -transform.basis.z
+		knife_cooldown_timer = KNIFE_COOLDOWN
 	Sound.play_3d("knife_swing", camera.global_position, -4.0)
 
 func update_melee(delta: float) -> void:
+	chop_shake = move_toward(chop_shake, 0.0, delta * 6.0)
 	if not is_meleeing:
 		return
-	melee_progress = min(melee_progress + delta / MELEE_DURATION, 1.0)
-	if not melee_hit_done and melee_progress >= 0.35:
+	var span: float = MELEE_DURATION
+	if current_weapon_index == ITEM_AXE:
+		span = AXE_SWING_DURATION
+	melee_progress = min(melee_progress + delta / span, 1.0)
+	var strike_at: float = 0.35
+	if current_weapon_index == ITEM_AXE:
+		strike_at = 0.52
+	if not melee_hit_done and melee_progress >= strike_at:
 		melee_hit_done = true
 		perform_melee_hit()
 	if melee_progress >= 1.0:
@@ -373,15 +491,43 @@ func perform_melee_hit() -> void:
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
 	query.exclude = [get_rid()]
 	var result: Dictionary = space_state.intersect_ray(query)
-	if not result.is_empty():
-		var target: Object = result.collider
-		if target and target.has_method("hit"):
-			target.hit(weapon_damage[idx])
-			var normal: Vector3 = result.normal
-			Effects.spawn_blood(result.position, normal)
-			Sound.play_3d("knife_hit", result.position, -2.0)
-			camera_kick += deg_to_rad(5.0)
+	if result.is_empty():
+		return
+	var target: Object = result.collider
+
+	# A tree is not a node of its own -- it is instances inside a MultiMesh --
+	# so resolve the shape we struck back to the trunk it belongs to.
+	if idx == ITEM_AXE and target is CollisionObject3D:
+		var body: CollisionObject3D = target as CollisionObject3D
+		var owner_id: int = body.shape_find_owner(int(result.shape))
+		var shape_node: Object = body.shape_owner_get_owner(owner_id)
+		if forest == null:
+			forest = get_tree().get_first_node_in_group("forest")
+		var outcome: Dictionary = {}
+		if forest != null:
+			outcome = forest.call("chop", shape_node, AXE_CHOP_DAMAGE)
+		if bool(outcome.get("hit", false)):
+			Effects.spawn_wood_chips(result.position, result.normal)
+			Sound.play_3d("knife_hit", result.position, -1.0)
+			camera_kick += deg_to_rad(3.4)
+			chop_shake = 1.0
 			GameState.trigger_hit_marker()
+			if bool(outcome.get("felled", false)):
+				GameState.add_wood(4)
+				GameState.announce("Timber!")
+				Sound.play_3d("land", result.position, 2.0)
+				camera_kick += deg_to_rad(6.0)
+			else:
+				GameState.add_wood(1)
+			return
+
+	if target and target.has_method("hit"):
+		target.hit(weapon_damage[idx])
+		var normal: Vector3 = result.normal
+		Effects.spawn_blood(result.position, normal)
+		Sound.play_3d("knife_hit", result.position, -2.0)
+		camera_kick += deg_to_rad(5.0)
+		GameState.trigger_hit_marker()
 
 func shoot() -> void:
 	if not can_shoot or is_reloading:
@@ -419,6 +565,89 @@ func shoot() -> void:
 	var muzzle_position: Vector3 = muzzle.global_position if muzzle else camera.global_position
 	Effects.spawn_tracer(muzzle_position, hit_point, true)
 
+# The hands are always on screen. They breathe when idle, close into a grip
+# when something is held, and ride along with a swing.
+func update_hands(delta: float) -> void:
+	var idx: int = active_weapon_index()
+	var holding: bool = idx != ITEM_HANDS
+
+	var target_pos: Vector3 = hands_base_position
+	var target_rot: Vector3 = hands_base_rotation
+	if holding:
+		# Bring both hands in and forward onto the haft.
+		target_pos += Vector3(-0.035, 0.045, -0.045)
+		target_rot += Vector3(deg_to_rad(-6.0), 0.0, 0.0)
+
+	var breathe: float = sin(idle_time * 1.6) * 0.006
+	var breathe_side: float = sin(idle_time * 0.9) * 0.004
+	target_pos += Vector3(breathe_side, breathe, 0.0)
+
+	var hand_bob := Vector3(
+		sin(bob_time * 0.5) * 0.022,
+		absf(sin(bob_time)) * 0.028,
+		0.0
+	) * bob_fade
+	target_pos += hand_bob
+	target_pos += Vector3(sway_offset.x, sway_offset.y, 0.0) * 0.8
+	target_rot += Vector3(sway_offset.y * 0.5, -sway_offset.x * 0.5, sway_offset.x * 0.3)
+
+	if is_meleeing and idx == ITEM_AXE:
+		var at: float = clamp(melee_progress, 0.0, 1.0)
+		var drive: float = 0.0
+		if at < 0.30:
+			drive = -(at / 0.30) * 0.09
+		elif at < 0.52:
+			drive = lerp(-0.09, 0.20, (at - 0.30) / 0.22)
+		else:
+			drive = lerp(0.20, 0.0, (at - 0.52) / 0.48)
+		target_pos += Vector3(0.0, -drive * 0.5, -drive)
+		target_rot += Vector3(deg_to_rad(-drive * 40.0), 0.0, 0.0)
+
+	# A short jolt when the edge bites, so contact is felt in the arms too.
+	if chop_shake > 0.001:
+		var j: float = chop_shake * 0.03
+		target_pos += Vector3(randf_range(-j, j), randf_range(-j, j), 0.0)
+
+	hands.position = hands.position.lerp(target_pos, clampf(delta * 14.0, 0.0, 1.0))
+	hands.rotation = hands.rotation.lerp(target_rot, clampf(delta * 14.0, 0.0, 1.0))
+
+	# With the axe out, both hands leave their resting pose and take hold of the
+	# haft. update_weapon_transform() has already placed the axe for this frame,
+	# so the grip points below are exactly where the wood is right now.
+	var want_grip: float = 0.0
+	if idx == ITEM_AXE:
+		want_grip = 1.0
+	grip_blend = move_toward(grip_blend, want_grip, delta * 5.0)
+
+	var to_hands: Transform3D = hands.transform.affine_inverse()
+	var axe_xf: Transform3D = weapon_axe.transform
+	pose_arm(arm_left, arm_left_rest, to_hands * (axe_xf * GRIP_LOW), ARM_TWIST_L, delta)
+	pose_arm(arm_right, arm_right_rest, to_hands * (axe_xf * GRIP_HIGH), ARM_TWIST_R, delta)
+
+# Aims the arm at `grip` from its resting shoulder and stretches it along its
+# own length so the palm lands on the haft, then eases the current pose toward
+# that. The shoulder stays put on purpose: solving for it instead walks it up
+# to within a few centimetres of the lens and the forearm swallows the screen.
+func pose_arm(arm: Node3D, rest: Transform3D, grip: Vector3, twist: float, delta: float) -> void:
+	var target: Transform3D = rest
+	if grip_blend > 0.001:
+		var to_grip: Vector3 = grip - rest.origin
+		var reach_len: float = to_grip.length()
+		if reach_len > 0.05:
+			var dir: Vector3 = to_grip / reach_len
+			var up: Vector3 = Vector3.UP
+			if absf(dir.dot(up)) > 0.97:
+				up = Vector3.BACK
+			var basis: Basis = Basis.looking_at(dir, up)
+			basis = basis * Basis(Vector3(0.0, 0.0, 1.0), deg_to_rad(twist))
+			# Scale on the right so it acts along the arm's own -Z, not the
+			# camera's: Basis.scaled() would multiply on the left and shear.
+			var stretch: float = clampf(reach_len / -ARM_HAND_LOCAL.z, 0.55, 1.5)
+			basis = basis * Basis.IDENTITY.scaled(Vector3(1.0, 1.0, stretch))
+			var reach := Transform3D(basis, rest.origin)
+			target = rest.interpolate_with(reach, grip_blend)
+	arm.transform = arm.transform.interpolate_with(target, clampf(delta * 16.0, 0.0, 1.0))
+
 func update_weapon_transform(delta: float) -> void:
 	recoil_kick = move_toward(recoil_kick, 0.0, delta * 6.0)
 
@@ -444,7 +673,34 @@ func update_weapon_transform(delta: float) -> void:
 
 	var melee_offset := Vector3.ZERO
 	var melee_rot := Vector3.ZERO
-	if is_meleeing:
+	if is_meleeing and idx == ITEM_AXE:
+		# Overhead chop: wind back over the shoulder, drive down through the
+		# cut, then a slow recover with the weight of the head carrying through.
+		var at: float = clamp(melee_progress, 0.0, 1.0)
+		var pitch: float = 0.0
+		var lift: float = 0.0
+		var reach: float = 0.0
+		if at < 0.30:
+			var w: float = at / 0.30
+			w = w * w * (3.0 - 2.0 * w)
+			pitch = lerp(0.0, 62.0, w)
+			lift = lerp(0.0, 0.12, w)
+			reach = lerp(0.0, 0.10, w)
+		elif at < 0.52:
+			var w2: float = (at - 0.30) / 0.22
+			w2 = w2 * w2
+			pitch = lerp(62.0, -74.0, w2)
+			lift = lerp(0.12, -0.16, w2)
+			reach = lerp(0.10, -0.26, w2)
+		else:
+			var w3: float = (at - 0.52) / 0.48
+			w3 = w3 * w3 * (3.0 - 2.0 * w3)
+			pitch = lerp(-74.0, 0.0, w3)
+			lift = lerp(-0.16, 0.0, w3)
+			reach = lerp(-0.26, 0.0, w3)
+		melee_offset = Vector3(0.0, lift, reach)
+		melee_rot = Vector3(deg_to_rad(pitch), deg_to_rad(pitch * 0.10), deg_to_rad(-pitch * 0.16))
+	elif is_meleeing:
 		var mt: float = clamp(melee_progress, 0.0, 1.0)
 		var swing_angle: float = 0.0
 		var thrust: float = 0.0
@@ -489,6 +745,8 @@ func update_weapon_transform(delta: float) -> void:
 
 	for i in weapon_nodes.size():
 		var node: Node3D = weapon_nodes[i]
+		if i == ITEM_HANDS:
+			continue
 		node.visible = (i == idx) and not is_scoped
 
 	var active_node: Node3D = weapon_nodes[idx]

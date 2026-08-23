@@ -6,7 +6,7 @@ config_version=5
 
 [application]
 
-config/name="Syfon v2.2 - Dead Woods"
+config/name="Syfon v2.3 - First Light"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 
