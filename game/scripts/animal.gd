@@ -11,10 +11,13 @@ extends CharacterBody3D
 const GRAVITY := 9.8
 const WANDER_RADIUS := 22.0
 const ARRIVE_DISTANCE := 1.4
-const NOTICE_DISTANCE := 11.0
-const FLEE_TIME := 6.0
+const NOTICE_DISTANCE := 16.0
+const ALERT_DISTANCE := 24.0
+const FLEE_TIME := 7.0
+# How far ahead it checks for a trunk before walking into one.
+const FEELER_LENGTH := 2.2
 
-enum State { GRAZE, WANDER, FLEE, DEAD }
+enum State { GRAZE, WANDER, ALERT, FLEE, DEAD }
 
 @export var species := "deer"
 @export var max_health := 40
@@ -141,9 +144,18 @@ func _build() -> void:
 # --- behaviour ---------------------------------------------------------------
 
 func _pick_new_target() -> void:
-	var angle: float = rng.randf_range(0.0, TAU)
-	var distance: float = rng.randf_range(4.0, WANDER_RADIUS)
-	target = home + Vector3(cos(angle) * distance, 0.0, sin(angle) * distance)
+	var terrain: Node = get_tree().get_first_node_in_group("terrain")
+	for attempt in 6:
+		var angle: float = rng.randf_range(0.0, TAU)
+		var distance: float = rng.randf_range(5.0, WANDER_RADIUS)
+		var spot: Vector3 = home + Vector3(cos(angle) * distance, 0.0, sin(angle) * distance)
+		# Do not set off toward a cliff it cannot climb.
+		if terrain != null and terrain.has_method("slope_at"):
+			if float(terrain.call("slope_at", spot.x, spot.z)) > 0.45:
+				continue
+		target = spot
+		return
+	target = home
 
 func _physics_process(delta: float) -> void:
 	if state == State.DEAD:
@@ -167,11 +179,17 @@ func _physics_process(delta: float) -> void:
 			state = State.GRAZE
 			state_timer = rng.randf_range(2.0, 5.0)
 
-	# Something too close is reason enough to move off, hit or not.
+	# Notices you at a distance and watches; bolts if you keep coming.
 	if state != State.FLEE and player != null:
 		var near: float = global_position.distance_to(player.global_position)
-		if near < NOTICE_DISTANCE * 0.45:
+		if near < NOTICE_DISTANCE:
 			_spook()
+		elif near < ALERT_DISTANCE and state != State.ALERT:
+			state = State.ALERT
+			state_timer = rng.randf_range(1.4, 2.8)
+		elif near > ALERT_DISTANCE * 1.3 and state == State.ALERT:
+			state = State.GRAZE
+			state_timer = rng.randf_range(2.0, 5.0)
 
 	var speed := 0.0
 	var direction := Vector3.ZERO
@@ -188,6 +206,16 @@ func _physics_process(delta: float) -> void:
 			if direction.length() < ARRIVE_DISTANCE or state_timer <= 0.0:
 				state = State.GRAZE
 				state_timer = rng.randf_range(2.5, 6.0)
+		State.ALERT:
+			# Head up, standing still, watching whatever it heard.
+			if player != null:
+				var toward: Vector3 = _flat(player.global_position - global_position)
+				if toward.length() > 0.1:
+					var look: float = atan2(-toward.normalized().x, -toward.normalized().z)
+					rotation.y = lerp_angle(rotation.y, look, clampf(delta * 2.4, 0.0, 1.0))
+			if state_timer <= 0.0:
+				state = State.GRAZE
+				state_timer = rng.randf_range(2.0, 5.0)
 		State.FLEE:
 			if player != null:
 				direction = _flat(global_position - player.global_position)
@@ -195,17 +223,49 @@ func _physics_process(delta: float) -> void:
 
 	if direction.length() > 0.01:
 		direction = direction.normalized()
-		velocity.x = move_toward(velocity.x, direction.x * speed, speed * 4.0 * delta)
-		velocity.z = move_toward(velocity.z, direction.z * speed, speed * 4.0 * delta)
-		# Turn to face where it is going rather than snapping.
-		var facing: float = atan2(direction.x, direction.z)
-		rotation.y = lerp_angle(rotation.y, facing, clampf(delta * 5.0, 0.0, 1.0))
+		direction = _steer_around(direction)
+
+		# Turn first, then go. Without this the body lerps toward the new
+		# heading while the velocity has already snapped to it, and for a
+		# moment the animal slides backwards with its legs cycling forwards.
+		var facing: float = atan2(-direction.x, -direction.z)
+		rotation.y = lerp_angle(rotation.y, facing, clampf(delta * 7.0, 0.0, 1.0))
+
+		var nose: Vector3 = -global_transform.basis.z
+		var alignment: float = clampf(nose.dot(direction), 0.0, 1.0)
+		# Barely moves until it is pointing more or less the right way.
+		var gate: float = clampf((alignment - 0.35) / 0.45, 0.0, 1.0)
+		var wanted: float = speed * (0.06 + 0.94 * gate)
+		velocity.x = move_toward(velocity.x, direction.x * wanted, speed * 5.0 * delta)
+		velocity.z = move_toward(velocity.z, direction.z * wanted, speed * 5.0 * delta)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, 12.0 * delta)
 		velocity.z = move_toward(velocity.z, 0.0, 12.0 * delta)
 
 	move_and_slide()
 	_animate(delta)
+
+# Looks a short way ahead and slides along whatever it finds, so an animal
+# stops pressing into a trunk with its legs cycling.
+func _steer_around(direction: Vector3) -> Vector3:
+	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	var eye: Vector3 = global_position + Vector3(0, 0.55, 0)
+	var query := PhysicsRayQueryParameters3D.create(eye, eye + direction * FEELER_LENGTH)
+	query.exclude = [get_rid()]
+	var hit: Dictionary = space.intersect_ray(query)
+	if hit.is_empty():
+		return direction
+	# Turn away from the surface, and give up on this target so it picks a new
+	# one rather than grinding along the obstacle forever.
+	var normal: Vector3 = _flat(hit.get("normal", Vector3.UP))
+	if normal.length() < 0.05:
+		return direction
+	var slid: Vector3 = _flat(direction - normal.normalized() * direction.dot(normal.normalized()))
+	if slid.length() < 0.15:
+		slid = Vector3(-direction.z, 0.0, direction.x)
+	if state == State.WANDER:
+		state_timer = minf(state_timer, 0.4)
+	return slid.normalized()
 
 func _flat(v: Vector3) -> Vector3:
 	return Vector3(v.x, 0.0, v.z)
@@ -220,6 +280,8 @@ func _animate(delta: float) -> void:
 	var speed: float = Vector2(velocity.x, velocity.z).length()
 	step_phase += delta * (2.0 + speed * 1.6)
 	var swing: float = clampf(speed / run_speed, 0.0, 1.0) * 0.7
+	if speed < 0.25:
+		swing = 0.0
 	for i in legs.size():
 		# Diagonal pairs move together, which is what makes a four-legged walk
 		# read as a walk rather than a shuffle.

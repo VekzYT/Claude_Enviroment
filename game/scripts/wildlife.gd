@@ -8,8 +8,11 @@ extends Node3D
 @export var deer_count := 14
 @export var boar_count := 8
 
-const MAP_HALF := 200.0
+const MAP_HALF := 215.0
 const MAX_SLOPE := 0.34
+# No two animals start closer than this, so the forest reads as sparsely
+# populated rather than as a few knots of wildlife.
+const MIN_SEPARATION := 46.0
 
 var rng := RandomNumberGenerator.new()
 var terrain: Node = null
@@ -33,13 +36,20 @@ func _spawn(scene: PackedScene, count: int, species: String, health: int,
 		walk: float, run: float, tint: Color) -> void:
 	var placed := 0
 	var tries := 0
-	while placed < count and tries < count * 60:
+	var separation: float = MIN_SEPARATION
+	while placed < count and tries < count * 200:
 		tries += 1
+		# Relax the spacing rather than fail to place: better a slightly tighter
+		# herd than eight animals where twenty-two were asked for.
+		if tries % (count * 40) == 0:
+			separation *= 0.72
 		var spot := Vector2(
 			rng.randf_range(-MAP_HALF, MAP_HALF), rng.randf_range(-MAP_HALF, MAP_HALF))
 		if terrain.has_method("in_clearing") and bool(terrain.call("in_clearing", spot, 6.0, 9.0)):
 			continue
 		if terrain.has_method("slope_at") and float(terrain.call("slope_at", spot.x, spot.y)) > MAX_SLOPE:
+			continue
+		if not _far_enough(spot, separation):
 			continue
 		var animal: Node3D = scene.instantiate() as Node3D
 		animal.set("species", species)
@@ -54,3 +64,13 @@ func _spawn(scene: PackedScene, count: int, species: String, health: int,
 		animal.global_position = Vector3(spot.x, ground + 0.1, spot.y)
 		animal.rotation.y = rng.randf_range(0.0, TAU)
 		placed += 1
+
+# True when this spot is clear of every animal already placed.
+func _far_enough(spot: Vector2, separation: float) -> bool:
+	for node in get_children():
+		var other := node as Node3D
+		if other == null:
+			continue
+		if Vector2(other.global_position.x, other.global_position.z).distance_to(spot) < separation:
+			return false
+	return true

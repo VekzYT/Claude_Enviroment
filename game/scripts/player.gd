@@ -219,6 +219,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			start_reload()
 		elif event.keycode == KEY_E:
 			try_interact()
+		elif event.keycode == KEY_M:
+			# Consumed, or the map screen's own handler gets the same press,
+			# sees the map open and closes it again in one keystroke.
+			open_map_screen()
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_TAB or event.keycode == KEY_I:
+			open_pack_screen()
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_F:
+			eat_apple()
 		elif event.keycode == KEY_1:
 			request_switch(WEAPON_SNIPER)
 		elif event.keycode == KEY_2:
@@ -488,6 +498,8 @@ func give_item(id: int) -> void:
 
 # Once the chart on the cabin table has been read, the map travels with you.
 func open_map_screen() -> void:
+	if GameState.map_open:
+		return
 	if not GameState.map_known:
 		GameState.announce("No map yet. There is a chart on the table inside the cabin.")
 		return
@@ -496,6 +508,8 @@ func open_map_screen() -> void:
 		screen.call("open_map")
 
 func open_pack_screen() -> void:
+	if GameState.inventory_open:
+		return
 	var screen: Node = get_tree().get_first_node_in_group("inventory_screen")
 	if screen != null:
 		screen.call("open_pack")
@@ -792,9 +806,25 @@ func perform_melee_hit() -> void:
 	var space_state: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
 	var from: Vector3 = camera.global_position
 	var to: Vector3 = from + (-camera.global_transform.basis.z) * melee_range
+	# Areas have to be included or the chopping block -- which is an Area3D --
+	# is invisible to the swing and a loaded log can never be split. Pickups are
+	# Areas too, so anything that is not the block is stepped over rather than
+	# swallowing the blow.
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
-	query.exclude = [get_rid()]
-	var result: Dictionary = space_state.intersect_ray(query)
+	query.collide_with_areas = true
+	var skip: Array[RID] = [get_rid()]
+	var result: Dictionary = {}
+	for attempt in 4:
+		query.exclude = skip
+		result = space_state.intersect_ray(query)
+		if result.is_empty():
+			return
+		var struck: Object = result.collider
+		if struck is Area3D and not (struck as Node).is_in_group("chopping_block"):
+			skip.append((struck as Area3D).get_rid())
+			result = {}
+			continue
+		break
 	if result.is_empty():
 		return
 	var target: Object = result.collider

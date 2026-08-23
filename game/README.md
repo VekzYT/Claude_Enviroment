@@ -1,4 +1,4 @@
-# Syfon v2.7.1 — Quarry
+# Syfon v2.7.2 — Quarry
 
 A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release gives it a clock and a reason to hurry.
 
@@ -7,6 +7,16 @@ You wake outside a log cabin in a forest of rolling hills and four mountain mass
 There is a map on the cabin table showing the whole valley, including the three places where people are still living and still trading. The sun rises and sets, the days count up, and **on day 10 they come**.
 
 **Zombies are not in yet** — the countdown is real, the horde is not there to meet it. Everything else is built around its arrival.
+
+## What's new in v2.7.2
+
+**Fixed: the map, the pack and eating had no keys bound.** `M`, `Tab`, `I` and `F` were never actually wired into the input handler — an earlier batch edit failed to match and the failure went unnoticed because other edits in the same script succeeded. `open_map_screen()` existed and worked when called; nothing called it. All four keys are bound now, and opening an overlay consumes the keypress so the overlay's own handler cannot see the same press and close it again.
+
+**Fixed: a log on the chopping block could not be split.** The melee raycast never enabled `collide_with_areas`, and the chopping block is an `Area3D` — so the axe swing passed straight through it and no swing could ever land. The swing now includes areas, and steps over pickups (which are also areas) rather than letting them absorb the blow. Load a log, swing four times, get 12 wood.
+
+**Fixed: animals moonwalked.** A Godot node faces its own −Z, so pointing it along a direction needs `atan2(-x, -z)`; the code used `atan2(x, z)`, which is exactly 180° out. Every animal walked backwards with its legs cycling forwards. On top of the sign fix they now **turn before they go** — speed is gated on how well the body is aligned with the direction of travel, so there is no window where the velocity has snapped to a new heading the body has not reached. Measured over 1,228 samples of moving animals: mean alignment **0.97**, worst **0.28**, no negatives.
+
+**Animals are spread out and behave better.** Minimum spawn separation is 46 m (the tightest pair was 9.9 m; it is 48.7 m now). They have a new **alert** state — they notice you at 24 m and stand watching with their heads up before bolting at 16 m — they steer around trees with a short forward feeler instead of grinding into trunks, they will not set off toward a slope they cannot climb, and their legs stop swinging when they stop.
 
 ## What's new in v2.7.1
 
