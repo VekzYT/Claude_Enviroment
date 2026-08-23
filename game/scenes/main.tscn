@@ -1,4 +1,4 @@
-[gd_scene load_steps=46 format=3]
+[gd_scene load_steps=47 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="2_hud"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://scripts/forest_scatter.gd" id="6_forest"]
 [ext_resource type="Script" path="res://scripts/terrain.gd" id="27_terrain"]
 [ext_resource type="PackedScene" path="res://scenes/axe_pickup.tscn" id="28_axe"]
+[ext_resource type="Script" path="res://scripts/cabin_detail.gd" id="29_cabin"]
 [ext_resource type="Script" path="res://scripts/landmarks.gd" id="7_landmarks"]
 [ext_resource type="Shader" path="res://shaders/ocean.gdshader" id="8_water"]
 [ext_resource type="Texture2D" path="res://textures/dirt_albedo.jpg" id="12_dirt_albedo"]
@@ -1391,8 +1392,8 @@ shadow_enabled = true
 [node name="HomePorchLight" type="OmniLight3D" parent="."]
 position = Vector3(-8.25, 2.7, 4)
 light_color = Color(1, 0.72, 0.4, 1)
-light_energy = 1.4
-omni_range = 7.0
+light_energy = 0.55
+omni_range = 5.5
 
 [node name="ChoppingBlock" type="StaticBody3D" parent="."]
 
@@ -1434,6 +1435,13 @@ scale = Vector3(0.11, 0.72, 0.11)
 mesh = SubResource("CylinderMesh_unit")
 surface_material_override/0 = SubResource("Mat_wood_dark")
 
+[node name="CabinDetail" type="Node3D" parent="."]
+script = ExtResource("29_cabin")
+wood_texture = ExtResource("15_wood_albedo")
+wood_normal = ExtResource("16_wood_normal")
+rock_texture = ExtResource("24_rock_albedo")
+rock_normal = ExtResource("25_rock_normal")
+
 [node name="AxePickup" parent="." instance=ExtResource("28_axe")]
 position = Vector3(-6.25, 1.06, 6.6)
 rotation_degrees = Vector3(0, 22, 196)
@@ -1444,281 +1452,6 @@ rotation_degrees = Vector3(0, 108, 0)
 
 [node name="HUD" type="CanvasLayer" parent="."]
 script = ExtResource("2_hud")
-
-[node name="Crosshair" type="Label" parent="HUD"]
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -10.0
-offset_top = -16.0
-offset_right = 10.0
-offset_bottom = 16.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_font_sizes/font_size = 28
-text = "+"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="HitMarker" type="Label" parent="HUD"]
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -18.0
-offset_top = -18.0
-offset_right = 18.0
-offset_bottom = 18.0
-mouse_filter = 2
-theme_override_font_sizes/font_size = 30
-theme_override_colors/font_color = Color(1, 0.95, 0.85, 1)
-horizontal_alignment = 1
-vertical_alignment = 1
-text = "✕"
-
-[node name="KnifeCooldownBG" type="ColorRect" parent="HUD"]
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -32.0
-offset_top = 24.0
-offset_right = 32.0
-offset_bottom = 34.0
-mouse_filter = 2
-color = Color(0.05, 0.05, 0.06, 0.75)
-visible = false
-
-[node name="KnifeCooldownFill" type="ColorRect" parent="HUD"]
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -30.0
-offset_top = 26.0
-offset_right = 30.0
-offset_bottom = 32.0
-mouse_filter = 2
-color = Color(0.6, 0.55, 0.4, 1)
-visible = false
-
-[node name="ScoreBG" type="ColorRect" parent="HUD"]
-offset_left = 14.0
-offset_top = 14.0
-offset_right = 226.0
-offset_bottom = 64.0
-mouse_filter = 2
-color = Color(0.05, 0.05, 0.06, 0.75)
-
-[node name="ScoreLabel" type="Label" parent="HUD"]
-offset_left = 20.0
-offset_top = 20.0
-offset_right = 220.0
-offset_bottom = 60.0
-theme_override_font_sizes/font_size = 24
-text = "Score: 0"
-
-[node name="SupplyLabel" type="Label" parent="HUD"]
-offset_left = 20.0
-offset_top = 70.0
-offset_right = 226.0
-offset_bottom = 98.0
-theme_override_font_sizes/font_size = 18
-theme_override_colors/font_color = Color(0.55, 0.85, 0.55, 1)
-text = "Supplies: 0 / 8"
-
-[node name="WoodLabel" type="Label" parent="HUD"]
-offset_left = 20.0
-offset_top = 96.0
-offset_right = 226.0
-offset_bottom = 124.0
-theme_override_font_sizes/font_size = 18
-theme_override_colors/font_color = Color(0.85, 0.72, 0.45, 1)
-text = "Wood: 0"
-
-[node name="HeldLabel" type="Label" parent="HUD"]
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -260.0
-offset_top = -60.0
-offset_right = -20.0
-offset_bottom = -30.0
-mouse_filter = 2
-theme_override_font_sizes/font_size = 20
-theme_override_colors/font_color = Color(0.88, 0.9, 0.82, 1)
-horizontal_alignment = 2
-text = "Bare hands"
-
-[node name="PromptLabel" type="Label" parent="HUD"]
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -220.0
-offset_top = 46.0
-offset_right = 220.0
-offset_bottom = 76.0
-mouse_filter = 2
-theme_override_font_sizes/font_size = 20
-theme_override_colors/font_color = Color(1, 0.93, 0.72, 1)
-horizontal_alignment = 1
-visible = false
-
-[node name="CompassLabel" type="Label" parent="HUD"]
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -70.0
-offset_top = 14.0
-offset_right = 70.0
-offset_bottom = 40.0
-theme_override_font_sizes/font_size = 20
-horizontal_alignment = 1
-text = "N   0°"
-
-[node name="ToastLabel" type="Label" parent="HUD"]
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -240.0
-offset_top = 50.0
-offset_right = 240.0
-offset_bottom = 82.0
-mouse_filter = 2
-theme_override_font_sizes/font_size = 22
-theme_override_colors/font_color = Color(0.85, 0.9, 0.7, 1)
-horizontal_alignment = 1
-
-[node name="HealthBarBG" type="ColorRect" parent="HUD"]
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -160.0
-offset_top = -70.0
-offset_right = 160.0
-offset_bottom = -42.0
-mouse_filter = 2
-color = Color(0.05, 0.05, 0.06, 0.75)
-
-[node name="HealthBarFill" type="ColorRect" parent="HUD"]
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -154.0
-offset_top = -64.0
-offset_right = 146.0
-offset_bottom = -48.0
-mouse_filter = 2
-color = Color(0.2, 0.85, 0.3, 1)
-
-[node name="HealthBarLabel" type="Label" parent="HUD"]
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -160.0
-offset_top = -70.0
-offset_right = 160.0
-offset_bottom = -42.0
-mouse_filter = 2
-theme_override_font_sizes/font_size = 16
-horizontal_alignment = 1
-vertical_alignment = 1
-text = "100 / 100"
-
-[node name="Instructions" type="Label" parent="HUD"]
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = -102.0
-offset_right = 920.0
-offset_bottom = -76.0
-theme_override_font_sizes/font_size = 15
-theme_override_colors/font_color = Color(0.82, 0.84, 0.78, 1)
-text = "WASD move   Shift sprint   Space jump   Click swing   E pick up   Scroll switch   R reload   Esc pause"
-
-[node name="DamageFlash" type="ColorRect" parent="HUD"]
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0.8, 0.05, 0.05, 0)
-
-[node name="LowHealthPulse" type="ColorRect" parent="HUD"]
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0.7, 0.02, 0.02, 0)
-
-[node name="WeaponPanelBG" type="ColorRect" parent="HUD"]
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -220.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = 132.0
-mouse_filter = 2
-color = Color(0.05, 0.05, 0.06, 0.8)
-visible = false
-
-[node name="WeaponPanelText" type="RichTextLabel" parent="HUD"]
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -210.0
-offset_top = 30.0
-offset_right = -30.0
-offset_bottom = 122.0
-mouse_filter = 2
-bbcode_enabled = true
-theme_override_font_sizes/normal_font_size = 18
-scroll_active = false
-text = "Carrying"
-visible = false
-
-[node name="ScopeOverlay" type="TextureRect" parent="HUD"]
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-stretch_mode = 0
-visible = false
-
-[node name="ScopeReticleH" type="ColorRect" parent="HUD"]
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -140.0
-offset_top = -1.0
-offset_right = 140.0
-offset_bottom = 1.0
-mouse_filter = 2
-color = Color(0, 0, 0, 0.85)
-visible = false
-
-[node name="ScopeReticleV" type="ColorRect" parent="HUD"]
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -1.0
-offset_top = -140.0
-offset_right = 1.0
-offset_bottom = 140.0
-mouse_filter = 2
-color = Color(0, 0, 0, 0.85)
-visible = false
 
 [node name="PauseMenu" type="CanvasLayer" parent="."]
 layer = 10

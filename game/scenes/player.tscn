@@ -1,6 +1,7 @@
 [gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/hand_rig.gd" id="2_hand"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -48,12 +49,8 @@ albedo_color = Color(0.75, 0.76, 0.78, 1)
 metallic = 0.9
 roughness = 0.15
 
-[sub_resource type="StandardMaterial3D" id="StdMat_skin"]
-albedo_color = Color(0.72, 0.55, 0.43, 1)
-roughness = 0.85
-
-[sub_resource type="StandardMaterial3D" id="StdMat_sleeve"]
-albedo_color = Color(0.27, 0.30, 0.24, 1)
+[sub_resource type="StandardMaterial3D" id="StdMat_leather"]
+albedo_color = Color(0.20, 0.15, 0.11, 1)
 roughness = 0.95
 
 [sub_resource type="StandardMaterial3D" id="StdMat_haft"]
@@ -276,126 +273,14 @@ surface_material_override/0 = SubResource("StdMat_gunmetal")
 [node name="LeftArm" type="Node3D" parent="Head/Camera3D/Hands"]
 position = Vector3(-0.27, -0.47, -0.3)
 rotation_degrees = Vector3(11, 8, 6)
-
-[node name="Sleeve" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
-position = Vector3(0, 0, -0.115)
-scale = Vector3(0.07, 0.072, 0.23)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_sleeve")
-
-[node name="Cuff" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
-position = Vector3(0, 0, -0.232)
-scale = Vector3(0.078, 0.08, 0.03)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_sleeve")
-
-[node name="Forearm" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
-position = Vector3(0, 0.002, -0.3)
-scale = Vector3(0.058, 0.055, 0.115)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Palm" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
-position = Vector3(0, 0.002, -0.392)
-scale = Vector3(0.062, 0.043, 0.078)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Knuckles" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
-position = Vector3(0, 0.006, -0.434)
-scale = Vector3(0.066, 0.046, 0.02)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Finger1" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
-position = Vector3(-0.024, -0.012, -0.47)
-rotation_degrees = Vector3(-28, 0, 0)
-scale = Vector3(0.021, 0.038, 0.06)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Finger2" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
-position = Vector3(0, -0.013, -0.472)
-rotation_degrees = Vector3(-30, 0, 0)
-scale = Vector3(0.021, 0.04, 0.064)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Finger3" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
-position = Vector3(0.024, -0.011, -0.468)
-rotation_degrees = Vector3(-26, 0, 0)
-scale = Vector3(0.02, 0.036, 0.056)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Thumb" type="MeshInstance3D" parent="Head/Camera3D/Hands/LeftArm"]
-position = Vector3(0.032, 0.01, -0.418)
-rotation_degrees = Vector3(-12, -26, 0)
-scale = Vector3(0.026, 0.03, 0.062)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
+script = ExtResource("2_hand")
+side = -1.0
 
 [node name="RightArm" type="Node3D" parent="Head/Camera3D/Hands"]
 position = Vector3(0.245, -0.445, -0.29)
 rotation_degrees = Vector3(10, -9, -7)
-
-[node name="Sleeve" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
-position = Vector3(0, 0, -0.115)
-scale = Vector3(0.07, 0.072, 0.23)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_sleeve")
-
-[node name="Cuff" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
-position = Vector3(0, 0, -0.232)
-scale = Vector3(0.078, 0.08, 0.03)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_sleeve")
-
-[node name="Forearm" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
-position = Vector3(0, 0.002, -0.3)
-scale = Vector3(0.058, 0.055, 0.115)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Palm" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
-position = Vector3(0, 0.002, -0.392)
-scale = Vector3(0.062, 0.043, 0.078)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Knuckles" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
-position = Vector3(0, 0.006, -0.434)
-scale = Vector3(0.066, 0.046, 0.02)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Finger1" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
-position = Vector3(0.024, -0.012, -0.47)
-rotation_degrees = Vector3(-28, 0, 0)
-scale = Vector3(0.021, 0.038, 0.06)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Finger2" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
-position = Vector3(0, -0.013, -0.472)
-rotation_degrees = Vector3(-30, 0, 0)
-scale = Vector3(0.021, 0.04, 0.064)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Finger3" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
-position = Vector3(-0.024, -0.011, -0.468)
-rotation_degrees = Vector3(-26, 0, 0)
-scale = Vector3(0.02, 0.036, 0.056)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
-
-[node name="Thumb" type="MeshInstance3D" parent="Head/Camera3D/Hands/RightArm"]
-position = Vector3(-0.032, 0.01, -0.418)
-rotation_degrees = Vector3(-12, 26, 0)
-scale = Vector3(0.026, 0.03, 0.062)
-mesh = SubResource("BoxMesh_unit")
-surface_material_override/0 = SubResource("StdMat_skin")
+script = ExtResource("2_hand")
+side = 1.0
 
 [node name="WeaponAxe" type="Node3D" parent="Head/Camera3D"]
 position = Vector3(0.24, -0.4, -0.52)
@@ -442,3 +327,37 @@ position = Vector3(0.034, 0.35, 0)
 scale = Vector3(0.038, 0.07, 0.036)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_axehead")
+
+[node name="HeadBeard" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(-0.052, 0.293, 0)
+rotation_degrees = Vector3(0, 0, 26)
+scale = Vector3(0.042, 0.05, 0.02)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_axehead")
+
+[node name="HeadCollar" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(0, 0.298, 0)
+scale = Vector3(0.05, 0.024, 0.046)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_axehead")
+
+[node name="WrapA" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(0, 0.028, 0)
+rotation_degrees = Vector3(0, 0, 4)
+scale = Vector3(0.036, 0.022, 0.032)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_leather")
+
+[node name="WrapB" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(0, -0.012, 0)
+rotation_degrees = Vector3(0, 0, -4)
+scale = Vector3(0.036, 0.022, 0.032)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_leather")
+
+[node name="WrapC" type="MeshInstance3D" parent="Head/Camera3D/WeaponAxe"]
+position = Vector3(0, -0.086, 0)
+rotation_degrees = Vector3(0, 0, 4)
+scale = Vector3(0.036, 0.022, 0.032)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_leather")

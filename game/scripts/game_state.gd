@@ -3,7 +3,6 @@ extends Node
 signal score_changed(new_score: int)
 signal health_changed(new_health: int)
 signal weapon_changed(index: int)
-signal weapon_panel_visibility_changed(is_open: bool)
 signal scope_active_changed(active: bool)
 signal knife_cooldown_changed(fraction: float)
 signal hit_marker_triggered
@@ -12,6 +11,7 @@ signal supply_collected(count: int, total: int)
 signal held_item_changed(title: String)
 signal interact_prompt_changed(text: String)
 signal wood_changed(amount: int)
+signal stamina_changed(fraction: float)
 signal announced(text: String)
 
 const SUPPLIES_TOTAL := 8
@@ -19,13 +19,13 @@ const SUPPLIES_TOTAL := 8
 var score := 0
 var player_health := 100
 var current_weapon := 1
-var weapon_panel_open := false
 var scope_active := false
 var knife_cooldown_fraction := 0.0
 var supplies_collected := 0
 var held_item := "Bare hands"
 var interact_prompt := ""
 var wood := 0
+var stamina := 1.0
 
 func add_point() -> void:
 	score += 1
@@ -38,10 +38,6 @@ func set_player_health(value: int) -> void:
 func set_current_weapon(index: int) -> void:
 	current_weapon = index
 	weapon_changed.emit(current_weapon)
-
-func set_weapon_panel_open(value: bool) -> void:
-	weapon_panel_open = value
-	weapon_panel_visibility_changed.emit(weapon_panel_open)
 
 func set_scope_active(value: bool) -> void:
 	scope_active = value
@@ -71,6 +67,13 @@ func set_interact_prompt(text: String) -> void:
 	interact_prompt = text
 	interact_prompt_changed.emit(interact_prompt)
 
+func set_stamina(fraction: float) -> void:
+	var f: float = clampf(fraction, 0.0, 1.0)
+	if is_equal_approx(f, stamina):
+		return
+	stamina = f
+	stamina_changed.emit(stamina)
+
 func add_wood(amount: int) -> void:
 	wood += amount
 	wood_changed.emit(wood)
@@ -82,6 +85,8 @@ func reset() -> void:
 	supplies_collected = 0
 	wood = 0
 	wood_changed.emit(wood)
+	stamina = 1.0
+	stamina_changed.emit(stamina)
 	held_item = "Bare hands"
 	held_item_changed.emit(held_item)
 	interact_prompt = ""
@@ -92,8 +97,6 @@ func reset() -> void:
 	health_changed.emit(player_health)
 	current_weapon = 1
 	weapon_changed.emit(current_weapon)
-	weapon_panel_open = false
-	weapon_panel_visibility_changed.emit(weapon_panel_open)
 	scope_active = false
 	scope_active_changed.emit(scope_active)
 	knife_cooldown_fraction = 0.0

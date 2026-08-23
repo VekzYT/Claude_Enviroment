@@ -772,6 +772,15 @@ func _register_tree(rec: Dictionary, parts: Array) -> void:
 
 # Called by the axe. Returns what happened so the player can react without
 # knowing anything about how the forest is stored.
+# True when this collision shape belongs to a tree that is still standing, so
+# callers can tell "I hit a trunk" apart from "I hit a rock" without chopping.
+func is_tree(collision_shape: Node) -> bool:
+	var entry: Variant = tree_by_shape.get(collision_shape)
+	if entry == null:
+		return false
+	var tree: Dictionary = entry
+	return not bool(tree["felled"])
+
 func chop(collision_shape: Node, damage: int) -> Dictionary:
 	var entry: Variant = tree_by_shape.get(collision_shape)
 	if entry == null:

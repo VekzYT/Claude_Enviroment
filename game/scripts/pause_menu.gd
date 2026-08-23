@@ -6,11 +6,24 @@ extends CanvasLayer
 @onready var settings_button: Button = $MenuBox/BoxBorder/Box/Content/SettingsButton
 @onready var quit_button: Button = $MenuBox/BoxBorder/Box/Content/QuitButton
 @onready var settings_panel: Control = $SettingsPanel
+@onready var title: Label = $MenuBox/BoxBorder/Box/Content/Title
+@onready var box_border: ColorRect = $MenuBox/BoxBorder
+@onready var box: ColorRect = $MenuBox/BoxBorder/Box
+@onready var content: VBoxContainer = $MenuBox/BoxBorder/Box/Content
 
 var is_open := false
 
 func _ready() -> void:
 	process_mode = PROCESS_MODE_ALWAYS
+	# CanvasLayer carries no theme of its own -- it hangs on the Control inside.
+	menu_box.theme = UITheme.menu_theme()
+	box_border.color = UITheme.LINE
+	box.color = Color(0.055, 0.062, 0.051, 0.97)
+	title.add_theme_font_override("font", UITheme.display())
+	title.add_theme_font_size_override("font_size", 30)
+	title.add_theme_color_override("font_color", UITheme.TEXT)
+	content.add_theme_constant_override("separation", 12)
+	dimmer.color = Color(0, 0, 0, 0.62)
 	dimmer.visible = false
 	menu_box.visible = false
 	settings_panel.visible = false
@@ -34,6 +47,17 @@ func open() -> void:
 	dimmer.visible = true
 	menu_box.visible = true
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	Sound.play_ui("ui_toggle", -8.0)
+	# The panel drops in even while the tree is paused, which is why the tween
+	# has to be told to ignore the pause it was opened by.
+	menu_box.modulate.a = 0.0
+	box_border.position.y = -12.0
+	var tween: Tween = create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_parallel(true)
+	tween.tween_property(menu_box, "modulate:a", 1.0, 0.14)
+	tween.tween_property(box_border, "position:y", 0.0, 0.20).set_ease(Tween.EASE_OUT)
+	resume_button.grab_focus()
 
 func close() -> void:
 	is_open = false

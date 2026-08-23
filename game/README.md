@@ -1,10 +1,39 @@
-# Syfon v2.3 — First Light
+# Syfon v2.4 — Homestead
 
-A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release gives you a home and something to do with your hands.
+A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release is the pass that makes it feel like a game rather than a prototype: a real interface, real fonts, and models with something in them besides boxes.
 
-You wake outside a small log cabin in a forest of rolling hills and four mountain massifs — around 1,400 trees across four species, deadfall, bushes, ferns, wildflowers, boulders and 18,000 blades of undergrowth, all swaying in the wind under a cold overcast sky. Your inventory is empty; you have nothing but your own two hands. An axe is buried in the chopping block on the porch. Take it, and the forest becomes a resource.
+You wake outside a log cabin in a forest of rolling hills and four mountain massifs — around 1,400 trees across four species, deadfall, bushes, ferns, wildflowers, boulders and 18,000 blades of undergrowth, all swaying in the wind under a cold overcast sky. Your inventory is empty; you have nothing but your own two hands. An axe stands buried in the chopping block on the porch. Take it, and the forest becomes a resource.
 
 **Zombies are not in yet** — this release intentionally clears out the old human soldier bots so the world can be built first.
+
+## What's new in v2.4
+
+### A real interface
+
+The HUD was a row of default-font labels on flat rectangles. It is now a designed thing, assembled in `scripts/hud.gd` against a single palette in `scripts/ui_theme.gd` so nothing can drift.
+
+- **Real typography.** Oswald for display, Barlow Condensed for everything else — both OFL, bundled with their licences (`ui/fonts/CREDITS.md`).
+- **A compass ribbon** instead of a text bearing: a 120° window with a tick every 15°, cardinals riding along it, and a fixed needle at dead ahead. It slides across north instead of jumping.
+- **A condition panel** with a health bar that changes colour as it drops, a pale trailing bar that shows what you just lost before it drains away, and a stamina bar under it.
+- **A dynamic crosshair** — four arms and a dot that spread as you move and kick wider mid-swing — plus a hit marker that punches outward on contact.
+- **Radial vignettes** rather than full-screen colour washes: a permanent corner darkening, a red bloom at the edges when you take damage, and a low-health pulse that scales with how bad it is. None of them wash out the middle of the screen.
+- **An item card** that pops when you swap, **key-capped interaction prompts**, **sliding toasts**, and a control hint line that fades out once you've had time to read it.
+- **Menus to match.** The title screen paints its own dusk backdrop with a warm horizon band and two mist layers drifting at different speeds, and staggers its elements in on load. The pause menu drops in, and the settings panel picks up the same palette.
+
+### Models with something in them
+
+- **The cabin is a log cabin now.** Eight courses of stacked logs with alternating proud/recessed rounds and notched corner posts, 450 overlapping roof shingles laid in staggered rows, a chimney faced in 200 individual stones, a cross-mullioned window with a sill and open shutters, a plank door with iron battens and a ring handle, a railed porch with balusters and steps, a stacked woodpile, and an oil lantern hung off the porch post. All of it batches into four `MultiMesh` instances rather than ~700 nodes.
+- **The hands have fingers.** Each arm is now a small rig (`scripts/hand_rig.gd`): tapered forearm, wrist, palm and heel, four three-jointed fingers and a two-jointed thumb. Picking up the axe *closes the fingers around the haft* — the curl is blended with the same weight that drives the reach, so the grip forms as the hands arrive.
+- **The axe** gained a leather-wrapped grip, a bearded bit, a collar at the eye and a single-piece head with a bright edge, instead of reading as stacked flat plates.
+
+### Feel and bug fixes
+
+- **Fixed: you stopped dead.** Ground friction was `move_toward(velocity, 0, speed)` — a per-call step, not a rate. You went from full speed to zero in a single frame, and *how* fast depended on the frame rate. It is a real deceleration now, with much lower friction in the air.
+- **Fixed: holding space bounced you.** The jump read the key's state rather than its press, so keeping space down re-fired every time you touched the ground. It is edge-triggered now.
+- **Fixed: bare hands did nothing.** Left-clicking with nothing equipped returned immediately — no animation, no sound, no feedback. Empty hands now swing, and hitting a tree with them tells you why nothing happened.
+- **Sprinting costs stamina.** It drains in about four seconds, needs a beat before it starts coming back, and leaves you winded until there's enough in reserve to run on again — so a sprint has a shape instead of being a permanently-held key.
+- **Removed the dead weapon panel.** `E` became the interact key in v2.3, which left the old weapon list unreachable — along with its `GameState` signal, its player-side toggle and its stale contents.
+- **Right-sized props.** The camp drum was 1.6 m across (a real one is 0.58 m) and wore a tiling rust texture that read as a stack of coins; it is now barrel-sized with iron hoops and a lid.
 
 ## What's new in v2.3
 
@@ -148,6 +177,7 @@ Godot is free, open-source, and its projects are plain text files, which is what
   - **Left Click** — fire (guns) or dash-slash (knife), with a visible tracer on gunfire and a hit marker on a landed hit
   - **Right Click (hold)** — aim (guns only) — the sniper's aim covers the screen with a real scope overlay
   - **R** — reload (guns only; magazine drops out and slides back in)
+  - **Shift** — sprint (costs stamina, shown under the health bar; run it dry and you're winded until it recovers)
   - **Mouse Wheel** — cycle through what you're actually carrying, with a draw/holster dip animation
   - **E** — pick up the thing you're looking at (the prompt appears under the crosshair when something is in reach)
   - **Esc** — pause (freezes the game, opens Resume / Settings / Quit to Main Menu)
@@ -179,11 +209,17 @@ game/
     bot.tscn                 # robotic enemy: detailed kitbashed body + AI script
     settings_panel.tscn       # reusable volume/sensitivity panel, instanced into both the main menu and the pause menu
     axe_pickup.tscn            # the starter axe in the chopping block: Area3D in the "pickup" group, tilts as it waits
+  ui/
+    fonts/                   # Oswald + Barlow Condensed (OFL) and their licences -- see CREDITS.md
   scripts/
     main_menu.gd             # main menu button wiring
     pause_menu.gd             # in-game pause menu (attached to main.tscn's PauseMenu node): freezes the tree, Resume/Settings/Quit
     settings_panel.gd          # slider <-> Settings autoload wiring, shared by both menus
-    player.gd               # movement, mouse-look, inventory + pickups, hand/arm posing and axe grip solve, swinging and chopping, health/death, sound triggers
+    player.gd               # movement, stamina, mouse-look, inventory + pickups, hand/arm posing and axe grip solve, swinging and chopping, health/death, sound triggers
+    ui_theme.gd              # the game's palette, fonts, styleboxes and vignette generator -- one source for HUD and menus alike
+    hud.gd                    # builds and drives the whole HUD: compass ribbon, condition panel, crosshair, item card, prompts, toasts, vignettes
+    hand_rig.gd                # one first-person arm: tapered forearm, palm, four three-jointed fingers and a thumb, with a grip curl
+    cabin_detail.gd             # log courses, roof shingles, chimney stones, window, door, porch rail, woodpile and lantern for the starter cabin
     axe_pickup.gd            # the world axe: idle tilt, "Hold E" prompt, hands the item to the player and sinks away
     forest_scatter.gd         # the forest itself, and the chop registry: every tree keyed by its own collision shape, fell animation, stump pool
     target.gd                # hit/respawn logic

@@ -22,6 +22,19 @@ const KNIFE_COOLDOWN := 1.1
 const MAX_HEALTH := 100
 const RESPAWN_DELAY := 2.0
 
+# Sprinting costs stamina and it only comes back once you ease off, so a chase
+# has a shape instead of being a permanently-held key.
+const STAMINA_DRAIN := 0.28
+const STAMINA_REGEN := 0.20
+const STAMINA_REGEN_DELAY := 0.9
+const STAMINA_SPRINT_FLOOR := 0.12
+
+# How hard the ground pulls you to a stop. The old code fed `speed` straight to
+# move_toward(), which is a per-call step, not a rate -- so you stopped dead in
+# a single frame and the amount depended on the frame rate.
+const GROUND_FRICTION := 34.0
+const AIR_FRICTION := 2.5
+
 const WEAPON_SNIPER := 0
 const WEAPON_HANDGUN := 1
 const WEAPON_KNIFE := 2
@@ -29,6 +42,7 @@ const ITEM_HANDS := 3
 const ITEM_AXE := 4
 
 const AXE_SWING_DURATION := 0.62
+const HAND_SWING_DURATION := 0.34
 const AXE_CHOP_DAMAGE := 1
 const INTERACT_RANGE := 3.2
 
@@ -75,7 +89,6 @@ var switch_out_index := ITEM_HANDS
 var switch_in_index := ITEM_HANDS
 var is_switching := false
 var switch_progress := 1.0
-var weapon_panel_visible := false
 
 var can_shoot := true
 var is_reloading := false
@@ -97,6 +110,10 @@ var idle_time := 0.0
 var camera_kick := 0.0
 var footstep_step := 0
 var was_on_floor := true
+var stamina := 1.0
+var stamina_idle := 0.0
+var jump_held := false
+var winded := false
 
 var mouse_delta := Vector2.ZERO
 var sway_offset := Vector2.ZERO
@@ -115,7 +132,7 @@ var chop_shake := 0.0
 # Where the palm sits inside an arm pivot's own space, and the two points on
 # the haft the hands close around. Together these let the arms reach for the
 # axe wherever the swing animation has thrown it.
-const ARM_HAND_LOCAL := Vector3(0.0, 0.002, -0.42)
+const ARM_HAND_LOCAL := Vector3(0.0, 0.002, -0.44)
 const GRIP_HIGH := Vector3(0.0, 0.23, 0.0)
 const GRIP_LOW := Vector3(0.0, -0.06, 0.0)
 const ARM_TWIST_L := 52.0
@@ -196,11 +213,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			cycle_item(-1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			cycle_item(1)
-
-func toggle_weapon_panel() -> void:
-	weapon_panel_visible = not weapon_panel_visible
-	GameState.set_weapon_panel_open(weapon_panel_visible)
-	Sound.play_ui("ui_toggle", -8.0)
 
 # Scrolling walks the carried items only, so an empty pack never cycles through
 # guns the player has not found.
@@ -297,9 +309,14 @@ func _physics_process(delta: float) -> void:
 		Sound.play_3d("land", global_position, -6.0)
 	was_on_floor = is_on_floor()
 
-	if Input.is_physical_key_pressed(KEY_SPACE) and is_on_floor():
+	# Edge-triggered: holding space used to re-fire every frame you touched down.
+	var jump_pressed: bool = Input.is_physical_key_pressed(KEY_SPACE)
+	if jump_pressed and not jump_held and is_on_floor():
 		velocity.y = JUMP_VELOCITY
+		stamina = maxf(stamina - 0.08, 0.0)
+		stamina_idle = 0.0
 		Sound.play_3d("jump", global_position, -6.0)
+	jump_held = jump_pressed
 
 	var input_dir := Vector2.ZERO
 	if Input.is_physical_key_pressed(KEY_W):
@@ -312,8 +329,11 @@ func _physics_process(delta: float) -> void:
 		input_dir.x += 1
 	input_dir = input_dir.normalized()
 
-	var speed: float = SPRINT_SPEED if Input.is_physical_key_pressed(KEY_SHIFT) else SPEED
 	var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+	var wants_sprint: bool = Input.is_physical_key_pressed(KEY_SHIFT) and direction.length_squared() > 0.01
+	var speed: float = SPEED
+	if update_stamina(delta, wants_sprint):
+		speed = SPRINT_SPEED
 
 	if knife_cooldown_timer > 0.0:
 		knife_cooldown_timer = max(knife_cooldown_timer - delta, 0.0)
@@ -325,11 +345,14 @@ func _physics_process(delta: float) -> void:
 		velocity.x = knife_dash_direction.x * KNIFE_DASH_SPEED
 		velocity.z = knife_dash_direction.z * KNIFE_DASH_SPEED
 	elif direction:
-		velocity.x = direction.x * speed
-		velocity.z = direction.z * speed
+		velocity.x = move_toward(velocity.x, direction.x * speed, speed * 12.0 * delta)
+		velocity.z = move_toward(velocity.z, direction.z * speed, speed * 12.0 * delta)
 	else:
-		velocity.x = move_toward(velocity.x, 0, speed)
-		velocity.z = move_toward(velocity.z, 0, speed)
+		var friction: float = GROUND_FRICTION
+		if not is_on_floor():
+			friction = AIR_FRICTION
+		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
+		velocity.z = move_toward(velocity.z, 0.0, friction * delta)
 
 	move_and_slide()
 
@@ -346,6 +369,25 @@ func _physics_process(delta: float) -> void:
 	update_hands(delta)
 
 	mouse_delta = Vector2.ZERO
+
+# Returns true if the player is actually sprinting this frame. Sprinting needs
+# a real stamina reserve, and once it bottoms out you stay winded until it has
+# recovered a bit -- otherwise you can tap shift forever at zero.
+func update_stamina(delta: float, wants_sprint: bool) -> bool:
+	var sprinting: bool = wants_sprint and not winded and stamina > 0.0
+	if sprinting:
+		stamina = maxf(stamina - STAMINA_DRAIN * delta, 0.0)
+		stamina_idle = 0.0
+		if stamina <= 0.0:
+			winded = true
+	else:
+		stamina_idle += delta
+		if stamina_idle >= STAMINA_REGEN_DELAY:
+			stamina = minf(stamina + STAMINA_REGEN * delta, 1.0)
+		if winded and stamina >= STAMINA_SPRINT_FLOOR:
+			winded = false
+	GameState.set_stamina(stamina)
+	return sprinting
 
 func update_view_bob(delta: float, moving: bool, horizontal_speed: float, strafe_axis: float) -> void:
 	if moving:
@@ -451,8 +493,6 @@ func start_melee() -> void:
 	if is_meleeing or is_switching:
 		return
 	var idx: int = current_weapon_index
-	if idx == ITEM_HANDS:
-		return
 	if idx == WEAPON_KNIFE and knife_cooldown_timer > 0.0:
 		return
 	is_meleeing = true
@@ -472,6 +512,8 @@ func update_melee(delta: float) -> void:
 	var span: float = MELEE_DURATION
 	if current_weapon_index == ITEM_AXE:
 		span = AXE_SWING_DURATION
+	elif current_weapon_index == ITEM_HANDS:
+		span = HAND_SWING_DURATION
 	melee_progress = min(melee_progress + delta / span, 1.0)
 	var strike_at: float = 0.35
 	if current_weapon_index == ITEM_AXE:
@@ -519,6 +561,18 @@ func perform_melee_hit() -> void:
 				camera_kick += deg_to_rad(6.0)
 			else:
 				GameState.add_wood(1)
+			return
+
+	if idx == ITEM_HANDS and target is CollisionObject3D:
+		var bare_body: CollisionObject3D = target as CollisionObject3D
+		var bare_owner: int = bare_body.shape_find_owner(int(result.shape))
+		var bare_shape: Object = bare_body.shape_owner_get_owner(bare_owner)
+		if forest == null:
+			forest = get_tree().get_first_node_in_group("forest")
+		if forest != null and bool(forest.call("is_tree", bare_shape)):
+			Sound.play_3d("knife_hit", result.position, -12.0)
+			camera_kick += deg_to_rad(1.2)
+			GameState.announce("You need an axe to fell this.")
 			return
 
 	if target and target.has_method("hit"):
@@ -591,6 +645,18 @@ func update_hands(delta: float) -> void:
 	target_pos += Vector3(sway_offset.x, sway_offset.y, 0.0) * 0.8
 	target_rot += Vector3(sway_offset.y * 0.5, -sway_offset.x * 0.5, sway_offset.x * 0.3)
 
+	if is_meleeing and idx == ITEM_HANDS:
+		var ht: float = clamp(melee_progress, 0.0, 1.0)
+		var punch: float = 0.0
+		if ht < 0.26:
+			punch = -(ht / 0.26) * 0.06
+		elif ht < 0.46:
+			punch = lerp(-0.06, 0.26, (ht - 0.26) / 0.20)
+		else:
+			punch = lerp(0.26, 0.0, (ht - 0.46) / 0.54)
+		target_pos += Vector3(0.0, punch * 0.18, -punch)
+		target_rot += Vector3(deg_to_rad(-punch * 26.0), 0.0, 0.0)
+
 	if is_meleeing and idx == ITEM_AXE:
 		var at: float = clamp(melee_progress, 0.0, 1.0)
 		var drive: float = 0.0
@@ -623,6 +689,10 @@ func update_hands(delta: float) -> void:
 	var axe_xf: Transform3D = weapon_axe.transform
 	pose_arm(arm_left, arm_left_rest, to_hands * (axe_xf * GRIP_LOW), ARM_TWIST_L, delta)
 	pose_arm(arm_right, arm_right_rest, to_hands * (axe_xf * GRIP_HIGH), ARM_TWIST_R, delta)
+	# The fingers close as the hands arrive, so the grip is a fist on the haft
+	# rather than an open palm resting against it.
+	arm_left.call("set_grip", grip_blend)
+	arm_right.call("set_grip", grip_blend)
 
 # Aims the arm at `grip` from its resting shoulder and stretches it along its
 # own length so the palm lands on the haft, then eases the current pose toward
@@ -749,6 +819,9 @@ func update_weapon_transform(delta: float) -> void:
 			continue
 		node.visible = (i == idx) and not is_scoped
 
+	if idx == ITEM_HANDS:
+		# update_hands() owns the arms; writing here would just be overwritten.
+		return
 	var active_node: Node3D = weapon_nodes[idx]
 	active_node.position = target_position
 	active_node.rotation = target_rotation

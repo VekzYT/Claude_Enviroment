@@ -13,6 +13,8 @@ signal back_pressed
 @onready var back_button: Button = $BoxBorder/Box/Content/BackButton
 
 func _ready() -> void:
+	theme = UITheme.menu_theme()
+	_style()
 	master_slider.value = Settings.master_volume
 	music_slider.value = Settings.music_volume
 	sfx_slider.value = Settings.sfx_volume
@@ -49,3 +51,26 @@ func _on_sens_changed(value: float) -> void:
 
 func _on_back_pressed() -> void:
 	back_pressed.emit()
+
+# Pulls the panel into the shared visual language without touching its scene
+# file, so the layout stays editable in the editor.
+func _style() -> void:
+	var border := get_node_or_null("BoxBorder") as ColorRect
+	if border != null:
+		border.color = UITheme.LINE
+	var box := get_node_or_null("BoxBorder/Box") as ColorRect
+	if box != null:
+		box.color = Color(0.055, 0.062, 0.051, 0.97)
+	for node in find_children("*", "Label", true, false):
+		var label := node as Label
+		label.add_theme_font_override("font", UITheme.body())
+		label.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+	var title := get_node_or_null("BoxBorder/Box/Content/Title") as Label
+	if title != null:
+		title.add_theme_font_override("font", UITheme.display())
+		title.add_theme_font_size_override("font_size", 28)
+		title.add_theme_color_override("font_color", UITheme.TEXT)
+	for node in [master_value, music_value, sfx_value, sens_value]:
+		var value := node as Label
+		value.add_theme_font_override("font", UITheme.body_bold())
+		value.add_theme_color_override("font_color", UITheme.ACCENT)
