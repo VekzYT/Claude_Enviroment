@@ -1,4 +1,4 @@
-[gd_scene load_steps=55 format=3]
+[gd_scene load_steps=56 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="2_hud"]
@@ -19,6 +19,7 @@
 [ext_resource type="Script" path="res://scripts/objectives.gd" id="37_guide"]
 [ext_resource type="Script" path="res://scripts/landmarks.gd" id="7_landmarks"]
 [ext_resource type="Shader" path="res://shaders/ocean.gdshader" id="8_water"]
+[ext_resource type="Script" path="res://scripts/pond.gd" id="8_pondscript"]
 [ext_resource type="Texture2D" path="res://textures/dirt_albedo.jpg" id="12_dirt_albedo"]
 [ext_resource type="Texture2D" path="res://textures/dirt_normal.jpg" id="13_dirt_normal"]
 [ext_resource type="Texture2D" path="res://textures/dirt_rough.jpg" id="14_dirt_rough"]
@@ -92,9 +93,9 @@ bottom_radius = 1.0
 height = 1.0
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_pond"]
-size = Vector2(46, 46)
-subdivide_width = 40
-subdivide_depth = 40
+size = Vector2(40, 40)
+subdivide_width = 72
+subdivide_depth = 72
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_bound_ns"]
 size = Vector3(400, 60, 3)
@@ -193,14 +194,20 @@ roughness = 0.9
 
 [sub_resource type="ShaderMaterial" id="ShaderMat_pond"]
 shader = ExtResource("8_water")
-shader_parameter/shallow_color = Color(0.16, 0.2, 0.15, 0.72)
-shader_parameter/deep_color = Color(0.04, 0.07, 0.06, 0.95)
-shader_parameter/wave_height = 0.05
-shader_parameter/wave_speed = 0.35
-shader_parameter/wave_scale = 0.25
+shader_parameter/shallow_color = Color(0.42, 0.5, 0.4, 1)
+shader_parameter/deep_color = Color(0.1, 0.19, 0.17, 1)
+shader_parameter/foam_color = Color(0.74, 0.79, 0.74, 1)
+shader_parameter/wave_height = 0.26
+shader_parameter/wave_speed = 0.7
+shader_parameter/wave_scale = 0.55
+shader_parameter/ripple_scale = 1.6
+shader_parameter/ripple_strength = 0.6
 shader_parameter/fresnel_power = 3.5
-shader_parameter/roughness_value = 0.14
-shader_parameter/metallic_value = 0.3
+shader_parameter/roughness_value = 0.13
+shader_parameter/metallic_value = 0.15
+shader_parameter/clarity_depth = 1.25
+shader_parameter/foam_depth = 0.22
+shader_parameter/refraction = 0.035
 
 [node name="Main" type="Node3D"]
 
@@ -258,7 +265,8 @@ terrain_path = NodePath("../Terrain")
 script = ExtResource("7_landmarks")
 
 [node name="Pond" type="MeshInstance3D" parent="."]
-position = Vector3(60, 0.16, -30)
+position = Vector3(60, -0.55, -30)
+script = ExtResource("8_pondscript")
 mesh = SubResource("PlaneMesh_pond")
 surface_material_override/0 = SubResource("ShaderMat_pond")
 

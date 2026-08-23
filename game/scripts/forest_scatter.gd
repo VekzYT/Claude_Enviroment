@@ -161,6 +161,234 @@ func _trunk_mesh() -> CylinderMesh:
 	m.rings = 1
 	return m
 
+# ------------------------------------------------------------------ trunks
+
+# Every tree in the forest used to share one cylinder. These three taper by
+# different amounts and flare out where they meet the ground, which is most of
+# what separates a tree from a fence post.
+const TRUNK_VARIANTS := 3
+const TRUNK_TAPER: Array[float] = [0.52, 0.36, 0.68]
+const TRUNK_FLARE: Array[float] = [0.50, 0.78, 0.32]
+
+# Radius profile from root (0) to crown (1): a flared base easing quickly into
+# a long even taper.
+func _trunk_radius(t: float, taper: float, flare: float) -> float:
+	var stem: float = lerpf(1.0, taper, t)
+	var root: float = flare * pow(clampf(1.0 - t / 0.2, 0.0, 1.0), 2.0)
+	return stem + root
+
+# Built by reshaping a CylinderMesh rather than laying out triangles by hand,
+# which keeps its winding, caps and UVs correct for the bark shader.
+func _trunk_variant_mesh(variant: int) -> ArrayMesh:
+	var src := CylinderMesh.new()
+	src.top_radius = 1.0
+	src.bottom_radius = 1.0
+	src.height = 1.0
+	src.radial_segments = 9
+	src.rings = 6
+	var taper: float = TRUNK_TAPER[variant]
+	var flare: float = TRUNK_FLARE[variant]
+	var n: FastNoiseLite = _noise(4100 + variant * 97, 1.4)
+
+	var arrays: Array = src.surface_get_arrays(0)
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	for i in verts.size():
+		var v: Vector3 = verts[i]
+		var t: float = clampf(v.y + 0.5, 0.0, 1.0)
+		var radial: float = _trunk_radius(t, taper, flare)
+		# A slow wobble around the trunk so it is not a machined post. Driven
+		# by the angle alone so every ring wobbles the same way and the trunk
+		# reads as a bent column rather than a stack of unrelated discs.
+		var ang: float = atan2(v.z, v.x)
+		radial *= 1.0 + n.get_noise_2d(cos(ang) * 2.0, sin(ang) * 2.0) * 0.17
+		verts[i] = Vector3(v.x * radial, v.y, v.z * radial)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+
+	var temp := ArrayMesh.new()
+	temp.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var st := SurfaceTool.new()
+	st.create_from(temp, 0)
+	st.generate_normals()
+	return st.commit()
+
+# ------------------------------------------------------------------- leaves
+
+# One leaf spray: a flat card attached at `stem` and reaching out along `dir`.
+# Four things are baked in that the shader needs and cannot work out for
+# itself -- see foliage_leaves.gdshader for what each channel means.
+#
+# The vertex normal is the crown's outward direction rather than the card's own
+# face. That single choice is what makes card foliage read as one soft mass
+# instead of a pile of flat plates catching the sun at random angles.
+func _leaf_card(st: SurfaceTool, stem: Vector3, dir: Vector3, roll: float,
+		w: float, h: float, phase: float, shade: float, shell: Vector3) -> void:
+	var d: Vector3 = dir.normalized()
+	if d.length_squared() < 0.5:
+		d = Vector3.UP
+	var seed_axis: Vector3 = Vector3.UP if absf(d.y) < 0.9 else Vector3.RIGHT
+	var right: Vector3 = d.cross(seed_axis).normalized().rotated(d, roll)
+	var tip: Vector3 = stem + d * h
+	# Narrower at the tip, so the card is a leaf shape and not a domino.
+	var half_base: Vector3 = right * (w * 0.5)
+	var half_tip: Vector3 = right * (w * 0.32)
+	var n: Vector3 = shell.normalized() if shell.length_squared() > 0.0001 else Vector3.UP
+
+	var pts: Array[Vector3] = [stem - half_base, stem + half_base, tip + half_tip, tip - half_tip]
+	var vs: Array[float] = [0.0, 0.0, 1.0, 1.0]
+	for i in [0, 1, 2, 0, 2, 3]:
+		st.set_normal(n)
+		st.set_uv(Vector2(shade, vs[i]))
+		st.set_uv2(Vector2(phase, vs[i]))
+		st.add_vertex(pts[i])
+
+# ------------------------------------------------------------------ conifers
+
+# Five trees in the same family: a tight fir, a broad spruce, a sparse
+# windblown pine, a dense young one, and a ragged old-growth with gaps in it.
+const CONIFER_VARIANTS := 5
+# Height as a multiple of the base radius. The canopy is authored at these real
+# proportions and then instanced with a single uniform scale, which matters:
+# scaling a canopy mesh separately in Y stretches every leaf card in it into a
+# vertical shard, and a forest of those reads as a field of spikes.
+const CONIFER_ASPECT: Array[float] = [3.0, 2.5, 3.4, 2.7, 2.9]
+const CONIFER_WHORLS: Array[int] = [20, 18, 15, 22, 19]
+const CONIFER_PER_WHORL: Array[int] = [16, 18, 12, 17, 15]
+const CONIFER_DROOP: Array[float] = [0.55, 0.32, 0.72, 0.42, 0.62]
+const CONIFER_PROFILE: Array[float] = [1.35, 1.0, 1.65, 1.15, 1.3]
+const CONIFER_SPRAY: Array[float] = [0.16, 0.19, 0.14, 0.15, 0.17]
+const CONIFER_GAPS: Array[float] = [0.0, 0.05, 0.24, 0.0, 0.17]
+
+# Authored with the base radius at 1.0 and the tip at y = aspect, so the whole
+# thing scales up uniformly.
+func _conifer_canopy_mesh(variant: int) -> ArrayMesh:
+	var r := RandomNumberGenerator.new()
+	r.seed = 90210 + variant * 7717
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var aspect: float = CONIFER_ASPECT[variant]
+	var whorls: int = CONIFER_WHORLS[variant]
+	var per: int = CONIFER_PER_WHORL[variant]
+	var droop: float = CONIFER_DROOP[variant]
+	var profile: float = CONIFER_PROFILE[variant]
+	var spray: float = CONIFER_SPRAY[variant]
+	var gaps: float = CONIFER_GAPS[variant]
+
+	for w in whorls:
+		var t: float = float(w) / float(whorls - 1)
+		var radius: float = pow(1.0 - t, profile) * r.randf_range(0.88, 1.06)
+		if radius < 0.04:
+			continue
+		var count: int = maxi(4, int(round(float(per) * (0.4 + 0.6 * radius))))
+		var base_ang: float = r.randf() * TAU
+		for i in count:
+			if r.randf() < gaps:
+				continue
+			var ang: float = base_ang + TAU * float(i) / float(count) + r.randf_range(-0.18, 0.18)
+			var rr: float = radius * r.randf_range(0.7, 1.0)
+			var y: float = (t + r.randf_range(-0.015, 0.015)) * aspect
+			var stem := Vector3(cos(ang) * rr * 0.25, y, sin(ang) * rr * 0.25)
+			# Fronds reach outward and hang, which is what makes a conifer read
+			# as a conifer instead of a green cone.
+			var out := Vector3(cos(ang), -droop, sin(ang))
+			_leaf_card(st, stem, out, r.randf_range(0.0, TAU),
+				spray * r.randf_range(0.8, 1.15), rr * 0.8 + spray * 0.6,
+				r.randf(), clampf(0.25 + t * 0.7, 0.0, 1.0),
+				Vector3(cos(ang) * 0.72, 0.62, sin(ang) * 0.72))
+
+		# Two sprays hard against the leader, so you cannot see clean daylight
+		# straight through the middle of the tree.
+		for _k in 2:
+			var ia: float = r.randf() * TAU
+			_leaf_card(st, Vector3(0.0, t * aspect, 0.0),
+				Vector3(cos(ia) * 0.6, -0.2 + r.randf() * 0.5, sin(ia) * 0.6),
+				r.randf_range(0.0, TAU), spray * 0.8, maxf(radius * 0.55, 0.09),
+				r.randf(), clampf(0.15 + t * 0.5, 0.0, 1.0), Vector3.UP)
+
+	# The leader: a spike of sprays at the very top.
+	for _k in 6:
+		var la: float = r.randf() * TAU
+		_leaf_card(st, Vector3(0.0, aspect * 0.95, 0.0),
+			Vector3(cos(la) * 0.35, 0.9, sin(la) * 0.35),
+			r.randf_range(0.0, TAU), spray * 0.6, spray * 1.6,
+			r.randf(), 1.0, Vector3.UP)
+	return st.commit()
+
+# ----------------------------------------------------------------- broadleaf
+
+# Round oak, tall poplar, wide maple, a drooping willow and a big airy elm.
+const BROADLEAF_VARIANTS := 5
+const BROADLEAF_LOBES: Array[int] = [3, 2, 4, 3, 5]
+const BROADLEAF_CARDS: Array[int] = [300, 260, 330, 250, 350]
+const BROADLEAF_SPRAY: Array[float] = [0.100, 0.115, 0.092, 0.108, 0.086]
+const BROADLEAF_DROOP: Array[float] = [0.0, 0.1, 0.0, 0.45, 0.12]
+const BROADLEAF_SQUASH: Array[float] = [0.86, 1.0, 0.78, 0.95, 0.9]
+
+# Authored centred on the origin with radius 0.5, matching the sphere the old
+# canopy blobs used, so the instancing maths stays familiar.
+func _broadleaf_crown_mesh(variant: int) -> ArrayMesh:
+	var r := RandomNumberGenerator.new()
+	r.seed = 51234 + variant * 3313
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var lobes: int = BROADLEAF_LOBES[variant]
+	var cards: int = BROADLEAF_CARDS[variant]
+	var spray: float = BROADLEAF_SPRAY[variant]
+	var droop: float = BROADLEAF_DROOP[variant]
+	var squash: float = BROADLEAF_SQUASH[variant]
+
+	# A handful of overlapping masses rather than one ball, which is what stops
+	# a crown reading as a green sphere stuck on a stick.
+	var centers: Array[Vector3] = [Vector3(0.0, 0.02, 0.0)]
+	var radii: Array[float] = [0.40]
+	for i in range(1, lobes):
+		var a: float = TAU * float(i) / float(lobes) + r.randf_range(-0.5, 0.5)
+		var d: float = r.randf_range(0.16, 0.28)
+		centers.append(Vector3(cos(a) * d, r.randf_range(-0.10, 0.16), sin(a) * d))
+		radii.append(r.randf_range(0.22, 0.33))
+
+	for _c in cards:
+		var li: int = r.randi() % centers.size()
+		var center: Vector3 = centers[li]
+		var rad: float = radii[li]
+		var dir := Vector3(r.randfn(0.0, 1.0), r.randfn(0.0, 1.0), r.randfn(0.0, 1.0))
+		if dir.length_squared() < 0.0001:
+			dir = Vector3.UP
+		dir = dir.normalized()
+		# Biased hard toward the surface, so the leaves form a shell instead of
+		# a solid ball of geometry nobody can ever see the inside of.
+		var t: float = pow(r.randf(), 0.32)
+		var stem: Vector3 = center + Vector3(dir.x, dir.y * squash, dir.z) * rad * t
+		var out := Vector3(dir.x, dir.y - droop, dir.z)
+		_leaf_card(st, stem, out, r.randf_range(0.0, TAU),
+			spray * r.randf_range(0.8, 1.25), spray * r.randf_range(1.0, 1.5),
+			r.randf(), clampf(t * 0.85 + stem.y + 0.35, 0.0, 1.0), dir)
+	return st.commit()
+
+# ------------------------------------------------------------------ deadfall
+
+# What is left in the crown of a standing dead tree: a scatter of brown sprays
+# clinging to the upper branches, nothing like a full canopy.
+func _dead_crown_mesh(variant: int) -> ArrayMesh:
+	var r := RandomNumberGenerator.new()
+	r.seed = 33871 + variant * 911
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cards: int = [46, 30][variant]
+	var spray: float = [0.15, 0.19][variant]
+	for _c in cards:
+		var dir := Vector3(r.randfn(0.0, 1.0), r.randfn(0.0, 0.7), r.randfn(0.0, 1.0))
+		if dir.length_squared() < 0.0001:
+			dir = Vector3.UP
+		dir = dir.normalized()
+		var t: float = pow(r.randf(), 0.4)
+		var stem: Vector3 = Vector3(dir.x, dir.y * 1.15, dir.z) * 0.46 * t
+		_leaf_card(st, stem, Vector3(dir.x, dir.y - 0.5, dir.z), r.randf_range(0.0, TAU),
+			spray * r.randf_range(0.7, 1.1), spray * r.randf_range(1.0, 1.6),
+			r.randf(), clampf(t, 0.0, 1.0), dir)
+	return st.commit()
+
 func _cone_source() -> CylinderMesh:
 	var m := CylinderMesh.new()
 	m.top_radius = 0.04
@@ -281,6 +509,37 @@ func _foliage_material(base: Color, tip: Color, pivot: float, strength: float, s
 	mat.set_shader_parameter("roughness_value", 0.92)
 	return mat
 
+# For canopies built out of leaf cards. Separate from _foliage_material, which
+# still drives the solid bushes, ferns and grass.
+func _leaf_material(base: Color, tip: Color, crown_h: float, sway: float,
+		speed: float, flutter: float) -> ShaderMaterial:
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/foliage_leaves.gdshader") as Shader
+	mat.set_shader_parameter("base_color", base)
+	mat.set_shader_parameter("tip_color", tip)
+	mat.set_shader_parameter("crown_height", crown_h)
+	mat.set_shader_parameter("wind_strength", sway)
+	mat.set_shader_parameter("wind_speed", speed)
+	mat.set_shader_parameter("wind_frequency", 0.22)
+	mat.set_shader_parameter("gust_strength", 0.55)
+	mat.set_shader_parameter("leaf_flutter", flutter)
+	mat.set_shader_parameter("leaf_speed", 2.6)
+	mat.set_shader_parameter("roughness_value", 0.92)
+	return mat
+
+# Commits one bucket of gathered instances. Buckets are plain untyped Arrays so
+# they can live in a list indexed by variant; this copies them back into the
+# typed arrays _add_multimesh wants.
+func _commit_bucket(mesh_name: String, mesh: Mesh, material: Material,
+		xf: Array, col: Array, cast_shadow: bool) -> MultiMesh:
+	var xs: Array[Transform3D] = []
+	var cs: Array[Color] = []
+	for v in xf:
+		xs.append(v)
+	for c in col:
+		cs.append(c)
+	return _add_multimesh(mesh_name, mesh, material, xs, cs, cast_shadow)
+
 func _rock_material() -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.62, 0.62, 0.63, 1.0)
@@ -352,208 +611,228 @@ func _add_trunk_collision(pos: Vector2, ground_y: float, radius: float) -> Colli
 func _scatter_conifers() -> void:
 	var points: Array[Vector2] = _find_spots(CONIFER_COUNT, 2.0, ROAD_CLEARANCE, TREE_MAX_SLOPE)
 
-	var trunk_xf: Array[Transform3D] = []
-	var trunk_col: Array[Color] = []
-	var tier_xf: Array[Array] = [[], [], [], []]
-	var tier_col: Array[Array] = [[], [], [], []]
+	var trunk_xf: Array = []
+	var trunk_col: Array = []
+	for _t in TRUNK_VARIANTS:
+		trunk_xf.append([])
+		trunk_col.append([])
+	var crown_xf: Array = []
+	var crown_col: Array = []
+	for _c in CONIFER_VARIANTS:
+		crown_xf.append([])
+		crown_col.append([])
 	var pending: Array = []
 
 	for p in points:
 		var gy: float = _ground(p.x, p.y)
-		var h: float = rng.randf_range(8.0, 19.0)
+		var h: float = rng.randf_range(8.0, 21.0)
 		var radius: float = 0.10 + h * 0.013
 		var yaw: float = rng.randf_range(0.0, TAU)
 		# A couple of degrees of lean stops the trunks looking like a pin array.
 		var tilt: float = rng.randf_range(0.0, 0.055)
 		var tilt_dir: float = rng.randf_range(0.0, TAU)
 		var rot: Basis = Basis(Vector3(cos(tilt_dir), 0.0, sin(tilt_dir)), tilt) * Basis(Vector3.UP, yaw)
+		var base := Vector3(p.x, gy, p.y)
 
-		var trunk_slot: int = trunk_xf.size()
-		var tier_slots: Array = []
-		trunk_xf.append(Transform3D(_local_scale(rot, Vector3(radius, h, radius)),
-			Vector3(p.x, gy + h * 0.5, p.y)))
+		var tv: int = rng.randi() % TRUNK_VARIANTS
+		var cv: int = rng.randi() % CONIFER_VARIANTS
+
+		# Both parts are placed by rotating their offset from the base through
+		# the same lean, so a tilted tree leans as one piece. Placing each part
+		# at the trunk position and letting it rotate about its own origin --
+		# which is what this used to do -- slid the canopy off the trunk by
+		# half a metre on the tall ones.
+		var trunk_slot: int = trunk_xf[tv].size()
+		trunk_xf[tv].append(Transform3D(_local_scale(rot, Vector3(radius, h, radius)),
+			base + rot * Vector3(0.0, h * 0.5, 0.0)))
 		var bark: float = rng.randf_range(0.72, 1.16)
-		trunk_col.append(Color(bark, bark * 0.97, bark * 0.92, 1.0))
+		trunk_col[tv].append(Color(bark, bark * 0.97, bark * 0.92, 1.0))
 
-		# Firs get four tight tiers, spruces three broader ones.
-		var is_fir: bool = rng.randf() < 0.55
-		var slim: float = rng.randf_range(0.8, 1.25)
-		var leaf: float = rng.randf_range(0.66, 1.22)
+		var crown_bottom: float = h * rng.randf_range(0.16, 0.28)
+		var crown_h: float = h - crown_bottom
+		# One uniform scale, derived from the height the canopy has to fill and
+		# the proportions its mesh was authored at. Scaling Y on its own would
+		# stretch every leaf card in the mesh into a shard.
+		var crown_s: float = crown_h / CONIFER_ASPECT[cv]
+		var leaf: float = rng.randf_range(0.78, 1.22)
 		var leaf_color := Color(leaf * 0.94, leaf, leaf * 0.88, 1.0)
-		var tiers: Array[Vector3] = []
-		if is_fir:
-			tiers = [
-				Vector3(0.40, 0.200, 0.30),
-				Vector3(0.575, 0.166, 0.27),
-				Vector3(0.745, 0.126, 0.24),
-				Vector3(0.895, 0.078, 0.20),
-			]
-		else:
-			tiers = [
-				Vector3(0.44, 0.232, 0.34),
-				Vector3(0.655, 0.176, 0.30),
-				Vector3(0.855, 0.108, 0.25),
-			]
-		for i in tiers.size():
-			var t: Vector3 = tiers[i]
-			var fw: float = h * t.y * slim
-			var fh: float = h * t.z
-			var xf := Transform3D(_local_scale(rot, Vector3(fw, fh, fw)),
-				Vector3(p.x, gy + h * t.x, p.y))
-			tier_slots.append(Vector2i(i, tier_xf[i].size()))
-			tier_xf[i].append(xf)
-			tier_col[i].append(leaf_color)
+		var crown_slot: int = crown_xf[cv].size()
+		crown_xf[cv].append(Transform3D(
+			_local_scale(rot * Basis(Vector3.UP, rng.randf_range(0.0, TAU)),
+				Vector3(crown_s, crown_s, crown_s)),
+			base + rot * Vector3(0.0, crown_bottom, 0.0)))
+		crown_col[cv].append(leaf_color)
 
 		var cs: CollisionShape3D = _add_trunk_collision(p, gy, radius)
 		pending.append({
-			"trunk": trunk_slot, "tiers": tier_slots, "cs": cs,
-			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
+			"tv": tv, "trunk": trunk_slot, "cv": cv, "crown": crown_slot, "cs": cs,
+			"base": base, "height": h, "radius": radius,
 			"tint": Color(0.42, 0.31, 0.20), "species": "conifer",
 		})
 
-	var trunk_mesh: CylinderMesh = _trunk_mesh()
 	var bark_mat: ShaderMaterial = _bark_material(Color(0.68, 0.62, 0.55, 1.0), Vector2(1.0, 3.0), 0.95)
-	var trunk_mm: MultiMesh = _add_multimesh("ConiferTrunks", trunk_mesh, bark_mat, trunk_xf, trunk_col, true)
+	var trunk_mms: Array = []
+	for tv in TRUNK_VARIANTS:
+		trunk_mms.append(_commit_bucket("ConiferTrunks%d" % tv, _trunk_variant_mesh(tv),
+			bark_mat, trunk_xf[tv], trunk_col[tv], true))
 
-	# Two differently deformed cones alternate between tiers so the canopy
-	# silhouette never repeats exactly.
-	var cone_a: ArrayMesh = _deform(_cone_source(), 0.26, 1.6, 3311, 1.0)
-	var cone_b: ArrayMesh = _deform(_cone_source(), 0.30, 2.1, 7742, 1.0)
-	var tier_mms: Array = []
-	var tier_names: Array[String] = ["ConiferCanopy1", "ConiferCanopy2", "ConiferCanopy3", "ConiferCanopy4"]
+	# Each variant gets its own green so a stand of trees is not one flat wall
+	# of the same colour.
 	var bases: Array[Color] = [
-		Color(0.075, 0.135, 0.075, 1.0), Color(0.085, 0.150, 0.082, 1.0),
-		Color(0.100, 0.170, 0.092, 1.0), Color(0.115, 0.190, 0.105, 1.0),
+		Color(0.130, 0.215, 0.118, 1.0), Color(0.150, 0.245, 0.132, 1.0),
+		Color(0.118, 0.196, 0.112, 1.0), Color(0.168, 0.265, 0.142, 1.0),
+		Color(0.140, 0.228, 0.124, 1.0),
 	]
 	var tips: Array[Color] = [
-		Color(0.135, 0.215, 0.105, 1.0), Color(0.155, 0.240, 0.115, 1.0),
-		Color(0.180, 0.270, 0.130, 1.0), Color(0.205, 0.300, 0.145, 1.0),
+		Color(0.270, 0.380, 0.180, 1.0), Color(0.300, 0.415, 0.198, 1.0),
+		Color(0.245, 0.345, 0.168, 1.0), Color(0.330, 0.440, 0.215, 1.0),
+		Color(0.285, 0.395, 0.190, 1.0),
 	]
-	for i in 4:
-		var xf_list: Array[Transform3D] = []
-		var col_list: Array[Color] = []
-		for v in tier_xf[i]:
-			xf_list.append(v)
-		for c in tier_col[i]:
-			col_list.append(c)
-		var tier_mesh: ArrayMesh = cone_a
-		if i % 2 == 1:
-			tier_mesh = cone_b
-		tier_mms.append(_add_multimesh(tier_names[i], tier_mesh,
-			_foliage_material(bases[i], tips[i], 1.0, 0.05 + float(i) * 0.02, 0.9 + float(i) * 0.08),
-			xf_list, col_list, i < 3))
+	var crown_mms: Array = []
+	for cv in CONIFER_VARIANTS:
+		crown_mms.append(_commit_bucket("ConiferCanopy%d" % cv, _conifer_canopy_mesh(cv),
+			_leaf_material(bases[cv], tips[cv], CONIFER_ASPECT[cv],
+				0.05 + float(cv) * 0.008, 0.85 + float(cv) * 0.06, 0.030),
+			crown_xf[cv], crown_col[cv], true))
 
 	for rec in pending:
-		var parts: Array = [{"mm": trunk_mm, "i": rec["trunk"], "rest": trunk_xf[rec["trunk"]]}]
-		for slot in rec["tiers"]:
-			parts.append({"mm": tier_mms[slot.x], "i": slot.y, "rest": tier_xf[slot.x][slot.y]})
-		_register_tree(rec, parts)
+		var tv: int = rec["tv"]
+		var cv: int = rec["cv"]
+		_register_tree(rec, [
+			{"mm": trunk_mms[tv], "i": rec["trunk"], "rest": trunk_xf[tv][rec["trunk"]]},
+			{"mm": crown_mms[cv], "i": rec["crown"], "rest": crown_xf[cv][rec["crown"]], "leafy": true},
+		])
 
 # ---------------------------------------------------------------- broadleaf
 
 func _scatter_broadleaf() -> void:
 	var points: Array[Vector2] = _find_spots(BROADLEAF_COUNT, 2.0, ROAD_CLEARANCE, TREE_MAX_SLOPE)
 
-	var trunk_xf: Array[Transform3D] = []
-	var trunk_col: Array[Color] = []
-	var blob_xf: Array[Transform3D] = []
-	var blob_col: Array[Color] = []
+	var trunk_xf: Array = []
+	var trunk_col: Array = []
+	for _t in TRUNK_VARIANTS:
+		trunk_xf.append([])
+		trunk_col.append([])
+	var crown_xf: Array = []
+	var crown_col: Array = []
+	for _c in BROADLEAF_VARIANTS:
+		crown_xf.append([])
+		crown_col.append([])
 	var pending: Array = []
 
 	for p in points:
 		var gy: float = _ground(p.x, p.y)
-		var h: float = rng.randf_range(6.0, 12.5)
+		var h: float = rng.randf_range(6.0, 13.5)
 		var radius: float = 0.13 + h * 0.016
 		var yaw: float = rng.randf_range(0.0, TAU)
 		var tilt: float = rng.randf_range(0.0, 0.07)
 		var tilt_dir: float = rng.randf_range(0.0, TAU)
 		var rot: Basis = Basis(Vector3(cos(tilt_dir), 0.0, sin(tilt_dir)), tilt) * Basis(Vector3.UP, yaw)
+		var base := Vector3(p.x, gy, p.y)
 
-		# Birches get a pale trunk, oaks a dark one — same mesh, different tint.
+		# Birches get a pale trunk, oaks a dark one -- same mesh, different tint.
 		var is_birch: bool = rng.randf() < 0.4
-		var trunk_ratio: float = 0.5
-		if is_birch:
-			trunk_ratio = 0.62
+		var trunk_ratio: float = 0.62 if is_birch else 0.5
 		var trunk_h: float = h * trunk_ratio
-		var trunk_slot: int = trunk_xf.size()
-		var blob_slots: Array = []
-		trunk_xf.append(Transform3D(_local_scale(rot, Vector3(radius, trunk_h, radius)),
-			Vector3(p.x, gy + trunk_h * 0.5, p.y)))
-		var shade: float = rng.randf_range(0.5, 0.8)
+		var tv: int = 1 if is_birch else rng.randi() % TRUNK_VARIANTS
+		var cv: int = rng.randi() % BROADLEAF_VARIANTS
+
+		var trunk_slot: int = trunk_xf[tv].size()
+		trunk_xf[tv].append(Transform3D(_local_scale(rot, Vector3(radius, trunk_h, radius)),
+			base + rot * Vector3(0.0, trunk_h * 0.5, 0.0)))
+		var shade: float = rng.randf_range(0.85, 1.2) if is_birch else rng.randf_range(0.5, 0.8)
 		if is_birch:
-			shade = rng.randf_range(0.85, 1.2)
-		if is_birch:
-			trunk_col.append(Color(shade * 1.25, shade * 1.22, shade * 1.12, 1.0))
+			trunk_col[tv].append(Color(shade * 1.25, shade * 1.22, shade * 1.12, 1.0))
 		else:
-			trunk_col.append(Color(shade, shade * 0.92, shade * 0.82, 1.0))
+			trunk_col[tv].append(Color(shade, shade * 0.92, shade * 0.82, 1.0))
 
 		var leaf: float = rng.randf_range(0.62, 1.2)
 		var warm: float = rng.randf_range(0.0, 1.0)
 		var leaf_color := Color(leaf * (0.9 + warm * 0.35), leaf, leaf * 0.72, 1.0)
-		# Three offset blobs make an irregular crown instead of one ball.
-		var crown_y: float = gy + trunk_h + h * 0.16
-		var crown_r: float = h * rng.randf_range(0.24, 0.33)
-		var blobs: int = 3
-		for i in blobs:
-			var ang: float = rng.randf_range(0.0, TAU)
-			var off: float = 0.0
-			var blob_scale: float = 1.0
-			if i > 0:
-				off = crown_r * rng.randf_range(0.35, 0.62)
-				blob_scale = rng.randf_range(0.55, 0.8)
-			var s: float = crown_r * blob_scale
-			var b := Basis(Vector3.UP, rng.randf_range(0.0, TAU))
-			blob_slots.append(blob_xf.size())
-			blob_xf.append(Transform3D(_local_scale(b, Vector3(s * 1.15, s * 0.9, s * 1.15)),
-				Vector3(p.x + cos(ang) * off, crown_y + rng.randf_range(-0.1, 0.3) * crown_r, p.y + sin(ang) * off)))
-			blob_col.append(leaf_color)
+		var cr: float = h * rng.randf_range(0.26, 0.36)
+		var tallness: float = rng.randf_range(0.82, 1.12)
+		# The crown mesh has radius 0.5, so it scales up by twice the radius.
+		var crown_slot: int = crown_xf[cv].size()
+		crown_xf[cv].append(Transform3D(
+			_local_scale(rot * Basis(Vector3.UP, rng.randf_range(0.0, TAU)),
+				Vector3(cr * 2.0, cr * 2.0 * tallness, cr * 2.0)),
+			base + rot * Vector3(0.0, trunk_h + cr * 0.55 * tallness, 0.0)))
+		crown_col[cv].append(leaf_color)
 
 		var cs: CollisionShape3D = _add_trunk_collision(p, gy, radius)
 		pending.append({
-			"trunk": trunk_slot, "blobs": blob_slots, "cs": cs,
-			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
+			"tv": tv, "trunk": trunk_slot, "cv": cv, "crown": crown_slot, "cs": cs,
+			"base": base, "height": h, "radius": radius,
 			"tint": Color(0.52, 0.43, 0.31), "species": "broadleaf",
 		})
 
 	var bark_mat: ShaderMaterial = _bark_material(Color(0.7, 0.66, 0.6, 1.0), Vector2(1.0, 2.2), 0.95)
-	var trunk_mm: MultiMesh = _add_multimesh("BroadleafTrunks", _trunk_mesh(), bark_mat, trunk_xf, trunk_col, true)
-	var blob: ArrayMesh = _deform(_sphere_source(12, 7), 0.30, 1.4, 5150, 0.95)
-	var blob_mm: MultiMesh = _add_multimesh("BroadleafCanopy", blob,
-		_foliage_material(Color(0.115, 0.175, 0.085, 1.0), Color(0.235, 0.315, 0.135, 1.0), 1.2, 0.09, 1.15),
-		blob_xf, blob_col, true)
+	var trunk_mms: Array = []
+	for tv in TRUNK_VARIANTS:
+		trunk_mms.append(_commit_bucket("BroadleafTrunks%d" % tv, _trunk_variant_mesh(tv),
+			bark_mat, trunk_xf[tv], trunk_col[tv], true))
+
+	var bases: Array[Color] = [
+		Color(0.185, 0.265, 0.128, 1.0), Color(0.205, 0.285, 0.125, 1.0),
+		Color(0.168, 0.246, 0.120, 1.0), Color(0.198, 0.278, 0.138, 1.0),
+		Color(0.176, 0.256, 0.124, 1.0),
+	]
+	var tips: Array[Color] = [
+		Color(0.370, 0.460, 0.205, 1.0), Color(0.405, 0.490, 0.212, 1.0),
+		Color(0.345, 0.435, 0.198, 1.0), Color(0.390, 0.478, 0.225, 1.0),
+		Color(0.378, 0.466, 0.210, 1.0),
+	]
+	var crown_mms: Array = []
+	for cv in BROADLEAF_VARIANTS:
+		# The crown mesh spans y -0.5..0.5, so a crown height of one unit puts
+		# the sway anchor at its underside.
+		crown_mms.append(_commit_bucket("BroadleafCanopy%d" % cv, _broadleaf_crown_mesh(cv),
+			_leaf_material(bases[cv], tips[cv], 1.0,
+				0.085 + float(cv) * 0.006, 1.05 + float(cv) * 0.07, 0.055),
+			crown_xf[cv], crown_col[cv], true))
+
 	for rec in pending:
-		var parts: Array = [{"mm": trunk_mm, "i": rec["trunk"], "rest": trunk_xf[rec["trunk"]]}]
-		for bi in rec["blobs"]:
-			parts.append({"mm": blob_mm, "i": bi, "rest": blob_xf[bi]})
-		_register_tree(rec, parts)
+		var tv: int = rec["tv"]
+		var cv: int = rec["cv"]
+		_register_tree(rec, [
+			{"mm": trunk_mms[tv], "i": rec["trunk"], "rest": trunk_xf[tv][rec["trunk"]]},
+			{"mm": crown_mms[cv], "i": rec["crown"], "rest": crown_xf[cv][rec["crown"]], "leafy": true},
+		])
 
 # ---------------------------------------------------------------- deadfall
 
 func _scatter_dead_trees() -> void:
 	var points: Array[Vector2] = _find_spots(DEAD_TREE_COUNT, 1.0, ROAD_CLEARANCE, TREE_MAX_SLOPE)
 
-	var trunk_xf: Array[Transform3D] = []
-	var trunk_col: Array[Color] = []
+	var trunk_xf: Array = []
+	var trunk_col: Array = []
+	for _t in TRUNK_VARIANTS:
+		trunk_xf.append([])
+		trunk_col.append([])
 	var branch_xf: Array[Transform3D] = []
 	var branch_col: Array[Color] = []
+	var crown_xf: Array = [[], []]
+	var crown_col: Array = [[], []]
 	var pending: Array = []
 
 	for p in points:
 		var gy: float = _ground(p.x, p.y)
-		var h: float = rng.randf_range(5.5, 14.0)
+		var h: float = rng.randf_range(5.5, 15.0)
 		var radius: float = 0.09 + h * 0.011
 		var yaw: float = rng.randf_range(0.0, TAU)
 		var lean: float = rng.randf_range(0.02, 0.16)
 		var lean_dir: float = rng.randf_range(0.0, TAU)
 		var rot: Basis = Basis(Vector3(cos(lean_dir), 0.0, sin(lean_dir)), lean) * Basis(Vector3.UP, yaw)
+		var base := Vector3(p.x, gy, p.y)
 
-		var trunk_slot: int = trunk_xf.size()
-		var branch_slots: Array = []
-		trunk_xf.append(Transform3D(_local_scale(rot, Vector3(radius, h, radius)),
-			Vector3(p.x, gy + h * 0.5, p.y)))
+		var tv: int = rng.randi() % TRUNK_VARIANTS
+		var trunk_slot: int = trunk_xf[tv].size()
+		trunk_xf[tv].append(Transform3D(_local_scale(rot, Vector3(radius, h, radius)),
+			base + rot * Vector3(0.0, h * 0.5, 0.0)))
 		var shade: float = rng.randf_range(0.40, 0.66)
-		trunk_col.append(Color(shade, shade * 0.94, shade * 0.86, 1.0))
+		trunk_col[tv].append(Color(shade, shade * 0.94, shade * 0.86, 1.0))
 
+		var branch_slots: Array = []
 		for _i in rng.randi_range(2, 5):
 			var by: float = rng.randf_range(0.4, 0.92) * h
 			var blen: float = rng.randf_range(0.9, 2.8)
@@ -563,24 +842,56 @@ func _scatter_dead_trees() -> void:
 			var b_rot: Basis = Basis(Vector3.UP, byaw) * Basis(Vector3.RIGHT, bpitch)
 			var offset := Vector3(cos(byaw), 0.0, sin(byaw)) * blen * 0.35
 			branch_slots.append(branch_xf.size())
-			branch_xf.append(Transform3D(_local_scale(b_rot, Vector3(brad, blen, brad)),
-				Vector3(p.x, gy + by, p.y) + offset))
+			branch_xf.append(Transform3D(_local_scale(rot * b_rot, Vector3(brad, blen, brad)),
+				base + rot * (Vector3(0.0, by, 0.0) + offset)))
 			branch_col.append(Color(shade * 0.9, shade * 0.85, shade * 0.78, 1.0))
+
+		# Roughly a third are only half dead and still hold some brown leaf.
+		var crown_variant: int = -1
+		var crown_slot: int = -1
+		if rng.randf() < 0.34:
+			crown_variant = rng.randi() % 2
+			var cr: float = h * rng.randf_range(0.16, 0.24)
+			crown_slot = crown_xf[crown_variant].size()
+			crown_xf[crown_variant].append(Transform3D(
+				_local_scale(rot * Basis(Vector3.UP, rng.randf_range(0.0, TAU)),
+					Vector3(cr * 2.0, cr * 1.7, cr * 2.0)),
+				base + rot * Vector3(0.0, h * rng.randf_range(0.72, 0.86), 0.0)))
+			var dry: float = rng.randf_range(0.72, 1.1)
+			crown_col[crown_variant].append(Color(dry, dry * 0.94, dry * 0.82, 1.0))
 
 		var cs: CollisionShape3D = _add_trunk_collision(p, gy, radius)
 		pending.append({
-			"trunk": trunk_slot, "branches": branch_slots, "cs": cs,
-			"base": Vector3(p.x, gy, p.y), "height": h, "radius": radius,
+			"tv": tv, "trunk": trunk_slot, "branches": branch_slots,
+			"cvar": crown_variant, "crown": crown_slot, "cs": cs,
+			"base": base, "height": h, "radius": radius,
 			"tint": Color(0.45, 0.41, 0.34), "species": "dead",
 		})
 
 	var dead_mat: ShaderMaterial = _bark_material(Color(0.5, 0.46, 0.4, 1.0), Vector2(1.0, 2.5), 1.0)
-	var trunk_mm: MultiMesh = _add_multimesh("DeadTrunks", _trunk_mesh(), dead_mat, trunk_xf, trunk_col, true)
-	var branch_mm: MultiMesh = _add_multimesh("DeadBranches", _trunk_mesh(), dead_mat, branch_xf, branch_col, false)
+	var trunk_mms: Array = []
+	for tv in TRUNK_VARIANTS:
+		trunk_mms.append(_commit_bucket("DeadTrunks%d" % tv, _trunk_variant_mesh(tv),
+			dead_mat, trunk_xf[tv], trunk_col[tv], true))
+	var branch_mm: MultiMesh = _add_multimesh("DeadBranches", _trunk_mesh(), dead_mat,
+		branch_xf, branch_col, false)
+
+	var crown_mms: Array = []
+	for cv in 2:
+		crown_mms.append(_commit_bucket("DeadCanopy%d" % cv, _dead_crown_mesh(cv),
+			_leaf_material(Color(0.135, 0.110, 0.062, 1.0), Color(0.285, 0.215, 0.105, 1.0),
+				1.0, 0.05, 1.15, 0.045),
+			crown_xf[cv], crown_col[cv], false))
+
 	for rec in pending:
-		var parts: Array = [{"mm": trunk_mm, "i": rec["trunk"], "rest": trunk_xf[rec["trunk"]]}]
+		var tv: int = rec["tv"]
+		var parts: Array = [{"mm": trunk_mms[tv], "i": rec["trunk"], "rest": trunk_xf[tv][rec["trunk"]]}]
 		for bi in rec["branches"]:
 			parts.append({"mm": branch_mm, "i": bi, "rest": branch_xf[bi]})
+		var cvar: int = rec["cvar"]
+		if cvar >= 0:
+			parts.append({"mm": crown_mms[cvar], "i": rec["crown"],
+				"rest": crown_xf[cvar][rec["crown"]], "leafy": true})
 		_register_tree(rec, parts)
 
 # ---------------------------------------------------------------- undergrowth
@@ -902,13 +1213,15 @@ func _settle_felled(tree: Dictionary, axis: Vector3, angle: float) -> void:
 	var parts: Array = tree["parts"]
 	var tint: Color = tree["tint"]
 
-	# Everything past the trunk is canopy. Burst it where it landed.
+	# Everything past the trunk comes down with it. The canopy parts are
+	# flagged when they are built, so a dead tree's bare branches do not throw
+	# a shower of green leaves the way indexing by position used to.
 	for i in range(1, parts.size()):
 		var part: Dictionary = parts[i]
 		var rest: Transform3D = part["rest"]
 		var landed: Vector3 = base + rot * (rest.origin - base)
-		if i <= 3:
-			Effects.spawn_leaf_burst(landed, _leaf_tint(tree), 22)
+		if bool(part.get("leafy", false)):
+			Effects.spawn_leaf_burst(landed, _leaf_tint(tree), 40)
 		_hide_part(part)
 
 	# Where the trunk ended up, and which way it is lying.

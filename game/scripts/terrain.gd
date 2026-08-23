@@ -50,8 +50,19 @@ const POI_RADII: Array[float] = [24.0, 15.0, 17.0, 20.0, 21.0, 15.0, 19.0, 27.0,
 const POI_BLENDS: Array[float] = [18.0, 14.0, 14.0, 16.0, 16.0, 14.0, 16.0, 18.0, 22.0]
 const POI_HEIGHTS: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 12.0]
 # How bare each pad is. Roads and camps are worn to dirt; the lookout stays
-# rocky and the pond keeps some ground cover at its rim.
-const POI_DIRT: Array[float] = [1.0, 0.85, 0.8, 0.9, 0.7, 0.8, 0.95, 0.45, 0.0]
+# rocky and the pond bed is mud.
+const POI_DIRT: Array[float] = [1.0, 0.85, 0.8, 0.9, 0.7, 0.8, 0.95, 0.8, 0.0]
+
+# The pond was a flat pad with a sheet of water floating sixteen centimetres
+# over it, which is exactly why it read as a slab. This digs a real bowl. The
+# waterline then falls wherever the bed rises past WATER_LEVEL, so the shore is
+# a shape the terrain decides rather than a circle drawn on top of it.
+const POND_CENTER := Vector2(60.0, -30.0)
+const POND_RIM := 20.0
+const POND_DEPTH := 3.1
+# Water sits below the surrounding ground, so no wave crest can breach the
+# bank and leave a shard of water floating out on the grass.
+const WATER_LEVEL := -0.55
 
 # Dirt roads out of camp, graded level like a real cut road.
 const ROAD_ENDS: Array[Vector2] = [
@@ -166,6 +177,18 @@ func _dirt_at(p: Vector2, edge_noise: FastNoiseLite) -> float:
 		seg += 2
 	return best
 
+# How far the ground drops below the pond pad at this spot. The rim is pushed
+# around by noise so the shoreline is not a circle, and the bowl is eased twice
+# so it shelves gently at the edge and you can wade in rather than stepping off
+# a shelf into three metres of water.
+func _basin_at(p: Vector2, edge_noise: FastNoiseLite) -> float:
+	var wobble: float = edge_noise.get_noise_2d(p.x * 0.6, p.y * 0.6) * 4.4
+	var d: float = p.distance_to(POND_CENTER) + wobble
+	if d >= POND_RIM:
+		return 0.0
+	var t: float = _smoothstep01(1.0 - d / POND_RIM)
+	return -POND_DEPTH * t * t
+
 func _raw_height(x: float, z: float, hills: FastNoiseLite, detail: FastNoiseLite, ridge: FastNoiseLite) -> float:
 	var h: float = hills.get_noise_2d(x, z) * HILL_AMP
 	h += detail.get_noise_2d(x, z) * DETAIL_AMP
@@ -216,6 +239,8 @@ func _bake_heights() -> void:
 			var raw: float = _raw_height(x, z, hills, detail, ridge)
 			var f: Vector2 = _flatten(Vector2(x, z))
 			var blended: float = raw + (f.y - raw) * f.x
+			# Carved after the flatten, or the pad would fill the bowl back in.
+			blended += _basin_at(Vector2(x, z), edge_noise)
 			heights[iz * side + ix] = blended
 			dirt[iz * side + ix] = _dirt_at(Vector2(x, z), edge_noise)
 

@@ -1,4 +1,4 @@
-# Syfon v2.7.2 — Quarry
+# Syfon v2.8.0 — Timberline
 
 A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release gives it a clock and a reason to hurry.
 
@@ -7,6 +7,34 @@ You wake outside a log cabin in a forest of rolling hills and four mountain mass
 There is a map on the cabin table showing the whole valley, including the three places where people are still living and still trading. The sun rises and sets, the days count up, and **on day 10 they come**.
 
 **Zombies are not in yet** — the countdown is real, the horde is not there to meet it. Everything else is built around its arrival.
+
+## What's new in v2.8.0
+
+**The trees are rebuilt from leaf cards.** Canopies used to be smooth deformed spheres and cones — green blobs on sticks — and the wind shader slid each whole blob sideways. Every canopy is now a mesh of individual leaf sprays, each carrying its own random phase, so leaves shiver independently on top of the crown's slower lean. There are **five conifer canopies** (tight fir, broad spruce, sparse windblown pine, dense young, ragged old-growth), **five broadleaf crowns** (oak, poplar, maple, willow, elm), **two half-dead crowns** that still hold brown leaf, and **three trunk profiles** that taper differently and flare where they meet the ground.
+
+Three real bugs came out of the old canopies along the way:
+
+- **Sway was multiplied by instance scale.** Displacement was applied in model space, so a canopy instanced six metres wide swayed six times as far as a small one — big trees whipped, small ones barely twitched. The scale is divided back out now, so every tree moves the same distance in the world.
+- **Canopies sat off their trunks.** Each part was placed at the trunk's position and left to rotate about its own origin, so on a leaning tree the crown slid sideways by up to half a metre. Both parts are now placed by rotating their offset from the tree's base through the same lean, and a tilted tree leans as one piece.
+- **Non-uniform scaling stretched the leaf cards.** The first rebuild scaled conifer canopies ~2 m wide and ~12 m tall, which turned every leaf card into a vertical shard and the forest into a field of spikes. Canopies are authored at real proportions and instanced with a single uniform scale.
+
+Felling still works exactly as before, and the leaf burst now keys off a flag set when the canopy is built — a dead tree's bare branches no longer throw a shower of green leaves.
+
+**The pond is a real pond.** It was a 46 m *square* sheet of water floating 16 cm above a perfectly flat pad, with a 5 cm wave height and a normal rebuilt from a finite difference two metres wide — which averaged every wave away and shaded it as a flat plate. Now:
+
+- The terrain has an actual **basin** dug into it, 2.6 m at the deepest, shelving gently so you can wade in. Its rim is pushed around by noise, so the waterline falls where the bed rises past it and the shore is a shape the terrain decides — measured between **9.25 m and 13.5 m** from the centre depending on which way you walk.
+- Waves are four directional layers with **exact analytic slopes** instead of a smeared finite difference, normalised so the wave height is honestly in metres and a crest can never climb the bank.
+- Depth drives everything: the bed shows through at the shore and is swallowed as it deepens, and foam sits in a narrow wet band where the water runs out.
+
+That depth is **baked off the terrain when the level loads** rather than read back from the depth buffer, because the reconstruction differs between renderers — Vulkan hands you a `[0,1]` depth and OpenGL a `[-1,1]` one, and getting it wrong turns the entire pond into a sheet of white foam. Baking it is exact, picks up the noisy shoreline for free, and behaves identically everywhere.
+
+**The pack shows your stuff.** It has drawn item icons instead of colour swatches, gear rows marking what is in your hands versus stowed, and a slot grid for everything you can carry. **Raw and cooked meat were missing entirely** — they were added last release and never made it into the pack. Empty slots stay visible and dim, so a thing you have not found yet still reads as a thing that exists.
+
+**Fixed: `M` would not close the map, and `Tab`/`I` would not close the pack.** This one was mine, introduced in v2.7.2. Opening consumed the keypress so the overlay's own handler could not see it — but `open_map_screen()` returned early when the map was already open, so the key was eaten and nothing closed. `M`, `Tab` and `I` are now true toggles owned by the player, the overlays keep only `ESC`, and `E` backs out of an open panel instead of reaching through it at whatever the crosshair was last pointing at.
+
+**Fixed: `ESC` over an open panel paused the game behind it.** The pause menu sits last in the scene, so it was offered the keypress before the map and the pack ever saw it. It now backs out of an open panel instead.
+
+Verified by pushing real key events through the running game: `M` four times gives open, closed, open, closed; the same for `Tab` and `I`; `ESC` and `E` both close without pausing; and opening either panel shuts the other.
 
 ## What's new in v2.7.2
 

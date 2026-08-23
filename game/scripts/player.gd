@@ -218,14 +218,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_R:
 			start_reload()
 		elif event.keycode == KEY_E:
-			try_interact()
+			# With a panel up, E backs out of it rather than reaching through
+			# the screen at whatever the crosshair was last pointing at.
+			if screen_is_open():
+				close_map_screen()
+				close_pack_screen()
+				get_viewport().set_input_as_handled()
+			else:
+				try_interact()
 		elif event.keycode == KEY_M:
-			# Consumed, or the map screen's own handler gets the same press,
-			# sees the map open and closes it again in one keystroke.
-			open_map_screen()
+			# The player owns the toggle. If the screen also listened for M we
+			# would open and close on the same press, so the screens only keep
+			# ESC and this consumes the key either way.
+			toggle_map_screen()
 			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_TAB or event.keycode == KEY_I:
-			open_pack_screen()
+			toggle_pack_screen()
 			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_F:
 			eat_apple()
@@ -497,22 +505,61 @@ func give_item(id: int) -> void:
 	request_switch(id)
 
 # Once the chart on the cabin table has been read, the map travels with you.
-func open_map_screen() -> void:
+# Opening a screen is the same keystroke as closing it, so both of these are
+# toggles rather than one-way doors. Every earlier version consumed the key on
+# the way in and then had nothing left to close with.
+func toggle_map_screen() -> void:
+	var screen: Node = get_tree().get_first_node_in_group("map_screen")
+	if screen == null:
+		return
 	if GameState.map_open:
+		screen.call("close_map")
 		return
 	if not GameState.map_known:
 		GameState.announce("No map yet. There is a chart on the table inside the cabin.")
 		return
+	close_pack_screen()
+	screen.call("open_map")
+
+func toggle_pack_screen() -> void:
+	var screen: Node = get_tree().get_first_node_in_group("inventory_screen")
+	if screen == null:
+		return
+	if GameState.inventory_open:
+		screen.call("close_pack")
+		return
+	close_map_screen()
+	screen.call("open_pack")
+
+# Only one full-screen panel at a time; opening either shuts the other.
+func close_map_screen() -> void:
+	if not GameState.map_open:
+		return
 	var screen: Node = get_tree().get_first_node_in_group("map_screen")
 	if screen != null:
-		screen.call("open_map")
+		screen.call("close_map")
+
+func close_pack_screen() -> void:
+	if not GameState.inventory_open:
+		return
+	var screen: Node = get_tree().get_first_node_in_group("inventory_screen")
+	if screen != null:
+		screen.call("close_pack")
+
+# True while any full-screen panel has the mouse, which is when the world
+# should ignore clicks and interact presses.
+func screen_is_open() -> bool:
+	return GameState.map_open or GameState.inventory_open
+
+func open_map_screen() -> void:
+	if GameState.map_open:
+		return
+	toggle_map_screen()
 
 func open_pack_screen() -> void:
 	if GameState.inventory_open:
 		return
-	var screen: Node = get_tree().get_first_node_in_group("inventory_screen")
-	if screen != null:
-		screen.call("open_pack")
+	toggle_pack_screen()
 
 func active_weapon_index() -> int:
 	if is_switching:

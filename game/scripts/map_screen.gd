@@ -46,7 +46,7 @@ const ROADS := [
 ]
 
 const POND_AT := Vector2(60.0, -30.0)
-const POND_RADIUS := 17.0
+const POND_RADIUS := 13.0
 
 const MOUNTAINS := [
 	{"at": Vector2(-150, -150), "r": 78.0},
@@ -452,6 +452,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not open:
 		return
 	if event is InputEventKey and event.pressed:
-		if event.keycode == KEY_M or event.keycode == KEY_ESCAPE or event.keycode == KEY_E:
+		# M and E are the player's toggle keys and never reach this far; it
+		# consumes them itself so one press cannot both open and close. ESC is
+		# ours alone.
+		if event.keycode == KEY_ESCAPE:
 			close_map()
 			get_viewport().set_input_as_handled()
