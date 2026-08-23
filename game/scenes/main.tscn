@@ -306,7 +306,7 @@ scale = Vector3(2.470, 0.12, 4.4)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("Mat_canvas")
 
-[node name="Campfire" type="Node3D" parent="."]
+[node name="Campfire" type="Area3D" parent="."]
 position = Vector3(0, 0, -2)
 script = ExtResource("34_campfire")
 

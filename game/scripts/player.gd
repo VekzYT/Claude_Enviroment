@@ -56,7 +56,7 @@ const AXE_CHOP_DAMAGE := 1
 const INTERACT_RANGE := 3.2
 # The forgiving fallback: a little shorter than the ray, and about 40 degrees
 # off centre.
-const INTERACT_REACH := 2.6
+const INTERACT_REACH := 3.0
 const INTERACT_COS := 0.76
 
 @onready var head: Node3D = $Head
@@ -338,7 +338,12 @@ func _interactable_in_view(from: Vector3, facing: Vector3) -> Array:
 			continue
 		var to_it: Vector3 = body.global_position - from
 		var away: float = to_it.length()
-		if away > INTERACT_REACH or away < 0.05:
+		if away < 0.05:
+			continue
+		# Range is judged mostly on ground distance, so kneeling-height things
+		# are not pushed out of reach by the camera being head-high.
+		var reach_check: float = Vector3(to_it.x, to_it.y * 0.45, to_it.z).length()
+		if reach_check > INTERACT_REACH:
 			continue
 		var aim: float = facing.dot(to_it / away)
 		if aim < INTERACT_COS:
@@ -349,7 +354,7 @@ func _interactable_in_view(from: Vector3, facing: Vector3) -> Array:
 		if text == "":
 			continue
 		# Prefer things you are looking straight at, then things that are close.
-		var score: float = aim - away * 0.06
+		var score: float = aim - reach_check * 0.06
 		if score > best_score:
 			best_score = score
 			best = body

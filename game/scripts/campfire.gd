@@ -1,4 +1,4 @@
-extends Node3D
+extends Area3D
 
 # A campfire that is the size of a campfire. The old one was a 4.8 m stone
 # pancake with two 2.2 m logs lying flat on it and a glowing disc in the
@@ -35,6 +35,7 @@ func _ready() -> void:
 	_build_embers()
 	_build_particles()
 	_build_light()
+	_build_interaction_volume()
 
 func _material(colour: Color, roughness: float) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
@@ -358,3 +359,13 @@ func _cook(delta: float) -> void:
 		cooking = 0
 		GameState.announce("The meat is done.")
 		Sound.play_ui("ui_toggle", -8.0)
+
+# Something for the interaction ray to actually strike. Tall enough to be hit
+# from standing height and wide enough to cover the whole ring.
+func _build_interaction_volume() -> void:
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(1.8, 2.0, 1.8)
+	shape.shape = box
+	shape.position = Vector3(0, 0.9, 0)
+	add_child(shape)

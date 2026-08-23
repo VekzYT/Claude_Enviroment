@@ -1,4 +1,4 @@
-# Syfon v2.7 — Quarry
+# Syfon v2.7.1 — Quarry
 
 A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release gives it a clock and a reason to hurry.
 
@@ -7,6 +7,15 @@ You wake outside a log cabin in a forest of rolling hills and four mountain mass
 There is a map on the cabin table showing the whole valley, including the three places where people are still living and still trading. The sun rises and sets, the days count up, and **on day 10 they come**.
 
 **Zombies are not in yet** — the countdown is real, the horde is not there to meet it. Everything else is built around its arrival.
+
+## What's new in v2.7.1
+
+**Fixed: the campfire could not be cooked on.** Two faults stacked on top of each other, and the feature was unusable because of them:
+
+- The fire had **no collision shape at all** — it was a plain `Node3D`, so the interaction ray had nothing to strike and passed straight through it. It is an `Area3D` with a real volume now.
+- Range was judged on straight-line distance from the camera. A fire pit sits at your feet, so standing a comfortable **2.5 m** away with the camera 2.2 m up measured as **3.3 m** and fell outside the 2.6 m reach. Height now counts for less than ground distance when deciding what is close, and the reach is 3.0 m.
+
+Tested from six stances around the fire: five prompt, and the sixth is facing away from it, which is correct. The axe, the map, the chopping block and the cooking chain all still behave.
 
 ## What's new in v2.7
 
