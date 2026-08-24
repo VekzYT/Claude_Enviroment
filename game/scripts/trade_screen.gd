@@ -68,11 +68,15 @@ func _rect(colour: Color) -> ColorRect:
 func _build() -> void:
 	root = Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# STOP, not IGNORE: the backdrop has to swallow clicks that miss a button.
+	# Anything that falls through reaches the player, who takes the mouse back
+	# and leaves the stall open but dead.
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(root)
 
 	var dimmer: ColorRect = _rect(Color(0, 0, 0, 0.74))
 	dimmer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dimmer.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.add_child(dimmer)
 
 	panel = PanelContainer.new()

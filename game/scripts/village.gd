@@ -44,6 +44,7 @@ func _ready() -> void:
 	_build_houses()
 	_build_square()
 	_place_trader()
+	_place_villagers()
 
 func _ground(x: float, z: float) -> float:
 	return float(terrain.call("height_at", x, z))
@@ -264,6 +265,68 @@ func _build_square() -> void:
 		fire.light_energy = 3.0
 		fire.omni_range = 16.0
 		add_child(fire)
+
+# Coats picked from a small palette so the village reads as a group of people
+# rather than a row of identical dolls.
+const COATS: Array[Color] = [
+	Color(0.34, 0.30, 0.24), Color(0.28, 0.32, 0.30), Color(0.42, 0.30, 0.22),
+	Color(0.26, 0.26, 0.31), Color(0.38, 0.36, 0.26), Color(0.30, 0.24, 0.26),
+]
+const SKINS: Array[Color] = [
+	Color(0.76, 0.58, 0.44), Color(0.60, 0.44, 0.32), Color(0.85, 0.70, 0.56),
+	Color(0.46, 0.33, 0.24), Color(0.70, 0.52, 0.38),
+]
+
+const VILLAGER_SCENE: PackedScene = preload("res://scenes/villager.tscn")
+
+func _spawn_villager(at: Vector2, walker: bool, facing: float, task: String) -> Node3D:
+	var v: Node3D = VILLAGER_SCENE.instantiate() as Node3D
+	v.set("mode", 0 if walker else 1)
+	v.set("coat", COATS[rng.randi() % COATS.size()])
+	v.set("skin", SKINS[rng.randi() % SKINS.size()])
+	v.set("walk_speed", rng.randf_range(1.2, 1.9))
+	v.set("roam_radius", rng.randf_range(9.0, 16.0))
+	v.set("post_facing", facing)
+	v.set("task", task)
+	# Placed before the node enters the tree, because _ready() picks the first
+	# thing to walk to from where the villager is standing. Positioning them
+	# afterwards had every one of them set off toward the world origin, a
+	# hundred and fifty metres away through the palisade.
+	var y: float = _ground(at.x, at.y)
+	v.position = Vector3(at.x, y + 0.1, at.y)
+	v.set("home", Vector3(at.x, y, at.y))
+	add_child(v)
+	return v
+
+func _place_villagers() -> void:
+	var gate: float = _gate_angle()
+
+	# Six wandering the lanes between the houses and the square.
+	for i in 6:
+		var a: float = rng.randf_range(0.0, TAU)
+		var r: float = rng.randf_range(5.0, 17.0)
+		_spawn_villager(CENTER + Vector2(cos(a), sin(a)) * r, true, 0.0, "idle")
+
+	# Two customers at the outer stalls, facing the counter.
+	for i in [0, 2]:
+		var a: float = gate + PI + (float(i) - 1.0) * 0.7
+		var stall: Vector2 = CENTER + Vector2(cos(a), sin(a)) * 6.4
+		var toward: Vector2 = (stall - CENTER).normalized()
+		var spot: Vector2 = stall - toward * 1.5
+		_spawn_villager(spot, false, atan2(-toward.x, -toward.y), "talk")
+
+	# Someone working at the well, and a pair talking beside a brazier.
+	_spawn_villager(CENTER + Vector2(2.4, 1.9), false, atan2(-2.4, -1.9), "work")
+	var brazier: Vector2 = CENTER + Vector2(cos(gate + PI * 0.5), sin(gate + PI * 0.5)) * 8.0
+	_spawn_villager(brazier + Vector2(1.1, 0.4), false, atan2(-1.1, 0.6), "talk")
+	_spawn_villager(brazier + Vector2(-1.1, -0.4), false, atan2(1.1, -0.6), "talk")
+
+	# A guard on each gate tower side, watching the road in.
+	for side in [-1.0, 1.0]:
+		var a: float = gate + 0.55 * side
+		var spot: Vector2 = CENTER + Vector2(cos(a), sin(a)) * (PALISADE_RADIUS - 2.4)
+		var out := Vector2(cos(gate), sin(gate))
+		_spawn_villager(spot, false, atan2(-out.x, -out.y), "idle")
 
 func _place_trader() -> void:
 	var a: float = _gate_angle() + PI

@@ -11,6 +11,7 @@ signal coins_changed(amount: int)
 signal arrows_changed(count: int)
 signal bow_acquired
 signal trade_visibility_changed(open: bool)
+signal build_mode_changed(active: bool)
 signal held_item_changed(title: String)
 signal interact_prompt_changed(text: String)
 signal wood_changed(amount: int)
@@ -44,6 +45,7 @@ var coins := 0
 var bow_owned := false
 var arrows := 0
 var trade_open := false
+var build_mode := false
 var held_item := "Bare hands"
 var interact_prompt := ""
 var wood := 0
@@ -92,6 +94,22 @@ func discover_landmark(landmark_name: String) -> void:
 func set_trade_open(value: bool) -> void:
 	trade_open = value
 	trade_visibility_changed.emit(trade_open)
+
+func set_build_mode(value: bool) -> void:
+	build_mode = value
+	build_mode_changed.emit(build_mode)
+
+# Building spends the same wood the fire and the trader want, so putting up a
+# wall is a real choice about what the day's chopping was for.
+func can_build(cost: int) -> bool:
+	return wood >= cost
+
+func spend_wood(cost: int) -> bool:
+	if wood < cost:
+		return false
+	wood -= cost
+	wood_changed.emit(wood)
+	return true
 
 func give_bow() -> void:
 	if bow_owned:
@@ -205,6 +223,7 @@ func announce(text: String) -> void:
 func reset() -> void:
 	coins = 0
 	coins_changed.emit(coins)
+	build_mode = false
 	bow_owned = false
 	arrows = 0
 	arrows_changed.emit(arrows)

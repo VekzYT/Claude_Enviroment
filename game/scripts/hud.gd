@@ -38,6 +38,8 @@ var compass_ticks: Array = []
 var coin_value: Label
 var arrow_value: Label
 var arrow_chip: Control
+var build_banner: PanelContainer
+var build_text: Label
 var wood_value: Label
 var meat_value: Label
 var day_value: Label
@@ -105,6 +107,8 @@ func _ready() -> void:
 	GameState.landmark_discovered.connect(_on_landmark_discovered)
 	GameState.coins_changed.connect(_on_coins_changed)
 	GameState.arrows_changed.connect(_on_arrows_changed)
+	GameState.build_mode_changed.connect(_on_build_mode_changed)
+	GameState.wood_changed.connect(func(_w: int) -> void: _refresh_build_banner())
 	GameState.bow_acquired.connect(func() -> void:
 		if arrow_chip != null:
 			arrow_chip.visible = true)
@@ -220,6 +224,7 @@ func _build() -> void:
 	_build_item_card()
 	_build_prompt()
 	_build_toast()
+	_build_build_banner()
 	_build_hints()
 	_build_objective()
 	_build_scope()
@@ -503,9 +508,25 @@ func _build_toast() -> void:
 	toast_label = _label("", UITheme.body(), 17, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	toast_box.add_child(toast_label)
 
+func _build_build_banner() -> void:
+	build_banner = _panel_box(UITheme.BG_DEEP, UITheme.ACCENT_DIM, 2)
+	build_banner.name = "BuildBanner"
+	build_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	build_banner.position = Vector2(-320, 100)
+	build_banner.custom_minimum_size = Vector2(640, 0)
+	build_banner.visible = false
+	var holder := Control.new()
+	holder.custom_minimum_size = Vector2(640, 24)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	build_banner.add_child(holder)
+	build_text = _label("", UITheme.body_light(), 14, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	build_text.set_anchors_preset(Control.PRESET_FULL_RECT)
+	holder.add_child(build_text)
+	root.add_child(build_banner)
+
 func _build_hints() -> void:
 	hint_label = _label(
-		"WASD move    SHIFT sprint    CTRL crouch    LMB swing    E interact    TAB pack    M map    F eat    ESC pause",
+		"WASD move    SHIFT sprint    CTRL crouch    LMB swing    E interact    B build    TAB pack    M map    F eat    ESC pause",
 		UITheme.body_light(), 14, UITheme.TEXT_FAINT, HORIZONTAL_ALIGNMENT_CENTER)
 	hint_label.name = "Hints"
 	hint_label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -739,6 +760,30 @@ func _on_landmark_discovered(landmark_name: String) -> void:
 
 func _on_coins_changed(amount: int) -> void:
 	coin_value.text = "%d" % amount
+
+# A band across the top while building, saying what a wall costs and whether
+# you can currently afford one.
+func _on_build_mode_changed(on: bool) -> void:
+	if build_banner == null:
+		return
+	build_banner.visible = on
+	_refresh_build_banner()
+
+func _refresh_build_banner() -> void:
+	if build_banner == null or not build_banner.visible:
+		return
+	var cost: int = 6
+	var builder: Node = get_tree().get_first_node_in_group("builder")
+	if builder != null:
+		cost = int(builder.get("WALL_COST"))
+	if GameState.wood >= cost:
+		build_text.text = "BUILDING   ·   wall %d wood   ·   you have %d   ·   LMB place   RMB remove   R turn   B done" % [
+			cost, GameState.wood]
+		build_text.add_theme_color_override("font_color", UITheme.TEXT)
+	else:
+		build_text.text = "BUILDING   ·   wall %d wood   ·   you have %d   ·   not enough" % [
+			cost, GameState.wood]
+		build_text.add_theme_color_override("font_color", UITheme.WARN)
 
 func _on_arrows_changed(count: int) -> void:
 	arrow_value.text = "%d" % count

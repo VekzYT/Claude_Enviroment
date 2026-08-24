@@ -38,7 +38,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_on_settings_back()
 		elif is_open:
 			close()
-		elif GameState.map_open or GameState.inventory_open:
+		elif GameState.map_open or GameState.inventory_open or GameState.trade_open:
 			# This node sits last in the scene and so is offered input before
 			# the map and the pack. Without this, ESC over an open panel would
 			# pause the game behind it instead of backing out of it.
@@ -56,6 +56,10 @@ func _close_open_screen() -> void:
 		var pack: Node = get_tree().get_first_node_in_group("inventory_screen")
 		if pack != null:
 			pack.call("close_pack")
+	if GameState.trade_open:
+		var stall: Node = get_tree().get_first_node_in_group("trade_screen")
+		if stall != null:
+			stall.call("close_trade")
 
 func open() -> void:
 	is_open = true

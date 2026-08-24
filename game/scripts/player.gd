@@ -229,7 +229,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_R:
-			start_reload()
+			if GameState.build_mode:
+				var builder: Node = get_tree().get_first_node_in_group("builder")
+				if builder != null:
+					builder.call("rotate_ghost")
+			else:
+				start_reload()
 		elif event.keycode == KEY_E:
 			# With a panel up, E backs out of it rather than reaching through
 			# the screen at whatever the crosshair was last pointing at.
@@ -259,16 +264,36 @@ func _unhandled_input(event: InputEvent) -> void:
 			request_switch(WEAPON_KNIFE)
 		elif event.keycode == KEY_4:
 			request_switch(ITEM_BOW)
+		elif event.keycode == KEY_B:
+			if not screen_is_open():
+				var builder: Node = get_tree().get_first_node_in_group("builder")
+				if builder != null:
+					builder.call("toggle")
+			get_viewport().set_input_as_handled()
 
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			if GameState.map_open or GameState.inventory_open:
+			# Any open panel owns the mouse. This used to name the map and the
+			# pack individually, so the shop -- added later -- was not covered:
+			# one click that missed a button recaptured the cursor, and the
+			# stall was left on screen with nothing on it clickable.
+			if screen_is_open():
 				return
 			if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
 				Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+			elif GameState.build_mode:
+				var builder: Node = get_tree().get_first_node_in_group("builder")
+				if builder != null:
+					builder.call("place")
 			else:
 				primary_action()
+		elif event.button_index == MOUSE_BUTTON_RIGHT and GameState.build_mode:
+			var builder: Node = get_tree().get_first_node_in_group("builder")
+			if builder != null:
+				builder.call("remove")
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			if screen_is_open():
+				return
 			cycle_item(-1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			cycle_item(1)

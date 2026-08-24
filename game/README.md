@@ -1,4 +1,4 @@
-# Syfon v2.9.0 — Elmswood
+# Syfon v2.10.0 — Palisade
 
 A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release gives it a clock and a reason to hurry.
 
@@ -7,6 +7,30 @@ You wake outside a log cabin in a forest of rolling hills and four mountain mass
 There is a map on the cabin table showing the whole valley, including the three places where people are still living and still trading. The sun rises and sets, the days count up, and **on day 10 they come**.
 
 **Zombies are not in yet** — the countdown is real, the horde is not there to meet it. Everything else is built around its arrival.
+
+## What's new in v2.10.0
+
+**Fixed: the stall was unusable.** Opening it and clicking anywhere that was not a button handed the mouse straight back to the player, who recaptured it — so the shop stayed on screen with the cursor gone and nothing on it clickable. The click guard named the map and the pack individually, and the shop, added a release later, was never added to the list. It asks `screen_is_open()` now, so every panel is covered including any future one, and the shop's backdrop swallows stray clicks itself.
+
+`ESC` over the shop had the same shape of bug in the pause menu and did not close it either. Both are fixed, and the whole path is now tested the way it is actually used: a click that misses a button, a click on the real **Sell** button, then `ESC`.
+
+I had "verified" this stall last release by calling its sell and buy functions directly. That never touched the mouse, which is where the bug was.
+
+**Elmswood has people in it.** Thirteen villagers: six walking the lanes between the houses, two browsing the outer stalls, one working at the well, a pair talking beside a brazier, and two on the gate watching the road. Posted villagers turn to face you when you come within seven metres. They wear one of six coats over one of five skin tones, so a crowd reads as a crowd rather than a row of identical dolls.
+
+They walk with the same turn-before-you-go gate the animals use, so nobody moonwalks.
+
+**Building, on B.** A green ghost of the next wall stands where the wall will actually stand — snapped to a two-metre grid, sitting on the terrain, turning red when the spot is refused. Left click plants it, right click takes one back down, `R` turns it, `B` puts the ghost away.
+
+| | |
+|---|---|
+| Wall | 6 wood |
+| Refund on removal | 3 wood |
+| Reach | 8 m |
+
+Walls are solid, cast shadows, and refuse to stack two in one cell or to sit on a slope steeper than they could stand on. The wood comes out of the same pile the trader wants and the fire burns, so putting up a wall is a real choice about what the day's chopping was for.
+
+One bug found while building it: every villager set off toward the world origin the moment they spawned, a hundred and fifty metres away through the palisade, because they chose their first destination in `_ready()` — which ran before the village had moved them into place. They are positioned before they enter the tree now.
 
 ## What's new in v2.9.0
 
