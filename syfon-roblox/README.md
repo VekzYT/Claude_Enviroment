@@ -57,16 +57,57 @@ clock; each client sets its own sky from it, so one party can be at noon while
 another is at midnight. That is why `Hud.luau` owns `Lighting` and `Run.luau`
 deliberately never touches it.
 
+## How it looks
+
+The valley is **real Roblox terrain**, not a green slab: rolling hills sculpted
+from two octaves of Perlin noise, four mountain massifs on the horizon, grass
+giving way to rock as it climbs, sand at the waterline, and a pond dug into the
+ground with terrain water in it.
+
+Terrain is filled as a **crust rather than solid columns**. Filling from bedrock
+to the mountain tops came to 4.7 million voxels across three arenas, all of it
+below ground and none of it ever seen. The crust scales with the local gradient,
+because a fixed depth shows daylight through the seam on a steep slope. Same
+valley, 1.6 million voxels.
+
+Trees come in three species — layered pines, broadleaves built from overlapping
+spheres, and bare deadfall — each with a tapered two-segment trunk and a slight
+random lean, so a forest does not read as one model copied a hundred times.
+Ferns and grass tufts cover the ground between them.
+
+The sky is drawn per client from that player's run clock: atmosphere, volumetric
+clouds, bloom, sun rays, depth of field and colour grading, all moving through
+dawn, noon, dusk and night. On night ten the grade changes — colour drains out,
+the fog closes to 220 studs, the clouds thicken and everything goes slightly
+red.
+
+## How it feels
+
+| | |
+|---|---|
+| **The axe is a real Tool** | It sits in your hand, and Roblox animates the swing for free |
+| **Interaction is by prompt** | Walk up, the prompt names what E does; no guessing where you are aimed |
+| **Every swing lands** | Wood chips, a pitched crack, and a tree that *tips over* away from you |
+| **Getting hit** | The screen flashes red and the camera kicks |
+| **The horde is audible first** | Groans carry 120 studs before you can see anything |
+| **Fire** | Real flame, smoke, and a light that throws shadows across the clearing |
+
+Sound is all Roblox's own built-in `rbxasset://` audio, pitched and levelled per
+use — the same snap is a chop at 0.8 and a splitting log at 0.5. That needs no
+upload and no moderation, which is the only way to have audio at all before the
+real assets go up.
+
 ## In
 
-Lobby and matchmaking · four arenas with cabin, forest, pond, rocks and flint ·
-the ten-day clock with day/night · felling, carrying, splitting, wood · hunger,
-stamina, starvation · the objective chain · **the day-10 horde**, waves that
-never stop until dawn · melee against them · win and loss.
+Lobby and matchmaking · three sculpted arenas with cabin, forest, pond, rocks
+and flint · the ten-day clock with day/night · felling, carrying, splitting,
+wood · lighting a fire with flint · hunger, stamina, starvation · the objective
+chain · **the day-10 horde**, waves that never stop until dawn · melee against
+them · win and loss.
 
 ## Not in yet
 
-Wildlife and hunting · the pedlar and trading · fire, flint-striking and cooking
+Wildlife and hunting · the pedlar and trading · cooking on the fire
 · the bow · building · the lamp · the map screen. All of their numbers are
 already in `Tuning.luau`, so each is a system to write rather than a design to
 redo.

@@ -9,11 +9,13 @@
 -- what kills you is being surrounded away from your fire at three in the
 -- morning with no stamina left.
 
+local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Build = require(Shared:WaitForChild("Build"))
+local Audio = require(Shared:WaitForChild("Audio"))
 
 local Zombies = {}
 
@@ -135,6 +137,7 @@ end
 
 -- Drive one horde for one run until the run ends.
 function Zombies.unleash(runId: number, arenaFolder: Folder, origin: Vector3,
+	groundAt: (x: number, z: number) -> number,
 	players: () -> { Player },
 	damage: (player: Player, amount: number) -> (),
 	stillRunning: () -> boolean)
@@ -149,10 +152,11 @@ function Zombies.unleash(runId: number, arenaFolder: Folder, origin: Vector3,
 		for i = 1, count do
 			local angle = (i / count) * math.pi * 2 + math.random() * 0.6
 			local radius = SPAWN_RING + math.random() * 40
+			local localX, localZ = math.cos(angle) * radius, math.sin(angle) * radius
 			local position = Vector3.new(
-				origin.X + math.cos(angle) * radius,
-				6,
-				origin.Z + math.sin(angle) * radius
+				origin.X + localX,
+				groundAt(localX, localZ) + 5,
+				origin.Z + localZ
 			)
 			local model, root = buildBody(CFrame.new(position), group)
 			-- Health lives on the model as an attribute so Zombies.strike, which
@@ -188,14 +192,24 @@ function Zombies.unleash(runId: number, arenaFolder: Folder, origin: Vector3,
 			for index = #live, 1, -1 do
 				local zombie = live[index]
 				zombie.health = (zombie.model:GetAttribute("Health") or 0) :: number
+
+				-- Drop it from the AI list but leave the body alone: Zombies.strike
+				-- has already given it a death, and Debris will clear it up. The
+				-- first pass destroyed it here on the next tick, so the death
+				-- never played.
 				if zombie.health <= 0 or not zombie.model.Parent then
-					zombie.model:Destroy()
 					table.remove(live, index)
 					continue
 				end
 
 				local target = nearestTarget(zombie.root, currentPlayers)
 				zombie.target = target
+
+				-- The horde should be heard coming. One in roughly ninety ticks
+				-- per zombie keeps it a soundscape rather than a wall of noise.
+				if target and math.random() < 0.011 then
+					Audio.play("zombieCall", zombie.root.Position)
+				end
 
 				if target and target.Character then
 					local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
@@ -232,11 +246,13 @@ function Zombies.unleash(runId: number, arenaFolder: Folder, origin: Vector3,
 	local _ = runId
 end
 
--- Called when a player swings at something; returns true if a zombie was hit.
-function Zombies.strike(origin: Vector3, direction: Vector3, arenaFolder: Folder, damageAmount: number): boolean
+-- Called when a player swings. Returns whether a zombie was hit and where, so
+-- the caller can put the blood and the sound at the point of contact rather
+-- than at the player's feet.
+function Zombies.strike(origin: Vector3, direction: Vector3, arenaFolder: Folder, damageAmount: number): (boolean, Vector3)
 	local group = arenaFolder:FindFirstChild("Zombies")
 	if not group then
-		return false
+		return false, origin
 	end
 
 	local best: Model? = nil
@@ -254,17 +270,28 @@ function Zombies.strike(origin: Vector3, direction: Vector3, arenaFolder: Folder
 	end
 
 	if not best then
-		return false
+		return false, origin
 	end
 
-	local health = (best:GetAttribute("Health") or HEALTH) :: number
+	local model = best :: Model
+	local primary = model.PrimaryPart :: BasePart
+	local where = primary.Position + Vector3.new(0, 2, 0)
+
+	local health = (model:GetAttribute("Health") or HEALTH) :: number
 	health -= damageAmount
-	best:SetAttribute("Health", health)
+	model:SetAttribute("Health", health)
 
 	if health <= 0 then
-		best:Destroy()
+		Audio.play("zombieDown", where)
+		-- Let it drop rather than vanish: unweld nothing, just release the
+		-- anchor state and tip it, then clear up a moment later.
+		primary.CanCollide = false
+		primary.AssemblyLinearVelocity = direction * 14 + Vector3.new(0, 12, 0)
+		primary.AssemblyAngularVelocity = Vector3.new(math.random() * 6 - 3, 0, math.random() * 6 - 3)
+		Debris:AddItem(model, 3.5)
 	end
-	return true
+
+	return true, where
 end
 
 local _ = Players

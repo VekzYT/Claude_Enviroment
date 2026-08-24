@@ -2,6 +2,7 @@
 -- Server entry point.
 
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -9,6 +10,7 @@ local Tuning = require(Shared:WaitForChild("Tuning"))
 local Net = require(Shared:WaitForChild("Net"))
 
 local Arenas = require(script:WaitForChild("Arenas"))
+local Landscape = require(script:WaitForChild("Landscape"))
 local Lobby = require(script:WaitForChild("Lobby"))
 local Run = require(script:WaitForChild("Run"))
 local Zombies = require(script:WaitForChild("Zombies"))
@@ -30,6 +32,9 @@ Run.onHorde = function(run)
 		run.id,
 		run.arena.folder,
 		run.arena.origin,
+		function(x, z)
+			return Landscape.heightAt(run.arena.seed, x, z)
+		end,
 		function()
 			local alive: { Player } = {}
 			for _, player in run.players do
@@ -90,14 +95,17 @@ end)
 Players.PlayerRemoving:Connect(function(player)
 	Lobby.withdraw(player)
 	Run.remove(player)
+	Actions.forget(player)
 end)
 
 --------------------------------------------------------------------------------
 -- What the client asks for
 --------------------------------------------------------------------------------
 
-Net.get("Interact").OnServerEvent:Connect(function(player)
-	Actions.interact(player)
+-- Interaction is by prompt now, which fires on the server directly. The client
+-- no longer decides what it is standing in front of.
+ProximityPromptService.PromptTriggered:Connect(function(promptInstance, player)
+	Actions.handlePrompt(promptInstance, player)
 end)
 
 Net.get("Swing").OnServerEvent:Connect(function(player)

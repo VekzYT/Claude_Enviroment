@@ -1,16 +1,21 @@
 --!strict
--- Actions: what pressing E or swinging actually does.
+-- Actions: what the player actually does, and what it feels like when they do.
 --
--- Syfon's chain was deliberate and it is kept intact: a tree does not give you
--- wood. It gives you a log, the log has to be carried home on your shoulder,
--- and the block turns it into firewood. Five chops, then four splits, then
--- twelve wood.
+-- Syfon's chain is kept intact: a tree does not give you wood. It gives you a
+-- log, the log is carried home on your shoulder, and the block turns it into
+-- firewood. Five chops, four splits, twelve wood.
+--
+-- Interaction is by ProximityPrompt rather than the cone test the first pass
+-- used. A prompt is what a Roblox player expects, it says what the key does, and
+-- it cannot fire on something behind you.
 
+local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Tuning = require(Shared:WaitForChild("Tuning"))
 local Build = require(Shared:WaitForChild("Build"))
+local Audio = require(Shared:WaitForChild("Audio"))
 
 local Run = require(script.Parent:WaitForChild("Run"))
 local Zombies = require(script.Parent:WaitForChild("Zombies"))
@@ -18,6 +23,48 @@ local Zombies = require(script.Parent:WaitForChild("Zombies"))
 local Actions = {}
 
 local LOG_COLOUR = Color3.fromRGB(122, 92, 62)
+local SWING_COOLDOWN = 0.45
+
+local lastSwing: { [Player]: number } = {}
+
+--------------------------------------------------------------------------------
+-- Feel
+--------------------------------------------------------------------------------
+
+-- A short burst of debris at a point. Chips for wood, dust for stone.
+local function burst(position: Vector3, colour: Color3, count: number, speed: number)
+	local anchor = Instance.new("Part")
+	anchor.Name = "Burst"
+	anchor.Size = Vector3.one
+	anchor.Transparency = 1
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CFrame = CFrame.new(position)
+	anchor.Parent = workspace
+
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	emitter.Color = ColorSequence.new(colour)
+	emitter.LightEmission = 0
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.5),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.1),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Lifetime = NumberRange.new(0.35, 0.8)
+	emitter.Speed = NumberRange.new(speed * 0.5, speed)
+	emitter.SpreadAngle = Vector2.new(180, 180)
+	emitter.Acceleration = Vector3.new(0, -60, 0)
+	emitter.Rate = 0
+	emitter.Parent = anchor
+
+	emitter:Emit(count)
+	Debris:AddItem(anchor, 2)
+end
 
 local function rootOf(player: Player): BasePart?
 	local character = player.Character
@@ -31,124 +78,117 @@ local function rootOf(player: Player): BasePart?
 	return nil
 end
 
--- What the player is looking at, within reach. Godot used a raycast from the
--- camera; the server has no camera, so this is a cone test around the character's
--- facing, which is what INTERACT_COS was doing in the original anyway.
-local function targetFor(player: Player, tags: { string }): BasePart?
-	local run = Run.forPlayer(player)
-	local root = rootOf(player)
-	if not run or not root then
-		return nil
-	end
-
-	local best: BasePart? = nil
-	local bestScore = -1
-
-	local function consider(part: BasePart)
-		local offset = part.Position - root.Position
-		local distance = offset.Magnitude
-		if distance > Tuning.INTERACT_RANGE * 2.2 then
-			return
-		end
-		local facing = offset.Unit:Dot(root.CFrame.LookVector)
-		if facing < 0.4 then
-			return
-		end
-		local score = facing / math.max(distance, 1)
-		if score > bestScore then
-			best = part
-			bestScore = score
-		end
-	end
-
-	for _, group in run.arena.folder:GetChildren() do
-		if group:IsA("Folder") or group:IsA("Model") then
-			for _, child in group:GetDescendants() do
-				if child:IsA("BasePart") then
-					local tag = child:GetAttribute("Interact")
-					if tag and table.find(tags, tag :: string) then
-						consider(child)
-					end
-				end
-			end
-		end
-	end
-
-	return best
-end
-
 --------------------------------------------------------------------------------
--- Interact  (E)
+-- The axe, as a real Tool
 --------------------------------------------------------------------------------
 
-function Actions.interact(player: Player)
-	local run = Run.forPlayer(player)
-	local stats = Run.statsFor(player)
-	if not run or not stats or not stats.alive then
+-- Handing the player a Tool rather than setting a boolean gets the grip, the
+-- hold pose and the swing animation from Roblox for nothing, and puts an axe in
+-- their hand that they can see.
+local function giveAxe(player: Player)
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	if not backpack or backpack:FindFirstChild("Axe") then
 		return
 	end
 
-	local target = targetFor(player, { "axe", "block", "map", "flint", "log" })
-	if not target then
-		return
+	local tool = Instance.new("Tool")
+	tool.Name = "Axe"
+	tool.RequiresHandle = true
+	tool.CanBeDropped = false
+	tool.ToolTip = "Fell trees, split logs, and swing at what comes on day 10"
+	tool.GripPos = Vector3.new(0, -0.6, 0.2)
+	tool.GripForward = Vector3.new(0, 0, -1)
+	tool.GripRight = Vector3.new(1, 0, 0)
+	tool.GripUp = Vector3.new(0, 1, 0)
+
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(0.45, 4.2, 0.45)
+	handle.Color = Color3.fromRGB(120, 88, 58)
+	handle.Material = Enum.Material.Wood
+	handle.CanCollide = false
+	handle.Parent = tool
+
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Size = Vector3.new(0.45, 1.9, 1.6)
+	head.Color = Color3.fromRGB(158, 160, 168)
+	head.Material = Enum.Material.Metal
+	head.CanCollide = false
+	head.CFrame = handle.CFrame * CFrame.new(0, 1.7, -0.5)
+	head.Parent = tool
+
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = handle
+	weld.Part1 = head
+	weld.Parent = handle
+
+	tool.Activated:Connect(function()
+		Actions.swing(player)
+	end)
+
+	tool.Parent = backpack
+
+	-- Equip it straight away; nobody wants to hunt the backpack for the thing
+	-- they just picked up.
+	local character = player.Character
+	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+	if humanoid then
+		humanoid:EquipTool(tool)
 	end
-
-	local tag = target:GetAttribute("Interact")
-
-	if tag == "axe" then
-		if stats.hasAxe then
-			return
-		end
-		stats.hasAxe = true
-		target:Destroy()
-		Run.announce(run, "You take the axe.")
-		if stats.objective == 1 then
-			stats.objective = 2
-		end
-
-	elseif tag == "log" then
-		if stats.carryingLog then
-			Run.announce(run, "Your hands are already full.")
-			return
-		end
-		stats.carryingLog = true
-		target:Destroy()
-		Run.announce(run, "You shoulder the log.")
-		if stats.objective == 3 then
-			stats.objective = 4
-		end
-
-	elseif tag == "block" then
-		if stats.carryingLog then
-			stats.carryingLog = false
-			target:SetAttribute("Loaded", true)
-			target:SetAttribute("Splits", 0)
-			Run.announce(run, "Log on the block. Swing the axe at it.")
-			if stats.objective == 4 then
-				stats.objective = 5
-			end
-		elseif not target:GetAttribute("Loaded") then
-			Run.announce(run, "You need a log to split.")
-		end
-
-	elseif tag == "map" then
-		Run.announce(run, string.format("Day %d. %d days until they come.",
-			run.day, math.max(Tuning.HORDE_DAY - run.day, 0)))
-		if stats.objective == 6 then
-			stats.objective = 7
-		end
-
-	elseif tag == "flint" then
-		stats.flint += 1
-		target:Destroy()
-		Run.announce(run, "Flint picked up.")
-	end
-
-	Run.sync(player)
 end
 
 --------------------------------------------------------------------------------
--- Swing  (left click)
+-- Fire
+--------------------------------------------------------------------------------
+
+local function lightFire(hearth: BasePart)
+	hearth:SetAttribute("Lit", true)
+
+	local flame = Instance.new("Part")
+	flame.Name = "Flame"
+	flame.Size = Vector3.new(2.4, 2.4, 2.4)
+	flame.Transparency = 1
+	flame.Anchored = true
+	flame.CanCollide = false
+	flame.CanQuery = false
+	flame.CFrame = hearth.CFrame * CFrame.new(0, 1.6, 0)
+	flame.Parent = hearth
+
+	local fire = Instance.new("Fire")
+	fire.Heat = 14
+	fire.Size = 8
+	fire.Color = Color3.fromRGB(255, 168, 76)
+	fire.SecondaryColor = Color3.fromRGB(190, 70, 30)
+	fire.Parent = flame
+
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 172, 96)
+	light.Range = 42
+	light.Brightness = 2.6
+	light.Shadows = true
+	light.Parent = flame
+
+	local smoke = Instance.new("Smoke")
+	smoke.Color = Color3.fromRGB(72, 66, 60)
+	smoke.Opacity = 0.22
+	smoke.RiseVelocity = 8
+	smoke.Size = 6
+	smoke.Parent = flame
+
+	Audio.play("ignite", hearth)
+
+	-- The looping bass doubles as a fire crackle; it has to come right down or
+	-- it sounds like the horde arriving eight days early.
+	local crackle = Audio.loop("horde", flame)
+	if crackle then
+		crackle.Volume = 0.16
+		crackle.PlaybackSpeed = 0.72
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Prompts
 --------------------------------------------------------------------------------
 
 local function dropLog(run: Run.Instance_, position: Vector3)
@@ -162,14 +202,129 @@ local function dropLog(run: Run.Instance_, position: Vector3)
 
 	local log = Build.part({
 		name = "Log",
-		size = Vector3.new(3, 3, 9),
-		cframe = CFrame.new(position.X, 1.6, position.Z) * CFrame.Angles(0, math.random() * math.pi, 0),
+		size = Vector3.new(3.2, 3.2, 10),
+		cframe = CFrame.new(position.X, position.Y + 1.7, position.Z)
+			* CFrame.Angles(0, math.random() * math.pi, math.rad(4)),
 		colour = LOG_COLOUR,
 		material = Enum.Material.Wood,
 	}, logs)
+
 	log:SetAttribute("Interact", "log")
-	Build.label(log, "CARRY  [E]", Color3.fromRGB(230, 210, 170), 3, 9)
+	local p = Instance.new("ProximityPrompt")
+	p.ActionText = "Shoulder"
+	p.ObjectText = "Log"
+	p.KeyboardKeyCode = Enum.KeyCode.E
+	p.MaxActivationDistance = 12
+	p.HoldDuration = 0
+	p.RequiresLineOfSight = false
+	p.Parent = log
 end
+
+function Actions.handlePrompt(promptInstance: ProximityPrompt, player: Player)
+	local target = promptInstance.Parent
+	if not target or not target:IsA("BasePart") then
+		return
+	end
+
+	local run = Run.forPlayer(player)
+	local stats = Run.statsFor(player)
+	if not run or not stats or not stats.alive then
+		return
+	end
+
+	-- A prompt in another party's arena is not yours to press.
+	if not target:IsDescendantOf(run.arena.folder) then
+		return
+	end
+
+	local tag = target:GetAttribute("Interact")
+
+	if tag == "axe" then
+		if stats.hasAxe then
+			return
+		end
+		stats.hasAxe = true
+		giveAxe(player)
+		Audio.play("takeAxe", target)
+		local haft = target.Parent and target.Parent:FindFirstChild("AxeHaft")
+		if haft then
+			haft:Destroy()
+		end
+		target:Destroy()
+		Run.announce(run, "You take the axe.")
+		if stats.objective == 1 then
+			stats.objective = 2
+		end
+
+	elseif tag == "log" then
+		if stats.carryingLog then
+			Run.announce(run, "Your hands are already full.")
+			return
+		end
+		stats.carryingLog = true
+		Audio.play("pickup", target.Position)
+		target:Destroy()
+		Run.announce(run, "You shoulder the log. Take it to the block.")
+		if stats.objective == 3 then
+			stats.objective = 4
+		end
+
+	elseif tag == "block" then
+		if stats.carryingLog then
+			stats.carryingLog = false
+			target:SetAttribute("Loaded", true)
+			target:SetAttribute("Splits", 0)
+			Audio.play("split", target)
+			Run.announce(run, "Log on the block. Swing the axe at it.")
+			if stats.objective == 4 then
+				stats.objective = 5
+			end
+		elseif not target:GetAttribute("Loaded") then
+			Run.announce(run, "You need a log to split.")
+		end
+
+	elseif tag == "map" then
+		Audio.play("uiPick", target)
+		Run.announce(run, string.format("Day %d. %d days until they come.",
+			run.day, math.max(Tuning.HORDE_DAY - run.day, 0)))
+		if stats.objective == 6 then
+			stats.objective = 7
+		end
+
+	elseif tag == "flint" then
+		stats.flint += 1
+		Audio.play("pickup", target.Position)
+		target:Destroy()
+		Run.announce(run, string.format("Flint. You have %d.", stats.flint))
+
+	elseif tag == "fire" then
+		if target:GetAttribute("Lit") then
+			Run.announce(run, "It is already burning.")
+			return
+		end
+		if stats.flint < 1 then
+			Run.announce(run, "You need flint to strike a spark.")
+			return
+		end
+		if stats.wood < Tuning.FIREWOOD_COST then
+			Run.announce(run, string.format("You need %d wood to lay a fire.", Tuning.FIREWOOD_COST))
+			return
+		end
+		stats.flint -= 1
+		stats.wood -= Tuning.FIREWOOD_COST
+		lightFire(target)
+		Run.announce(run, "The fire catches.")
+		if stats.objective == 8 then
+			stats.objective = 9
+		end
+	end
+
+	Run.sync(player)
+end
+
+--------------------------------------------------------------------------------
+-- Swinging
+--------------------------------------------------------------------------------
 
 function Actions.swing(player: Player)
 	local run = Run.forPlayer(player)
@@ -179,23 +334,36 @@ function Actions.swing(player: Player)
 		return
 	end
 
-	-- A swing is a swing whether or not it lands on wood; check the horde first
-	-- so fighting takes priority over chopping when both are in front of you.
-	if Zombies.strike(root.Position, root.CFrame.LookVector, run.arena.folder,
-		if stats.hasAxe then 20 else 8) then
+	local now = os.clock()
+	if now - (lastSwing[player] or 0) < SWING_COOLDOWN then
+		return
+	end
+	lastSwing[player] = now
+
+	local damage = if stats.hasAxe then 20 else 8
+	local hit, where = Zombies.strike(root.Position, root.CFrame.LookVector, run.arena.folder, damage)
+	if hit then
+		burst(where, Color3.fromRGB(96, 116, 78), 18, 26)
+		Audio.play("hitFlesh", where)
 		Run.sync(player)
 		return
 	end
 
 	if not stats.hasAxe then
+		Audio.play("strike", root.Position)
 		return
 	end
 
-	-- The block, if it has a log on it.
-	local block = targetFor(player, { "block" })
-	if block and block:GetAttribute("Loaded") then
+	-- The block, if a log is on it.
+	local cabin = run.arena.folder:FindFirstChild("Cabin")
+	local block = if cabin then cabin:FindFirstChild("ChoppingBlock") else nil
+	if block and block:IsA("BasePart") and block:GetAttribute("Loaded")
+		and (block.Position - root.Position).Magnitude < 14 then
+
 		local splits = ((block:GetAttribute("Splits") or 0) :: number) + 1
 		block:SetAttribute("Splits", splits)
+		burst(block.Position + Vector3.new(0, 2.4, 0), LOG_COLOUR, 14, 22)
+		Audio.play("split", block)
 
 		if splits >= Tuning.SPLITS_PER_LOG then
 			block:SetAttribute("Loaded", false)
@@ -219,14 +387,14 @@ function Actions.swing(player: Player)
 	end
 
 	local best: Model? = nil
-	local bestDistance = Tuning.INTERACT_RANGE * 2.4
+	local bestDistance = 16
 
 	for _, tree in trees:GetChildren() do
 		if tree:IsA("Model") and not tree:GetAttribute("Felled") and tree.PrimaryPart then
 			local offset = tree.PrimaryPart.Position - root.Position
 			local flat = Vector3.new(offset.X, 0, offset.Z)
 			local distance = flat.Magnitude
-			if distance < bestDistance and flat.Unit:Dot(root.CFrame.LookVector) > 0.45 then
+			if distance < bestDistance and distance > 0 and flat.Unit:Dot(root.CFrame.LookVector) > 0.4 then
 				best = tree
 				bestDistance = distance
 			end
@@ -234,22 +402,55 @@ function Actions.swing(player: Player)
 	end
 
 	if not best then
+		Audio.play("strike", root.Position)
 		return
 	end
 
+	local primary = best.PrimaryPart :: BasePart
 	local chops = ((best:GetAttribute("Chops") or 0) :: number) + 1
 	best:SetAttribute("Chops", chops)
 
+	burst(primary.Position + Vector3.new(0, 3, 0), LOG_COLOUR, 12, 20)
+	Audio.play("chop", primary.Position)
+
 	if chops >= Tuning.CHOPS_TO_FELL then
 		best:SetAttribute("Felled", true)
-		local where = if best.PrimaryPart then best.PrimaryPart.Position else root.Position
-		for _, piece in best:GetChildren() do
-			if piece:IsA("BasePart") then
-				piece.Transparency = 1
+		local where2 = primary.Position
+
+		-- Tip it over rather than blinking it out. The trunk falls away from the
+		-- player, which is both what happens and what reads as cause and effect.
+		local away = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z).Unit
+		local axis = Vector3.new(-away.Z, 0, away.X)
+
+		-- Rotate about the foot of the trunk. Rotating each part by a bare
+		-- CFrame.Angles pivots it about the world origin instead, which throws
+		-- the tree thousands of studs across the map -- arenas are not at 0,0.
+		local foot = CFrame.new(primary.Position - Vector3.new(0, primary.Size.Y / 2, 0))
+		local originals: { [BasePart]: CFrame } = {}
+		for _, piece in best:GetDescendants() do
+			if piece:IsA("BasePart") and piece.Name ~= "Hitbox" then
+				originals[piece] = piece.CFrame
 				piece.CanCollide = false
 			end
 		end
-		dropLog(run, where + root.CFrame.LookVector * 6)
+
+		task.spawn(function()
+			for stepIndex = 1, 16 do
+				local angle = math.rad(86 * (stepIndex / 16) ^ 1.7)
+				local turn = foot * CFrame.fromAxisAngle(axis, angle) * foot:Inverse()
+				for piece, original in originals do
+					piece.CFrame = turn * original
+				end
+				task.wait(0.03)
+			end
+			task.wait(1.1)
+			for piece in originals do
+				piece.Transparency = 1
+			end
+		end)
+
+		Audio.play("timber", where2)
+		dropLog(run, where2 + away * 8)
 		Run.announce(run, "Timber. Shoulder the log.")
 		if stats.objective == 2 then
 			stats.objective = 3
@@ -262,8 +463,6 @@ function Actions.swing(player: Player)
 end
 
 --------------------------------------------------------------------------------
--- Eat  (F)
---------------------------------------------------------------------------------
 
 function Actions.eat(player: Player, foodId: unknown)
 	local run = Run.forPlayer(player)
@@ -275,8 +474,6 @@ function Actions.eat(player: Player, foodId: unknown)
 		return
 	end
 
-	-- "auto" is what F sends: eat the best thing on you rather than failing
-	-- because the one named food happens to be the one you are out of.
 	if foodId == "auto" then
 		if stats.cookedMeat > 0 then
 			foodId = "cooked"
@@ -295,24 +492,19 @@ function Actions.eat(player: Player, foodId: unknown)
 		return
 	end
 
-	local have = if foodId == "apple" then stats.apples
-		elseif foodId == "raw" then stats.rawMeat
-		else stats.cookedMeat
-
-	if have <= 0 then
-		Run.announce(run, "You have no " .. string.lower(food.name) .. ".")
-		return
-	end
-
 	if foodId == "apple" then
+		if stats.apples <= 0 then return end
 		stats.apples -= 1
 	elseif foodId == "raw" then
+		if stats.rawMeat <= 0 then return end
 		stats.rawMeat -= 1
 	else
+		if stats.cookedMeat <= 0 then return end
 		stats.cookedMeat -= 1
 	end
 
 	stats.hunger = math.min(stats.hunger + food.restore, 1)
+	Audio.play("pickup", rootOf(player) or workspace)
 	Run.announce(run, "You eat the " .. string.lower(food.name) .. ".")
 	if stats.objective == 9 then
 		stats.objective = 10
@@ -326,6 +518,10 @@ function Actions.setSprinting(player: Player, sprinting: unknown)
 		return
 	end
 	stats.sprinting = sprinting == true and stats.stamina > Tuning.STAMINA_SPRINT_FLOOR
+end
+
+function Actions.forget(player: Player)
+	lastSwing[player] = nil
 end
 
 return Actions

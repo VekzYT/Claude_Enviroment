@@ -2,42 +2,41 @@
 -- Arenas: builds and hands out the copies of the valley that runs happen in.
 --
 -- Roblox has one Workspace, so parties cannot each have their own place without
--- reserved servers. Instead every arena is built far enough apart that nobody
--- can see or reach a neighbour, and a run is given one for its lifetime.
+-- reserved servers. Every arena is built far enough apart that nobody can see or
+-- reach a neighbour, and a run is given one for its lifetime.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Build = require(Shared:WaitForChild("Build"))
+local Flora = require(Shared:WaitForChild("Flora"))
+
+local Landscape = require(script.Parent:WaitForChild("Landscape"))
 
 local Arenas = {}
 
-local ARENA_COUNT = 4
-local ARENA_SPACING = 4000 -- studs between arena origins
-local GROUND_SIZE = 520
-local TREE_COUNT = 150
-local FLINT_COUNT = 24
-local ROCK_COUNT = 30
+local ARENA_COUNT = 3
+local ARENA_SPACING = 3000
+local TREE_COUNT = 130
+local ROCK_COUNT = 34
+local FLINT_COUNT = 22
+local TUFT_COUNT = 260
 
 local COLOURS = {
-	grass = Color3.fromRGB(78, 112, 62),
-	dirt = Color3.fromRGB(104, 84, 60),
-	water = Color3.fromRGB(58, 96, 118),
-	trunk = Color3.fromRGB(84, 62, 44),
-	leaves = Color3.fromRGB(58, 96, 52),
-	leavesDark = Color3.fromRGB(44, 76, 42),
+	plank = Color3.fromRGB(118, 90, 62),
+	plankDark = Color3.fromRGB(88, 66, 46),
+	roof = Color3.fromRGB(66, 50, 42),
 	log = Color3.fromRGB(122, 92, 62),
-	plank = Color3.fromRGB(126, 96, 64),
-	plankDark = Color3.fromRGB(94, 70, 48),
-	roof = Color3.fromRGB(78, 58, 46),
-	stone = Color3.fromRGB(112, 112, 116),
-	flint = Color3.fromRGB(58, 58, 66),
-	axe = Color3.fromRGB(150, 152, 158),
+	stone = Color3.fromRGB(104, 104, 110),
+	flint = Color3.fromRGB(52, 54, 62),
+	steel = Color3.fromRGB(158, 160, 168),
+	ember = Color3.fromRGB(226, 122, 54),
 }
 
 export type Arena = {
 	index: number,
 	origin: Vector3,
+	seed: number,
 	folder: Folder,
 	spawnCFrame: CFrame,
 	inUse: boolean,
@@ -45,202 +44,257 @@ export type Arena = {
 
 local arenas: { Arena } = {}
 
---------------------------------------------------------------------------------
--- Pieces of the valley
---------------------------------------------------------------------------------
-
--- A fellable tree. Health and the log it leaves are handled by Timber; this
--- only builds the shape and tags it.
-local function buildTree(origin: Vector3, x: number, z: number, rng: Random, parent: Instance)
-	local height = rng:NextNumber(16, 26)
-	local model = Instance.new("Model")
-	model.Name = "Tree"
-	model:SetAttribute("Chops", 0)
-	model:SetAttribute("Felled", false)
-	model.Parent = parent
-
-	local trunk = Build.part({
-		name = "Trunk",
-		size = Vector3.new(2.4, height, 2.4),
-		cframe = CFrame.new(origin.X + x, height / 2, origin.Z + z),
-		colour = COLOURS.trunk,
-		material = Enum.Material.Wood,
-	}, model)
-	model.PrimaryPart = trunk
-
-	-- Three offset canopy slabs read as foliage from any angle without the cost
-	-- of a real leaf card system.
-	for i = 1, 3 do
-		local spread = 11 - i * 1.6
-		Build.part({
-			name = "Canopy",
-			size = Vector3.new(spread, 3.4, spread),
-			cframe = CFrame.new(origin.X + x, height - 1 + i * 2.6, origin.Z + z)
-				* CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
-			colour = if i % 2 == 0 then COLOURS.leavesDark else COLOURS.leaves,
-			material = Enum.Material.Grass,
-			canCollide = false,
-		}, model)
-	end
+local function groundAt(arena: Arena, x: number, z: number): number
+	return Landscape.heightAt(arena.seed, x, z)
 end
 
-local function buildCabin(origin: Vector3, parent: Instance): CFrame
+-- Interactables carry a ProximityPrompt rather than being found by a cone test
+-- from the character's facing. The prompt is what a Roblox player expects: it
+-- appears when you are close, it says what the key does, and it cannot fire on
+-- something behind you.
+local function prompt(part: BasePart, action: string, object: string, tag: string): ProximityPrompt
+	part:SetAttribute("Interact", tag)
+
+	local p = Instance.new("ProximityPrompt")
+	p.Name = "Prompt"
+	p.ActionText = action
+	p.ObjectText = object
+	p.KeyboardKeyCode = Enum.KeyCode.E
+	p.MaxActivationDistance = 12
+	p.HoldDuration = 0
+	p.RequiresLineOfSight = false
+	p.Parent = part
+
+	return p
+end
+
+--------------------------------------------------------------------------------
+-- The cabin
+--------------------------------------------------------------------------------
+
+local function buildCabin(arena: Arena, parent: Instance): CFrame
+	local origin = arena.origin
+	local floorY = groundAt(arena, 0, 0)
+
 	local cabin = Instance.new("Model")
 	cabin.Name = "Cabin"
 	cabin.Parent = parent
 
-	local base = origin + Vector3.new(0, 0, 0)
-	local W, D, H = 26, 20, 11
+	local W, D, H = 28, 22, 12
+	local base = Vector3.new(origin.X, floorY, origin.Z)
 
-	local floor = Build.part({
-		name = "Floor",
-		size = Vector3.new(W, 1, D),
-		cframe = CFrame.new(base.X, 0.5, base.Z),
-		colour = COLOURS.plankDark,
-		material = Enum.Material.WoodPlanks,
-	}, cabin)
+	-- Stilts, so the cabin sits on uneven ground without a floating edge.
+	for _, corner in {
+		Vector2.new(-1, -1), Vector2.new(1, -1), Vector2.new(-1, 1), Vector2.new(1, 1),
+	} do
+		local px, pz = corner.X * (W / 2 - 2), corner.Y * (D / 2 - 2)
+		local groundY = groundAt(arena, px, pz)
+		local height = math.max(floorY - groundY + 4, 2)
+		Build.part({ name = "Stilt", size = Vector3.new(2.4, height, 2.4),
+			cframe = CFrame.new(base.X + px, floorY - height / 2, base.Z + pz),
+			colour = COLOURS.plankDark, material = Enum.Material.Wood }, cabin)
+	end
+
+	local floor = Build.part({ name = "Floor", size = Vector3.new(W, 1.2, D),
+		cframe = CFrame.new(base.X, floorY + 0.6, base.Z),
+		colour = COLOURS.plankDark, material = Enum.Material.WoodPlanks }, cabin)
 	cabin.PrimaryPart = floor
 
-	-- Back and side walls; the front is left open with a doorway gap.
-	Build.part({ name = "WallBack", size = Vector3.new(W, H, 1),
-		cframe = CFrame.new(base.X, H / 2, base.Z - D / 2),
-		colour = COLOURS.plank, material = Enum.Material.WoodPlanks }, cabin)
-	Build.part({ name = "WallLeft", size = Vector3.new(1, H, D),
-		cframe = CFrame.new(base.X - W / 2, H / 2, base.Z),
-		colour = COLOURS.plank, material = Enum.Material.WoodPlanks }, cabin)
-	Build.part({ name = "WallRight", size = Vector3.new(1, H, D),
-		cframe = CFrame.new(base.X + W / 2, H / 2, base.Z),
-		colour = COLOURS.plank, material = Enum.Material.WoodPlanks }, cabin)
-
-	-- Front wall in two pieces, leaving a doorway in the middle.
-	for _, side in { -1, 1 } do
-		Build.part({ name = "WallFront", size = Vector3.new(W / 2 - 3, H, 1),
-			cframe = CFrame.new(base.X + side * (W / 4 + 1.5), H / 2, base.Z + D / 2),
+	local function wall(name: string, size: Vector3, offset: Vector3)
+		Build.part({ name = name, size = size,
+			cframe = CFrame.new(base.X + offset.X, floorY + offset.Y, base.Z + offset.Z),
 			colour = COLOURS.plank, material = Enum.Material.WoodPlanks }, cabin)
 	end
-	Build.part({ name = "Lintel", size = Vector3.new(6, H - 8, 1),
-		cframe = CFrame.new(base.X, H - (H - 8) / 2, base.Z + D / 2),
-		colour = COLOURS.plank, material = Enum.Material.WoodPlanks }, cabin)
 
-	Build.part({ name = "Roof", size = Vector3.new(W + 4, 1, D + 4),
-		cframe = CFrame.new(base.X, H + 0.5, base.Z),
-		colour = COLOURS.roof, material = Enum.Material.Wood }, cabin)
+	wall("WallBack", Vector3.new(W, H, 1), Vector3.new(0, H / 2, -D / 2))
+	wall("WallLeft", Vector3.new(1, H, D), Vector3.new(-W / 2, H / 2, 0))
+	wall("WallRight", Vector3.new(1, H, D), Vector3.new(W / 2, H / 2, 0))
+	for _, side in { -1, 1 } do
+		wall("WallFront", Vector3.new(W / 2 - 3.5, H, 1), Vector3.new(side * (W / 4 + 1.75), H / 2, D / 2))
+	end
+	wall("Lintel", Vector3.new(7, 4, 1), Vector3.new(0, H - 2, D / 2))
 
-	-- The table the valley map sits on.
-	local table_ = Build.part({ name = "MapTable", size = Vector3.new(6, 3, 4),
-		cframe = CFrame.new(base.X - 6, 2.5, base.Z - 5),
+	-- A pitched roof out of two wedges reads far better than a flat slab.
+	for _, side in { -1, 1 } do
+		local roof = Build.wedge({ name = "Roof", size = Vector3.new(D + 5, 7, W / 2 + 2.5),
+			cframe = CFrame.new(base.X + side * (W / 4 + 1.25), floorY + H + 3.5, base.Z)
+				* CFrame.Angles(0, math.rad(90 * side), 0) * CFrame.Angles(0, 0, math.rad(90)),
+			colour = COLOURS.roof, material = Enum.Material.Wood }, cabin)
+		local _ = roof
+	end
+
+	-- Porch.
+	Build.part({ name = "Porch", size = Vector3.new(W, 1, 9),
+		cframe = CFrame.new(base.X, floorY + 0.4, base.Z + D / 2 + 4.5),
+		colour = COLOURS.plankDark, material = Enum.Material.WoodPlanks }, cabin)
+
+	local lamp = Build.part({ name = "PorchLamp", size = Vector3.new(1.4, 1.8, 1.4),
+		cframe = CFrame.new(base.X + 4, floorY + H - 2, base.Z + D / 2 + 0.6),
+		colour = COLOURS.ember, material = Enum.Material.Neon }, cabin)
+	local lampLight = Instance.new("PointLight")
+	lampLight.Color = Color3.fromRGB(255, 186, 118)
+	lampLight.Range = 26
+	lampLight.Brightness = 1.6
+	lampLight.Parent = lamp
+
+	-- The table with the valley map on it.
+	local table_ = Build.part({ name = "MapTable", size = Vector3.new(7, 3.2, 4.5),
+		cframe = CFrame.new(base.X - 7, floorY + 2.8, base.Z - 6),
 		colour = COLOURS.plank, material = Enum.Material.Wood }, cabin)
-	table_:SetAttribute("Interact", "map")
-	Build.label(table_, "MAP  [E]", Color3.fromRGB(230, 220, 190), 3, 8)
+	prompt(table_, "Read", "Valley map", "map")
 
-	-- The chopping block outside the door, with the axe still in it.
-	local block = Build.part({ name = "ChoppingBlock", size = Vector3.new(4, 4, 4),
-		cframe = CFrame.new(base.X, 2, base.Z + D / 2 + 7),
+	-- The chopping block, with the axe still buried in it.
+	local blockY = groundAt(arena, 0, D / 2 + 12)
+	local block = Build.part({ name = "ChoppingBlock", size = Vector3.new(4.4, 4.4, 4.4),
+		cframe = CFrame.new(base.X, blockY + 2.2, base.Z + D / 2 + 12),
 		colour = COLOURS.log, material = Enum.Material.Wood }, cabin)
-	block:SetAttribute("Interact", "block")
 	block:SetAttribute("Loaded", false)
+	prompt(block, "Load log", "Chopping block", "block")
 
-	local axe = Build.part({ name = "Axe", size = Vector3.new(0.4, 3.2, 1.6),
-		cframe = CFrame.new(base.X, 5.2, base.Z + D / 2 + 7) * CFrame.Angles(0, 0, math.rad(18)),
-		colour = COLOURS.axe, material = Enum.Material.Metal, canCollide = false }, cabin)
-	axe:SetAttribute("Interact", "axe")
-	Build.label(axe, "TAKE AXE  [E]", Color3.fromRGB(240, 236, 220), 3, 10)
+	local axeHead = Build.part({ name = "Axe", size = Vector3.new(0.5, 2.2, 1.8),
+		cframe = CFrame.new(base.X, blockY + 5.6, base.Z + D / 2 + 12) * CFrame.Angles(0, 0, math.rad(20)),
+		colour = COLOURS.steel, material = Enum.Material.Metal, canCollide = false }, cabin)
+	Build.part({ name = "AxeHaft", size = Vector3.new(0.42, 3.4, 0.42),
+		cframe = CFrame.new(base.X + 0.5, blockY + 7.4, base.Z + D / 2 + 12) * CFrame.Angles(0, 0, math.rad(20)),
+		colour = Color3.fromRGB(120, 88, 58), material = Enum.Material.Wood, canCollide = false }, cabin)
+	prompt(axeHead, "Take", "Axe", "axe")
 
-	return CFrame.new(base.X, 6, base.Z + D / 2 + 16)
+	return CFrame.new(base.X, floorY + 6, base.Z + D / 2 + 20)
 end
 
-local function buildPond(origin: Vector3, parent: Instance)
-	Build.part({ name = "Pond", size = Vector3.new(70, 2, 54),
-		cframe = CFrame.new(origin.X - 120, 0.2, origin.Z - 90),
-		colour = COLOURS.water, material = Enum.Material.Water,
-		canCollide = false, transparency = 0.25 }, parent)
-	Build.part({ name = "PondBed", size = Vector3.new(78, 2, 62),
-		cframe = CFrame.new(origin.X - 120, -0.9, origin.Z - 90),
-		colour = COLOURS.dirt, material = Enum.Material.Slate }, parent)
+-- The fire pit: a ring of stones the party lights and cooks on.
+local function buildFirePit(arena: Arena, parent: Instance)
+	local x, z = 22, 26
+	local y = groundAt(arena, x, z)
+
+	local pit = Instance.new("Model")
+	pit.Name = "FirePit"
+	pit.Parent = parent
+
+	for i = 1, 9 do
+		local angle = (i / 9) * math.pi * 2
+		Build.part({ name = "Stone", size = Vector3.new(2.2, 1.6, 2.2),
+			cframe = CFrame.new(arena.origin.X + x + math.cos(angle) * 4.2, y + 0.6,
+				arena.origin.Z + z + math.sin(angle) * 4.2) * CFrame.Angles(0, angle, 0),
+			colour = COLOURS.stone, material = Enum.Material.Rock }, pit)
+	end
+
+	local hearth = Build.part({ name = "Hearth", size = Vector3.new(4, 1, 4),
+		cframe = CFrame.new(arena.origin.X + x, y + 0.5, arena.origin.Z + z),
+		colour = Color3.fromRGB(42, 36, 32), material = Enum.Material.Slate }, pit)
+	hearth:SetAttribute("Lit", false)
+	pit.PrimaryPart = hearth
+	prompt(hearth, "Light", "Fire pit", "fire")
 end
 
 --------------------------------------------------------------------------------
--- Building a whole arena
+-- Scatter
+--------------------------------------------------------------------------------
+
+local function scatter(arena: Arena, parent: Instance)
+	local rng = Build.rng(math.floor(arena.seed * 7919))
+	local shape = Landscape.shape()
+
+	local trees = Instance.new("Folder")
+	trees.Name = "Trees"
+	trees.Parent = parent
+
+	local props = Instance.new("Folder")
+	props.Name = "Props"
+	props.Parent = parent
+
+	local detail = Instance.new("Folder")
+	detail.Name = "Detail"
+	detail.Parent = parent
+
+	-- A candidate point that is on walkable land: above the waterline, off the
+	-- mountains, and outside the cabin clearing unless asked otherwise.
+	local function findGround(minRadius: number, maxRadius: number, maxHeight: number): (Vector3?, number)
+		for _ = 1, 24 do
+			local angle = rng:NextNumber(0, math.pi * 2)
+			local radius = rng:NextNumber(minRadius, maxRadius)
+			local x, z = math.cos(angle) * radius, math.sin(angle) * radius
+			local y = groundAt(arena, x, z)
+			if y > shape.waterLevel + 3 and y < maxHeight then
+				return Vector3.new(arena.origin.X + x, y, arena.origin.Z + z), y
+			end
+		end
+		return nil, 0
+	end
+
+	local placed = 0
+	while placed < TREE_COUNT do
+		local point = findGround(shape.clearingRadius + 12, shape.radius - 70, 88)
+		if point then
+			-- Seated a little into the ground: voxel terrain smooths away from
+			-- the sampled height, and a floating trunk is very obvious.
+			Flora.tree(point - Vector3.new(0, 1.5, 0), trees, rng)
+			placed += 1
+		else
+			break
+		end
+	end
+
+	for _ = 1, ROCK_COUNT do
+		local point = findGround(shape.clearingRadius + 6, shape.radius - 50, 110)
+		if point then
+			Flora.rock(point, props, rng)
+		end
+	end
+
+	for i = 1, FLINT_COUNT do
+		-- A third of it close to the cabin: the fire step should be findable
+		-- without a twenty-minute hunt, which was true in the original too.
+		local point = if i <= 7
+			then findGround(14, 46, 80)
+			else findGround(50, shape.radius - 70, 90)
+		if point then
+			local flint = Build.part({ name = "Flint", size = Vector3.new(1.8, 0.9, 1.5),
+				cframe = CFrame.new(point + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
+				colour = COLOURS.flint, material = Enum.Material.Slate, canCollide = false }, props)
+			prompt(flint, "Pick up", "Flint", "flint")
+		end
+	end
+
+	for _ = 1, TUFT_COUNT do
+		local point = findGround(10, shape.radius - 60, 84)
+		if point then
+			Flora.tuft(point, detail, rng)
+		end
+	end
+end
+
 --------------------------------------------------------------------------------
 
 local function buildArena(index: number): Arena
 	local origin = Vector3.new((index - 1) * ARENA_SPACING, 0, 0)
-	local rng = Build.rng(index * 7919)
+	local seed = index * 137.4
 
 	local folder = Instance.new("Folder")
 	folder.Name = "Arena" .. index
 	folder.Parent = workspace
 
-	Build.part({ name = "Ground", size = Vector3.new(GROUND_SIZE, 4, GROUND_SIZE),
-		cframe = CFrame.new(origin.X, -2, origin.Z),
-		colour = COLOURS.grass, material = Enum.Material.Grass }, folder)
-
-	local spawnCFrame = buildCabin(origin, folder)
-	buildPond(origin, folder)
-
-	local trees = Instance.new("Folder")
-	trees.Name = "Trees"
-	trees.Parent = folder
-
-	local placed = 0
-	local attempts = 0
-	while placed < TREE_COUNT and attempts < TREE_COUNT * 12 do
-		attempts += 1
-		local x = rng:NextNumber(-GROUND_SIZE / 2 + 20, GROUND_SIZE / 2 - 20)
-		local z = rng:NextNumber(-GROUND_SIZE / 2 + 20, GROUND_SIZE / 2 - 20)
-		-- Keep the clearing around the cabin and the pond free.
-		if math.abs(x) < 34 and math.abs(z) < 40 then
-			continue
-		end
-		if (Vector3.new(x, 0, z) - Vector3.new(-120, 0, -90)).Magnitude < 55 then
-			continue
-		end
-		buildTree(origin, x, z, rng, trees)
-		placed += 1
-	end
-
-	local ground = Instance.new("Folder")
-	ground.Name = "GroundItems"
-	ground.Parent = folder
-
-	for _ = 1, ROCK_COUNT do
-		local x = rng:NextNumber(-GROUND_SIZE / 2 + 20, GROUND_SIZE / 2 - 20)
-		local z = rng:NextNumber(-GROUND_SIZE / 2 + 20, GROUND_SIZE / 2 - 20)
-		local size = rng:NextNumber(3, 9)
-		Build.part({ name = "Rock", size = Vector3.new(size, size * 0.7, size * 0.9),
-			cframe = CFrame.new(origin.X + x, size * 0.25, origin.Z + z)
-				* CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
-			colour = COLOURS.stone, material = Enum.Material.Slate }, ground)
-	end
-
-	-- Flint, several pieces of it close to the cabin so the fire step is
-	-- findable without a long hunt.
-	for i = 1, FLINT_COUNT do
-		local radius = if i <= 6 then rng:NextNumber(14, 30) else rng:NextNumber(40, GROUND_SIZE / 2 - 30)
-		local angle = rng:NextNumber(0, math.pi * 2)
-		local flint = Build.part({ name = "Flint", size = Vector3.new(1.6, 0.8, 1.4),
-			cframe = CFrame.new(origin.X + math.cos(angle) * radius, 0.5, origin.Z + math.sin(angle) * radius)
-				* CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
-			colour = COLOURS.flint, material = Enum.Material.Slate, canCollide = false }, ground)
-		flint:SetAttribute("Interact", "flint")
-	end
-
-	return {
-		index = index,
-		origin = origin,
-		folder = folder,
-		spawnCFrame = spawnCFrame,
-		inUse = false,
+	local arena: Arena = {
+		index = index, origin = origin, seed = seed,
+		folder = folder, spawnCFrame = CFrame.new(origin), inUse = false,
 	}
+
+	Landscape.build(origin, seed)
+	arena.spawnCFrame = buildCabin(arena, folder)
+	buildFirePit(arena, folder)
+	scatter(arena, folder)
+
+	return arena
 end
 
 function Arenas.build()
+	Landscape.styleWater()
 	for index = 1, ARENA_COUNT do
 		table.insert(arenas, buildArena(index))
+		task.wait()
 	end
 end
 
--- Take a free arena, or nil when every one is busy.
 function Arenas.claim(): Arena?
 	for _, arena in arenas do
 		if not arena.inUse then
@@ -251,25 +305,34 @@ function Arenas.claim(): Arena?
 	return nil
 end
 
--- Hand an arena back, rebuilding anything a run consumed.
 function Arenas.release(arena: Arena)
 	local trees = arena.folder:FindFirstChild("Trees")
 	if trees then
 		for _, tree in trees:GetChildren() do
 			tree:SetAttribute("Chops", 0)
 			tree:SetAttribute("Felled", false)
-			for _, piece in tree:GetChildren() do
+			for _, piece in tree:GetDescendants() do
 				if piece:IsA("BasePart") then
-					piece.Transparency = 0
-					-- Felling cleared CanCollide; restore it per part or the
-					-- next party walks straight through a standing forest.
+					piece.Transparency = if piece.Name == "Hitbox" then 1 else 0
 					piece.CanCollide = piece.Name == "Trunk"
 				end
 			end
 		end
 	end
 
-	for _, name in { "Logs", "Zombies", "Animals", "Fires" } do
+	local pit = arena.folder:FindFirstChild("FirePit")
+	if pit then
+		local hearth = pit:FindFirstChild("Hearth")
+		if hearth then
+			hearth:SetAttribute("Lit", false)
+			local flame = hearth:FindFirstChild("Flame")
+			if flame then
+				flame:Destroy()
+			end
+		end
+	end
+
+	for _, name in { "Logs", "Zombies", "Animals" } do
 		local group = arena.folder:FindFirstChild(name)
 		if group then
 			group:Destroy()

@@ -11,7 +11,6 @@ local Hud = require(script:WaitForChild("Hud"))
 
 Hud.build()
 
-local interactRemote = Net.get("Interact")
 local swingRemote = Net.get("Swing")
 local eatRemote = Net.get("Eat")
 local sprintRemote = Net.get("Sprint")
@@ -31,10 +30,10 @@ UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: 
 		return
 	end
 
+	-- Clicking swings bare hands. With the axe equipped the Tool's own
+	-- Activated event does it, which is what gets the swing animation.
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		swingRemote:FireServer()
-	elseif input.KeyCode == Enum.KeyCode.E then
-		interactRemote:FireServer()
 	elseif input.KeyCode == Enum.KeyCode.F then
 		-- Cooked first, then raw, then an apple: eat the best thing you have.
 		eatRemote:FireServer("auto")

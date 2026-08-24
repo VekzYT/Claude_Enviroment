@@ -65,7 +65,18 @@ function Lobby.build()
 
 	Build.part({ name = "Floor", size = Vector3.new(220, 4, 160),
 		cframe = CFrame.new(ORIGIN.X, -2, ORIGIN.Z),
-		colour = Color3.fromRGB(64, 66, 74), material = Enum.Material.Slate }, folder)
+		colour = Color3.fromRGB(58, 56, 60), material = Enum.Material.Cobblestone }, folder)
+
+	-- A timber ceiling keeps the lobby feeling like a room rather than a slab
+	-- floating in the sky, and gives the brazier light something to bounce off.
+	Build.part({ name = "Ceiling", size = Vector3.new(226, 3, 166),
+		cframe = CFrame.new(ORIGIN.X, 30, ORIGIN.Z),
+		colour = Color3.fromRGB(48, 38, 32), material = Enum.Material.WoodPlanks }, folder)
+	for i = -4, 4 do
+		Build.part({ name = "Beam", size = Vector3.new(4, 3, 166),
+			cframe = CFrame.new(ORIGIN.X + i * 24, 27, ORIGIN.Z),
+			colour = Color3.fromRGB(62, 48, 38), material = Enum.Material.Wood }, folder)
+	end
 
 	-- A low wall so the lobby reads as a place rather than a floating slab.
 	for _, spec in {
@@ -76,14 +87,39 @@ function Lobby.build()
 	} do
 		Build.part({ name = "Wall", size = spec[1],
 			cframe = CFrame.new(ORIGIN + spec[2]),
-			colour = Color3.fromRGB(48, 50, 58), material = Enum.Material.Concrete }, folder)
+			colour = Color3.fromRGB(44, 42, 46), material = Enum.Material.Brick }, folder)
 	end
 
-	local title = Build.part({ name = "Sign", size = Vector3.new(60, 10, 2),
-		cframe = CFrame.new(ORIGIN.X, 16, ORIGIN.Z - 60),
-		colour = Color3.fromRGB(40, 42, 50), material = Enum.Material.Metal }, folder)
-	Build.label(title, "SYFON", Color3.fromRGB(226, 92, 72), 8, 26)
-	Build.label(title, "ten days until they come", Color3.fromRGB(190, 190, 200), 2, 22)
+	local title = Build.part({ name = "Sign", size = Vector3.new(64, 12, 2),
+		cframe = CFrame.new(ORIGIN.X, 18, ORIGIN.Z - 62),
+		colour = Color3.fromRGB(28, 28, 34), material = Enum.Material.Metal }, folder)
+	Build.label(title, "SYFON", Color3.fromRGB(206, 66, 56), 10, 30)
+	Build.label(title, "ten days until they come", Color3.fromRGB(176, 176, 188), 2.5, 24)
+
+	-- Braziers, so the room has light of its own and somewhere for the eye to
+	-- rest between the pads.
+	for _, spot in {
+		Vector3.new(-96, 0, -66), Vector3.new(96, 0, -66),
+		Vector3.new(-96, 0, 66), Vector3.new(96, 0, 66),
+	} do
+		local bowl = Build.part({ name = "Brazier", size = Vector3.new(5, 6, 5),
+			cframe = CFrame.new(ORIGIN + spot + Vector3.new(0, 3, 0)),
+			colour = Color3.fromRGB(52, 46, 44), material = Enum.Material.Metal }, folder)
+
+		local fire = Instance.new("Fire")
+		fire.Heat = 10
+		fire.Size = 6
+		fire.Color = Color3.fromRGB(255, 164, 74)
+		fire.SecondaryColor = Color3.fromRGB(178, 62, 28)
+		fire.Parent = bowl
+
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 176, 104)
+		light.Range = 44
+		light.Brightness = 2.2
+		light.Shadows = true
+		light.Parent = bowl
+	end
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "LobbySpawn"
@@ -101,10 +137,23 @@ function Lobby.build()
 	local total = #PAD_SPECS
 	for index, spec in PAD_SPECS do
 		local x = ORIGIN.X + (index - (total + 1) / 2) * (PAD_SIZE + PAD_GAP)
+		-- A stone plinth under a glowing pad: the pad reads as a control, the
+		-- plinth stops it looking like a sticker on the floor.
+		Build.part({ name = "Plinth_" .. spec.id,
+			size = Vector3.new(PAD_SIZE + 4, 2, PAD_SIZE + 4),
+			cframe = CFrame.new(x, 0.4, ORIGIN.Z - 20),
+			colour = Color3.fromRGB(38, 36, 40), material = Enum.Material.Slate }, folder)
+
 		local part = Build.part({ name = "Pad_" .. spec.id,
 			size = Vector3.new(PAD_SIZE, 1, PAD_SIZE),
-			cframe = CFrame.new(x, 0.5, ORIGIN.Z - 20),
+			cframe = CFrame.new(x, 1.6, ORIGIN.Z - 20),
 			colour = spec.colour, material = Enum.Material.Neon }, folder)
+
+		local glow = Instance.new("PointLight")
+		glow.Color = spec.colour
+		glow.Range = 26
+		glow.Brightness = 1.5
+		glow.Parent = part
 
 		local gui = Build.label(part, spec.label, Color3.new(1, 1, 1), 7, 14)
 		local sign = gui:FindFirstChild("Text") :: TextLabel
