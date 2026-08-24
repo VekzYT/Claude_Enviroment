@@ -2,6 +2,12 @@ extends CharacterBody3D
 
 const SPEED := 6.0
 const SPRINT_SPEED := 9.5
+# Crouching is for closing on animals. It does not change the collision shape,
+# only how fast you move, how low you look from, and how far off you are
+# noticed -- so there is no way to stand up inside a rafter and get stuck.
+const CROUCH_SPEED := 2.5
+const CROUCH_DROP := 0.62
+const CROUCH_LERP := 11.0
 const JUMP_VELOCITY := 4.8
 const MOUSE_SENSITIVITY := 0.0025
 const GRAVITY := 9.8
@@ -49,6 +55,7 @@ const WEAPON_HANDGUN := 1
 const WEAPON_KNIFE := 2
 const ITEM_HANDS := 3
 const ITEM_AXE := 4
+const ITEM_BOW := 5
 
 const AXE_SWING_DURATION := 0.62
 const HAND_SWING_DURATION := 0.34
@@ -70,6 +77,7 @@ const INTERACT_COS := 0.76
 @onready var arm_left: Node3D = $Head/Camera3D/Hands/LeftArm
 @onready var arm_right: Node3D = $Head/Camera3D/Hands/RightArm
 @onready var weapon_axe: Node3D = $Head/Camera3D/WeaponAxe
+@onready var weapon_bow: Node3D = $Head/Camera3D/WeaponBow
 
 @onready var sniper_muzzle: MeshInstance3D = $Head/Camera3D/WeaponSniper/MuzzleFlash
 @onready var sniper_magazine: MeshInstance3D = $Head/Camera3D/WeaponSniper/Magazine
@@ -85,17 +93,17 @@ var weapon_hip_positions: Array = []
 var weapon_hip_rotations: Array = []
 var magazine_base_positions: Array = []
 
-var weapon_damage: Array = [100, 25, 999, 0, 40]
-var weapon_fire_cooldown: Array = [1.3, 0.28, 0.45, 0.5, 0.62]
-var weapon_reload_time: Array = [2.4, 1.0, 0.0, 0.0, 0.0]
-var weapon_is_melee: Array = [false, false, true, true, true]
-var weapon_full_scope: Array = [true, false, false, false, false]
-var weapon_ads_fov: Array = [16.0, 55.0, 75.0, 75.0, 75.0]
-var weapon_melee_range: Array = [0.0, 0.0, 2.2, 1.5, 3.1]
-var weapon_titles: Array = ["Sniper", "Handgun", "Knife", "Bare hands", "Axe"]
+var weapon_damage: Array = [100, 25, 999, 0, 40, 46]
+var weapon_fire_cooldown: Array = [1.3, 0.28, 0.45, 0.5, 0.62, 0.75]
+var weapon_reload_time: Array = [2.4, 1.0, 0.0, 0.0, 0.0, 0.0]
+var weapon_is_melee: Array = [false, false, true, true, true, false]
+var weapon_full_scope: Array = [true, false, false, false, false, false]
+var weapon_ads_fov: Array = [16.0, 55.0, 75.0, 75.0, 75.0, 58.0]
+var weapon_melee_range: Array = [0.0, 0.0, 2.2, 1.5, 3.1, 0.0]
+var weapon_titles: Array = ["Sniper", "Handgun", "Knife", "Bare hands", "Axe", "Bow"]
 
 # You start with nothing but your hands. Everything else has to be found.
-var owned: Array[bool] = [false, false, false, true, false]
+var owned: Array[bool] = [false, false, false, true, false, false]
 
 var current_weapon_index := ITEM_HANDS
 var switch_out_index := ITEM_HANDS
@@ -161,6 +169,10 @@ var grip_blend := 0.0
 # axe goes away and nothing can be swung until it is put down.
 const LOG_CARRY_SPEED := 0.62
 var carrying_log := false
+var crouching := false
+# Eased rather than snapped, so dropping into a crouch is a movement of the
+# camera and not a teleport.
+var crouch_blend := 0.0
 var carried_log_tint: Color = Color(0.46, 0.35, 0.23)
 var carried_log_node: Node3D = null
 var log_pickup_scene: PackedScene = preload("res://scenes/log_pickup.tscn")
@@ -173,9 +185,9 @@ func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	add_to_group("player")
 
-	weapon_nodes = [weapon_sniper, weapon_handgun, weapon_knife, hands, weapon_axe]
-	weapon_muzzles = [sniper_muzzle, handgun_muzzle, null, null, null]
-	weapon_magazines = [sniper_magazine, handgun_magazine, null, null, null]
+	weapon_nodes = [weapon_sniper, weapon_handgun, weapon_knife, hands, weapon_axe, weapon_bow]
+	weapon_muzzles = [sniper_muzzle, handgun_muzzle, null, null, null, null]
+	weapon_magazines = [sniper_magazine, handgun_magazine, null, null, null, null]
 
 	for i in weapon_nodes.size():
 		var node: Node3D = weapon_nodes[i]
@@ -205,6 +217,7 @@ func _ready() -> void:
 	GameState.set_player_health(health)
 	GameState.set_current_weapon(current_weapon_index)
 	GameState.set_held_item(weapon_titles[current_weapon_index])
+	GameState.bow_acquired.connect(func() -> void: give_item(ITEM_BOW))
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
@@ -223,6 +236,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if screen_is_open():
 				close_map_screen()
 				close_pack_screen()
+				close_trade_screen()
 				get_viewport().set_input_as_handled()
 			else:
 				try_interact()
@@ -243,6 +257,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			request_switch(WEAPON_HANDGUN)
 		elif event.keycode == KEY_3:
 			request_switch(WEAPON_KNIFE)
+		elif event.keycode == KEY_4:
+			request_switch(ITEM_BOW)
 
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -354,7 +370,13 @@ func _interactable_in_view(from: Vector3, facing: Vector3) -> Array:
 		var body := node as Node3D
 		if body == null or not is_instance_valid(body):
 			continue
-		var to_it: Vector3 = body.global_position - from
+		# Aim at the point the thing wants to be aimed at, not at its origin.
+		# A person's origin is between her feet, so judging both the angle and
+		# the range from there asks you to look at the ground in front of her.
+		var focus: Vector3 = body.global_position
+		if body.has_method("interact_point"):
+			focus = body.call("interact_point")
+		var to_it: Vector3 = focus - from
 		var away: float = to_it.length()
 		if away < 0.05:
 			continue
@@ -549,7 +571,14 @@ func close_pack_screen() -> void:
 # True while any full-screen panel has the mouse, which is when the world
 # should ignore clicks and interact presses.
 func screen_is_open() -> bool:
-	return GameState.map_open or GameState.inventory_open
+	return GameState.map_open or GameState.inventory_open or GameState.trade_open
+
+func close_trade_screen() -> void:
+	if not GameState.trade_open:
+		return
+	var screen: Node = get_tree().get_first_node_in_group("trade_screen")
+	if screen != null:
+		screen.call("close_trade")
 
 func open_map_screen() -> void:
 	if GameState.map_open:
@@ -560,6 +589,23 @@ func open_pack_screen() -> void:
 	if GameState.inventory_open:
 		return
 	toggle_pack_screen()
+
+# How loudly you are moving, as a multiplier on how far off an animal notices
+# you. Standing still counts for a lot: a crouched player who has stopped is
+# nearly invisible, and a sprinting one is spotted half again as far out.
+func stealth_factor() -> float:
+	var pace: float = Vector2(velocity.x, velocity.z).length()
+	var factor: float = 1.0
+	if crouching:
+		factor = 0.42 if pace < 0.4 else 0.58
+	elif pace > SPEED + 0.6:
+		factor = 1.45
+	elif pace < 0.4:
+		factor = 0.8
+	return factor
+
+func is_crouching() -> bool:
+	return crouching
 
 func active_weapon_index() -> int:
 	if is_switching:
@@ -601,13 +647,17 @@ func _physics_process(delta: float) -> void:
 	input_dir = input_dir.normalized()
 
 	var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+	crouching = Input.is_physical_key_pressed(KEY_CTRL) and not carrying_log
 	var wants_sprint: bool = Input.is_physical_key_pressed(KEY_SHIFT) and direction.length_squared() > 0.01
-	# A log on your shoulder is too heavy to run with.
-	if carrying_log:
+	# A log on your shoulder is too heavy to run with, and you cannot sprint
+	# out of a crouch without standing up first.
+	if carrying_log or crouching:
 		wants_sprint = false
 	var speed: float = SPEED
 	if update_stamina(delta, wants_sprint):
 		speed = SPRINT_SPEED
+	if crouching:
+		speed = CROUCH_SPEED
 	if carrying_log:
 		speed *= LOG_CARRY_SPEED
 
@@ -642,6 +692,7 @@ func _physics_process(delta: float) -> void:
 	update_aim(delta)
 	update_reload(delta)
 	update_melee(delta)
+	update_bow(delta)
 	update_weapon_transform(delta)
 	update_hands(delta)
 
@@ -724,9 +775,10 @@ func update_view_bob(delta: float, moving: bool, horizontal_speed: float, strafe
 		sin(bob_time * 0.5) * BOB_SIDE_AMPLITUDE,
 		abs(sin(bob_time)) * BOB_AMPLITUDE,
 		0.0
-	) * bob_fade
+	) * bob_fade * (1.0 - 0.65 * crouch_blend)
 
-	camera.position = camera_base_position + bob_offset
+	crouch_blend = move_toward(crouch_blend, 1.0 if crouching else 0.0, delta * CROUCH_LERP)
+	camera.position = camera_base_position + bob_offset - Vector3(0.0, CROUCH_DROP * crouch_blend, 0.0)
 	camera.rotation.z = lerp(camera.rotation.z, -strafe_axis * deg_to_rad(1.5), delta * 5.0)
 
 	camera_kick = move_toward(camera_kick, 0.0, delta * 7.0)
@@ -803,11 +855,58 @@ func primary_action() -> void:
 	if is_dead or is_switching:
 		return
 	var idx: int = current_weapon_index
+	if idx == ITEM_BOW:
+		loose_arrow()
+		return
 	var is_melee: bool = weapon_is_melee[idx]
 	if is_melee:
 		start_melee()
 	else:
 		shoot()
+
+const ARROW_SCENE: PackedScene = preload("res://scenes/arrow.tscn")
+const BOW_DRAW_TIME := 0.42
+
+var bow_draw := 0.0
+var bow_cooldown := 0.0
+
+func loose_arrow() -> void:
+	if bow_cooldown > 0.0:
+		return
+	if GameState.arrows <= 0:
+		GameState.announce("No arrows. Maren sells them in Elmswood.")
+		Sound.play_ui("reload_click", -10.0)
+		return
+	GameState.add_arrows(-1)
+	bow_cooldown = float(weapon_fire_cooldown[ITEM_BOW])
+	bow_draw = 1.0
+
+	var arrow: Node3D = ARROW_SCENE.instantiate() as Node3D
+	get_tree().current_scene.add_child(arrow)
+	# Out of the camera rather than off the bow model, so where you are looking
+	# is where it goes. The model sits off to one side of the crosshair.
+	var origin: Vector3 = camera.global_position + camera.global_transform.basis.z * -0.5
+	arrow.call("launch", origin, -camera.global_transform.basis.z,
+		int(weapon_damage[ITEM_BOW]), self)
+	Sound.play_3d("knife_swing", global_position, -6.0)
+	camera_kick += deg_to_rad(1.2)
+
+# The bow is drawn back as it recovers, so the string and the nocked arrow show
+# the shot being readied rather than snapping between two poses.
+func update_bow(delta: float) -> void:
+	if bow_cooldown > 0.0:
+		bow_cooldown = maxf(bow_cooldown - delta, 0.0)
+	bow_draw = move_toward(bow_draw, 0.0, delta / BOW_DRAW_TIME)
+	if weapon_bow == null:
+		return
+	var nocked: Node3D = weapon_bow.get_node_or_null("NockedArrow")
+	var string_root: Node3D = weapon_bow.get_node_or_null("String")
+	var ready_shot: bool = GameState.arrows > 0 and bow_cooldown <= 0.0
+	if nocked != null:
+		nocked.visible = ready_shot and current_weapon_index == ITEM_BOW
+		nocked.position.z = -0.16 + bow_draw * 0.1
+	if string_root != null:
+		string_root.position.z = bow_draw * 0.06
 
 func start_melee() -> void:
 	if is_meleeing or is_switching:

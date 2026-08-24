@@ -7,12 +7,14 @@ extends Node3D
 @export var terrain_path: NodePath = NodePath("../Terrain")
 @export var deer_count := 14
 @export var boar_count := 8
+@export var hare_count := 16
+@export var elk_count := 5
 
 const MAP_HALF := 215.0
 const MAX_SLOPE := 0.34
 # No two animals start closer than this, so the forest reads as sparsely
 # populated rather than as a few knots of wildlife.
-const MIN_SEPARATION := 46.0
+const MIN_SEPARATION := 34.0
 
 var rng := RandomNumberGenerator.new()
 var terrain: Node = null
@@ -29,11 +31,16 @@ func _ready() -> void:
 		terrain.call("ensure_built")
 
 	var animal_scene: PackedScene = load("res://scenes/animal.tscn") as PackedScene
-	_spawn(animal_scene, deer_count, "deer", 40, 1.9, 7.6, Color(0.46, 0.33, 0.21))
-	_spawn(animal_scene, boar_count, "boar", 52, 1.5, 6.2, Color(0.24, 0.20, 0.18))
+	# Run speeds matter against the player's 9.5 m/s sprint. A deer is a fair
+	# race, an elk you will lose, and a hare you will never catch on foot --
+	# that one is there to make the bow worth buying.
+	_spawn(animal_scene, deer_count, "deer", 40, 1.9, 8.6, 1.0, Color(0.46, 0.33, 0.21))
+	_spawn(animal_scene, boar_count, "boar", 52, 1.5, 6.4, 0.78, Color(0.24, 0.20, 0.18))
+	_spawn(animal_scene, elk_count, "elk", 78, 1.7, 9.8, 0.92, Color(0.34, 0.25, 0.17))
+	_spawn(animal_scene, hare_count, "hare", 10, 1.7, 13.5, 1.65, Color(0.55, 0.47, 0.36))
 
 func _spawn(scene: PackedScene, count: int, species: String, health: int,
-		walk: float, run: float, tint: Color) -> void:
+		walk: float, run: float, wariness: float, tint: Color) -> void:
 	var placed := 0
 	var tries := 0
 	var separation: float = MIN_SEPARATION
@@ -56,6 +63,7 @@ func _spawn(scene: PackedScene, count: int, species: String, health: int,
 		animal.set("max_health", health)
 		animal.set("walk_speed", walk)
 		animal.set("run_speed", run)
+		animal.set("wariness", wariness)
 		animal.set("body_tint", tint.lightened(rng.randf_range(-0.0, 0.16)))
 		add_child(animal)
 		var ground: float = 0.0

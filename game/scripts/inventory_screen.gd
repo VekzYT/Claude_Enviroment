@@ -1,8 +1,8 @@
 extends CanvasLayer
 
 # The pack. Opens on Tab or I, and is the one place that shows everything you
-# are carrying at once -- what is in your hands, every supply you have picked
-# up, and how close you are to starving.
+# are carrying at once -- what is in your hands, every supply you have to your
+# name, and how close you are to starving.
 #
 # Items are drawn rather than swatched. A coloured square next to the word
 # "Axe" is a placeholder; a little axe is an inventory.
@@ -11,88 +11,6 @@ const PANEL := Vector2(680, 620)
 const GEAR_ROW := 36.0
 const GEAR_ROWS := 4
 const CELL := Vector2(202, 82)
-
-# A hand-drawn item glyph. Everything is expressed as a fraction of the box so
-# the same icon works at 24px in a gear row and at 40px in a supply slot.
-class ItemIcon extends Control:
-	var kind: String = "crate"
-	var tint: Color = Color(0.8, 0.8, 0.8)
-
-	func _init(k: String, t: Color, s: float) -> void:
-		kind = k
-		tint = t
-		custom_minimum_size = Vector2(s, s)
-		size = Vector2(s, s)
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	func _p(x: float, y: float) -> Vector2:
-		var s: float = minf(size.x, size.y)
-		return Vector2(x * s, y * s)
-
-	func _poly(pts: Array, c: Color) -> void:
-		var out := PackedVector2Array()
-		for pt in pts:
-			out.append(_p(pt[0], pt[1]))
-		draw_colored_polygon(out, c)
-
-	func _stroke(a: Array, b: Array, c: Color, w: float) -> void:
-		var s: float = minf(size.x, size.y)
-		draw_line(_p(a[0], a[1]), _p(b[0], b[1]), c, w * s, true)
-
-	func _draw() -> void:
-		var s: float = minf(size.x, size.y)
-		var dark: Color = tint.darkened(0.55)
-		var light: Color = tint.lightened(0.3)
-		var steel := Color(0.72, 0.75, 0.79)
-		var wood := Color(0.46, 0.33, 0.20)
-		match kind:
-			"axe":
-				_poly([[0.34, 0.90], [0.44, 0.90], [0.66, 0.22], [0.56, 0.20]], wood)
-				_poly([[0.58, 0.10], [0.86, 0.20], [0.80, 0.44], [0.50, 0.32]], steel.darkened(0.25))
-				_poly([[0.80, 0.16], [0.88, 0.21], [0.82, 0.42], [0.75, 0.39]], steel)
-			"knife":
-				_poly([[0.30, 0.86], [0.42, 0.86], [0.44, 0.60], [0.32, 0.60]], wood)
-				_poly([[0.32, 0.60], [0.44, 0.60], [0.62, 0.14], [0.40, 0.30]], steel)
-			"rifle":
-				_poly([[0.08, 0.62], [0.86, 0.44], [0.88, 0.54], [0.10, 0.72]], Color(0.28, 0.24, 0.21))
-				_poly([[0.08, 0.62], [0.30, 0.57], [0.34, 0.84], [0.14, 0.80]], wood)
-				draw_rect(Rect2(_p(0.44, 0.34), Vector2(0.26 * s, 0.10 * s)), steel.darkened(0.3))
-			"pistol":
-				_poly([[0.16, 0.40], [0.84, 0.40], [0.84, 0.54], [0.16, 0.54]], Color(0.26, 0.26, 0.28))
-				_poly([[0.24, 0.54], [0.44, 0.54], [0.38, 0.86], [0.20, 0.86]], Color(0.20, 0.20, 0.22))
-			"hands":
-				_poly([[0.14, 0.82], [0.14, 0.44], [0.24, 0.28], [0.34, 0.44], [0.34, 0.82]], tint)
-				_poly([[0.50, 0.82], [0.50, 0.40], [0.62, 0.24], [0.74, 0.40], [0.74, 0.82]], light)
-			"log":
-				_poly([[0.20, 0.34], [0.80, 0.34], [0.80, 0.68], [0.20, 0.68]], wood)
-				draw_circle(_p(0.80, 0.51), 0.17 * s, wood.lightened(0.18))
-				draw_circle(_p(0.80, 0.51), 0.09 * s, wood.darkened(0.3))
-				_stroke([0.30, 0.44], [0.68, 0.44], wood.darkened(0.35), 0.035)
-			"apple":
-				draw_circle(_p(0.44, 0.60), 0.26 * s, tint)
-				draw_circle(_p(0.60, 0.60), 0.24 * s, tint.darkened(0.12))
-				_stroke([0.52, 0.36], [0.55, 0.20], Color(0.32, 0.24, 0.14), 0.045)
-				_poly([[0.55, 0.24], [0.74, 0.16], [0.66, 0.32]], Color(0.32, 0.52, 0.24))
-			"meat_raw":
-				_poly([[0.22, 0.60], [0.30, 0.34], [0.62, 0.28], [0.76, 0.50],
-					[0.66, 0.76], [0.34, 0.78]], tint)
-				draw_circle(_p(0.46, 0.54), 0.11 * s, light)
-				_poly([[0.66, 0.72], [0.84, 0.80], [0.78, 0.88], [0.62, 0.80]], Color(0.90, 0.88, 0.82))
-			"meat_cooked":
-				_poly([[0.22, 0.60], [0.30, 0.34], [0.62, 0.28], [0.76, 0.50],
-					[0.66, 0.76], [0.34, 0.78]], dark)
-				_stroke([0.32, 0.44], [0.62, 0.38], Color(0.14, 0.10, 0.08), 0.05)
-				_stroke([0.34, 0.60], [0.68, 0.54], Color(0.14, 0.10, 0.08), 0.05)
-				_poly([[0.66, 0.72], [0.84, 0.80], [0.78, 0.88], [0.62, 0.80]], Color(0.86, 0.84, 0.78))
-			"wood":
-				_poly([[0.16, 0.78], [0.30, 0.26], [0.40, 0.28], [0.28, 0.80]], wood)
-				_poly([[0.44, 0.80], [0.56, 0.24], [0.66, 0.26], [0.56, 0.82]], wood.lightened(0.15))
-				_poly([[0.66, 0.78], [0.78, 0.32], [0.86, 0.36], [0.76, 0.80]], wood.darkened(0.2))
-			_:
-				draw_rect(Rect2(_p(0.18, 0.26), Vector2(0.64 * s, 0.52 * s)), tint.darkened(0.4))
-				draw_rect(Rect2(_p(0.18, 0.26), Vector2(0.64 * s, 0.52 * s)), tint, false, 0.035 * s)
-				_stroke([0.18, 0.26], [0.82, 0.78], tint, 0.035)
-				_stroke([0.82, 0.26], [0.18, 0.78], tint, 0.035)
 
 var root: Control
 var panel: PanelContainer
@@ -118,10 +36,11 @@ func _ready() -> void:
 	GameState.wood_changed.connect(func(_c: int) -> void: _refresh())
 	GameState.hunger_changed.connect(func(_f: float) -> void: _refresh())
 	GameState.health_changed.connect(func(_h: int) -> void: _refresh())
-	GameState.supply_collected.connect(func(_c: int, _t: int) -> void: _refresh())
+	GameState.coins_changed.connect(func(_c: int) -> void: _refresh())
 	GameState.meat_changed.connect(func(_r: int, _c: int) -> void: _refresh())
 	GameState.carry_changed.connect(func(_c: bool) -> void: _refresh())
 	GameState.weapon_changed.connect(func(_i: int) -> void: _refresh())
+	GameState.arrows_changed.connect(func(_c: int) -> void: _refresh())
 
 func _label(text: String, font: Font, size: int, colour: Color, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
@@ -223,8 +142,8 @@ func _build() -> void:
 	_add_cell("apples", 1, 0, "Apples", "apple", Color(0.72, 0.20, 0.16))
 	_add_cell("raw", 2, 0, "Raw meat", "meat_raw", Color(0.74, 0.32, 0.31))
 	_add_cell("cooked", 3, 0, "Cooked meat", "meat_cooked", Color(0.60, 0.38, 0.22))
-	_add_cell("log", 4, 0, "Log", "log", UITheme.WOOD)
-	_add_cell("supplies", 5, 0, "Supply caches", "crate", UITheme.GOOD)
+	_add_cell("arrows", 4, 0, "Arrows", "arrow", Color(0.70, 0.66, 0.58))
+	_add_cell("coins", 5, 0, "Coins", "coin", UITheme.ACCENT)
 
 	var cond_y: float = supplies_y + 22.0 + CELL.y * 2.0 + 10.0 + 18.0
 	canvas.add_child(_section("CONDITION", cond_y))
@@ -312,6 +231,8 @@ func _set_cell(id: String, text: String, filled: bool) -> void:
 
 func _icon_for(index: int) -> String:
 	match index:
+		5:
+			return "bow"
 		0:
 			return "rifle"
 		1:
@@ -356,9 +277,8 @@ func _refresh() -> void:
 	_set_cell("apples", "%d" % GameState.apples, GameState.apples > 0)
 	_set_cell("raw", "%d" % GameState.raw_meat, GameState.raw_meat > 0)
 	_set_cell("cooked", "%d" % GameState.cooked_meat, GameState.cooked_meat > 0)
-	_set_cell("log", "1" if GameState.carrying_log else "0", GameState.carrying_log)
-	_set_cell("supplies", "%d / %d" % [GameState.supplies_collected, GameState.SUPPLIES_TOTAL],
-		GameState.supplies_collected > 0)
+	_set_cell("arrows", "%d" % GameState.arrows, GameState.arrows > 0)
+	_set_cell("coins", "%d" % GameState.coins, GameState.coins > 0)
 
 	var hunger: float = GameState.hunger
 	hunger_fill.size.x = (PANEL.x - 50.0) * hunger

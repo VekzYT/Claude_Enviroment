@@ -7,7 +7,10 @@ signal scope_active_changed(active: bool)
 signal knife_cooldown_changed(fraction: float)
 signal hit_marker_triggered
 signal landmark_discovered(landmark_name: String)
-signal supply_collected(count: int, total: int)
+signal coins_changed(amount: int)
+signal arrows_changed(count: int)
+signal bow_acquired
+signal trade_visibility_changed(open: bool)
 signal held_item_changed(title: String)
 signal interact_prompt_changed(text: String)
 signal wood_changed(amount: int)
@@ -26,7 +29,6 @@ signal objective_completed(text: String)
 signal meat_changed(raw: int, cooked: int)
 signal tree_felled
 
-const SUPPLIES_TOTAL := 8
 # The horde is not implemented yet, but everything counts down to it: the day
 # chip, the warnings, and the reason to go trade instead of sitting at home.
 const HORDE_DAY := 10
@@ -36,7 +38,12 @@ var player_health := 100
 var current_weapon := 1
 var scope_active := false
 var knife_cooldown_fraction := 0.0
-var supplies_collected := 0
+# What the village trades in. Wood and meat go out, a bow and arrows come
+# back. Everything you sell is priced in these.
+var coins := 0
+var bow_owned := false
+var arrows := 0
+var trade_open := false
 var held_item := "Bare hands"
 var interact_prompt := ""
 var wood := 0
@@ -82,9 +89,35 @@ func trigger_hit_marker() -> void:
 func discover_landmark(landmark_name: String) -> void:
 	landmark_discovered.emit(landmark_name)
 
-func collect_supply() -> void:
-	supplies_collected += 1
-	supply_collected.emit(supplies_collected, SUPPLIES_TOTAL)
+func set_trade_open(value: bool) -> void:
+	trade_open = value
+	trade_visibility_changed.emit(trade_open)
+
+func give_bow() -> void:
+	if bow_owned:
+		return
+	bow_owned = true
+	bow_acquired.emit()
+
+func add_arrows(count: int) -> void:
+	arrows = maxi(arrows + count, 0)
+	arrows_changed.emit(arrows)
+
+func add_coins(amount: int) -> void:
+	coins = maxi(coins + amount, 0)
+	coins_changed.emit(coins)
+
+# True when the purse could cover this, so a shop can grey a row out rather
+# than letting you click a button that quietly does nothing.
+func can_afford(cost: int) -> bool:
+	return coins >= cost
+
+func spend_coins(cost: int) -> bool:
+	if coins < cost:
+		return false
+	coins -= cost
+	coins_changed.emit(coins)
+	return true
 
 func set_held_item(title: String) -> void:
 	held_item = title
@@ -170,7 +203,11 @@ func announce(text: String) -> void:
 	announced.emit(text)
 
 func reset() -> void:
-	supplies_collected = 0
+	coins = 0
+	coins_changed.emit(coins)
+	bow_owned = false
+	arrows = 0
+	arrows_changed.emit(arrows)
 	wood = 0
 	wood_changed.emit(wood)
 	stamina = 1.0

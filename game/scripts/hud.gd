@@ -35,7 +35,9 @@ var hit_marker: Control
 var compass_strip: Control
 var compass_ticks: Array = []
 
-var supply_value: Label
+var coin_value: Label
+var arrow_value: Label
+var arrow_chip: Control
 var wood_value: Label
 var meat_value: Label
 var day_value: Label
@@ -101,7 +103,11 @@ func _ready() -> void:
 	GameState.knife_cooldown_changed.connect(_on_knife_cooldown_changed)
 	GameState.hit_marker_triggered.connect(_on_hit_marker_triggered)
 	GameState.landmark_discovered.connect(_on_landmark_discovered)
-	GameState.supply_collected.connect(_on_supply_collected)
+	GameState.coins_changed.connect(_on_coins_changed)
+	GameState.arrows_changed.connect(_on_arrows_changed)
+	GameState.bow_acquired.connect(func() -> void:
+		if arrow_chip != null:
+			arrow_chip.visible = true)
 	GameState.wood_changed.connect(_on_wood_changed)
 	GameState.day_changed.connect(_on_day_changed)
 	GameState.time_changed.connect(_on_time_changed)
@@ -121,7 +127,7 @@ func _ready() -> void:
 	_on_weapon_changed(GameState.current_weapon)
 	_on_scope_active_changed(GameState.scope_active)
 	_on_knife_cooldown_changed(GameState.knife_cooldown_fraction)
-	_on_supply_collected(GameState.supplies_collected, GameState.SUPPLIES_TOTAL)
+	_on_coins_changed(GameState.coins)
 	_on_wood_changed(GameState.wood)
 	_on_meat_changed(GameState.raw_meat, GameState.cooked_meat)
 	_on_day_changed(GameState.day)
@@ -358,9 +364,9 @@ func _build_chips() -> void:
 	day_caption.custom_minimum_size = Vector2(112, 0)
 	day_row.add_child(day_caption)
 
-	var supplies: Array = _chip(UITheme.GOOD, "SUPPLIES")
-	column.add_child(supplies[0])
-	supply_value = supplies[1]
+	var coins: Array = _chip(UITheme.ACCENT, "COINS")
+	column.add_child(coins[0])
+	coin_value = coins[1]
 
 	var wood: Array = _chip(UITheme.WOOD, "WOOD")
 	column.add_child(wood[0])
@@ -370,6 +376,14 @@ func _build_chips() -> void:
 	var meat: Array = _chip(Color(0.62, 0.22, 0.20), "MEAT")
 	column.add_child(meat[0])
 	meat_value = meat[1]
+
+	# Hidden until Maren sells you a bow -- a count of a thing you cannot own
+	# yet is just clutter.
+	var arrows: Array = _chip(Color(0.70, 0.66, 0.58), "ARROWS")
+	arrow_chip = arrows[0]
+	arrow_value = arrows[1]
+	arrow_chip.visible = GameState.bow_owned
+	column.add_child(arrow_chip)
 
 func _bar(width: float, height: float, fill_colour: Color) -> Array:
 	var holder := Control.new()
@@ -491,7 +505,7 @@ func _build_toast() -> void:
 
 func _build_hints() -> void:
 	hint_label = _label(
-		"WASD move    SHIFT sprint    LMB swing    E interact    TAB pack    M map    F eat    SCROLL swap    ESC pause",
+		"WASD move    SHIFT sprint    CTRL crouch    LMB swing    E interact    TAB pack    M map    F eat    ESC pause",
 		UITheme.body_light(), 14, UITheme.TEXT_FAINT, HORIZONTAL_ALIGNMENT_CENTER)
 	hint_label.name = "Hints"
 	hint_label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -723,10 +737,13 @@ func _on_landmark_discovered(landmark_name: String) -> void:
 	show_toast("Discovered  ·  %s" % landmark_name)
 	Sound.play_ui("ui_toggle", -4.0)
 
-func _on_supply_collected(count: int, total: int) -> void:
-	supply_value.text = "%d/%d" % [count, total]
-	if count > 0:
-		show_toast("Supply cache recovered  ·  %d of %d" % [count, total])
+func _on_coins_changed(amount: int) -> void:
+	coin_value.text = "%d" % amount
+
+func _on_arrows_changed(count: int) -> void:
+	arrow_value.text = "%d" % count
+	if arrow_chip != null and GameState.bow_owned:
+		arrow_chip.visible = true
 
 func _on_wood_changed(amount: int) -> void:
 	wood_value.text = "%d" % amount

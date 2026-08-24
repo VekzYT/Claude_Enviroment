@@ -13,6 +13,12 @@ const WANDER_RADIUS := 22.0
 const ARRIVE_DISTANCE := 1.4
 const NOTICE_DISTANCE := 16.0
 const ALERT_DISTANCE := 24.0
+
+# How big each animal is built, as a multiple of the deer. Applied to the whole
+# body at once rather than to each box, so proportions cannot drift apart.
+const BODY_SCALE := {
+	"deer": 1.0, "boar": 1.0, "hare": 0.34, "elk": 1.26,
+}
 const FLEE_TIME := 7.0
 # How far ahead it checks for a trunk before walking into one.
 const FEELER_LENGTH := 2.2
@@ -24,6 +30,8 @@ enum State { GRAZE, WANDER, ALERT, FLEE, DEAD }
 @export var walk_speed := 1.9
 @export var run_speed := 7.4
 @export var body_tint: Color = Color(0.44, 0.32, 0.21)
+# Multiplies how far off it spots you. A hare is jumpy, a boar barely cares.
+@export var wariness := 1.0
 
 var health := 0
 var state: int = State.GRAZE
@@ -82,6 +90,10 @@ func _build() -> void:
 	if species == "boar":
 		tall = 0.62
 		length = 1.12
+	elif species == "hare":
+		tall = 0.74
+		length = 0.92
+	body_root.scale = Vector3.ONE * float(BODY_SCALE.get(species, 1.0))
 
 	_part(body_root, Vector3(0, tall, 0), Vector3(0.46, 0.5, length), hide_mat)
 	_part(body_root, Vector3(0, tall - 0.06, -length * 0.42), Vector3(0.42, 0.42, 0.3), hide_mat)
@@ -95,11 +107,20 @@ func _build() -> void:
 	var neck_len: float = 0.42
 	if species == "boar":
 		neck_len = 0.2
+	elif species == "hare":
+		neck_len = 0.14
 	_part(head_pivot, Vector3(0, 0, -neck_len * 0.5), Vector3(0.24, 0.26, neck_len), hide_mat)
 	_part(head_pivot, Vector3(0, 0.02, -neck_len - 0.14), Vector3(0.22, 0.22, 0.34), hide_mat)
 	_part(head_pivot, Vector3(0, -0.02, -neck_len - 0.31), Vector3(0.15, 0.14, 0.12), dark)
 
-	if species == "deer":
+	if species == "hare":
+		# All ears. They are most of what you see of one before it goes.
+		for side in [-1.0, 1.0]:
+			_part(head_pivot, Vector3(0.07 * side, 0.30, -neck_len - 0.02),
+				Vector3(0.09, 0.52, 0.06), pale, Vector3(-8, 0, 13 * side))
+		_part(body_root, Vector3(0, tall + 0.10, length * 0.5),
+			Vector3(0.2, 0.2, 0.18), pale)
+	elif species == "deer" or species == "elk":
 		# Ears out to the sides, and a pair of simple antlers.
 		for side in [-1.0, 1.0]:
 			_part(head_pivot, Vector3(0.11 * side, 0.12, -neck_len - 0.06),
@@ -133,12 +154,13 @@ func _build() -> void:
 		_part(pivot, Vector3(0, -leg_len + 0.03, 0), Vector3(0.13, 0.1, 0.15), dark)
 		legs.append(pivot)
 
+	var body_size: float = float(BODY_SCALE.get(species, 1.0))
 	var shape := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
-	capsule.radius = 0.36
-	capsule.height = tall + 0.5
+	capsule.radius = 0.36 * body_size
+	capsule.height = (tall + 0.5) * body_size
 	shape.shape = capsule
-	shape.position = Vector3(0, (tall + 0.5) * 0.5, 0)
+	shape.position = Vector3(0, (tall + 0.5) * 0.5 * body_size, 0)
 	add_child(shape)
 
 # --- behaviour ---------------------------------------------------------------
@@ -182,12 +204,20 @@ func _physics_process(delta: float) -> void:
 	# Notices you at a distance and watches; bolts if you keep coming.
 	if state != State.FLEE and player != null:
 		var near: float = global_position.distance_to(player.global_position)
-		if near < NOTICE_DISTANCE:
+		# Crouching shrinks both of these, which is the whole point of it:
+		# walk up on a deer and it bolts at sixteen metres, crawl and you can
+		# get inside seven.
+		var stealth: float = 1.0
+		if player.has_method("stealth_factor"):
+			stealth = float(player.call("stealth_factor"))
+		var notice_at: float = NOTICE_DISTANCE * wariness * stealth
+		var alert_at: float = ALERT_DISTANCE * wariness * stealth
+		if near < notice_at:
 			_spook()
-		elif near < ALERT_DISTANCE and state != State.ALERT:
+		elif near < alert_at and state != State.ALERT:
 			state = State.ALERT
 			state_timer = rng.randf_range(1.4, 2.8)
-		elif near > ALERT_DISTANCE * 1.3 and state == State.ALERT:
+		elif near > alert_at * 1.3 and state == State.ALERT:
 			state = State.GRAZE
 			state_timer = rng.randf_range(2.0, 5.0)
 
@@ -333,6 +363,10 @@ func _drop_meat() -> void:
 	var count: int = 2
 	if species == "boar":
 		count = 3
+	elif species == "elk":
+		count = 4
+	elif species == "hare":
+		count = 1
 	var meat_scene: PackedScene = load("res://scenes/meat_pickup.tscn") as PackedScene
 	for i in count:
 		var meat: Node3D = meat_scene.instantiate() as Node3D

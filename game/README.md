@@ -1,4 +1,4 @@
-# Syfon v2.8.0 — Timberline
+# Syfon v2.9.0 — Elmswood
 
 A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release gives it a clock and a reason to hurry.
 
@@ -7,6 +7,50 @@ You wake outside a log cabin in a forest of rolling hills and four mountain mass
 There is a map on the cabin table showing the whole valley, including the three places where people are still living and still trading. The sun rises and sets, the days count up, and **on day 10 they come**.
 
 **Zombies are not in yet** — the countdown is real, the horde is not there to meet it. Everything else is built around its arrival.
+
+## What's new in v2.9.0
+
+**There is a village now.** Elmswood sits west along the road, behind a log palisade with a gated approach and lit braziers. Eight houses with pitched gable roofs, a stone well, a row of market stalls under cloth awnings, and **Maren**, who runs the middle stall and is the only person in the valley who will trade with you.
+
+It is generated rather than hand-placed, like the forest. Every post, wall and crate asks the terrain how high it is and sits on that, so nothing floats or sinks when the ground changes.
+
+**Trading, and a bow.** Maren buys wood, raw meat, cooked meat and apples, and sells a hunting bow and arrows. Coins replaced the supply-cache counter on the HUD.
+
+| | |
+|---|---|
+| Wood | 3 coins |
+| Raw meat | 6 coins |
+| Cooked meat | 11 coins |
+| Apples | 2 coins |
+| **Hunting bow** | **70 coins** |
+| **Arrows ×6** | **14 coins** |
+
+The bow is item slot **4**. Arrows are a real projectile: they arc under gravity, stick in whatever they miss, and are raycast along each frame's travel rather than moved as a physics body — at 62 m/s a body would jump a metre per frame and tunnel straight through a hare.
+
+**Crouch, on CTRL.** It does not change your collision shape, only how fast you move, how low you look from, and how far off you are noticed. That last one is the point:
+
+| | Deer notices you at |
+|---|---|
+| Sprinting | 23.2 m |
+| Walking | 16.0 m |
+| Standing still | 12.8 m |
+| **Crouched, still** | **6.7 m** |
+
+**Two new animals, and one of them you cannot catch.** A hare runs at **13.5 m/s** against your 9.5 m/s sprint, and is the jumpiest thing in the forest — it spots you at nearly twice a deer's range. It exists to make the bow worth buying. Elk are new too: bigger, slower to spook, and worth four meat.
+
+| | Run speed | Wariness |
+|---|---|---|
+| Boar | 6.4 m/s | 0.78 |
+| Deer | 8.6 m/s | 1.00 |
+| Elk | 9.8 m/s | 0.92 |
+| Hare | 13.5 m/s | 1.65 |
+
+**The supply caches are gone.** All eight orbs, the scene, the script, the HUD counter and the pack slot.
+
+Two bugs found and fixed while building the village:
+
+- **Every roof was a sheared, floating parallelogram.** A `Basis` holds rotation and scale as one matrix, so rotating a node that has already been scaled non-uniformly multiplies the rotation onto the right of `R*S` and shears it instead. Roof panels are composed as `R * scaled(S)` now.
+- **Maren could only be reached from 12 of 36 stances, and pressing E did nothing.** The interaction cone measured both the angle and the range to an interactable's *origin* — which for a person is the point between her boots, not where anyone looks. Interactables can now name their own aim point, and she was standing partly inside the stall counter besides. Re-tested: **36 of 36 stances**, and E opens the stall.
 
 ## What's new in v2.8.0
 

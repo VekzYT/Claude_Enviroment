@@ -46,8 +46,12 @@ const STEPS := [
 		"hint": "Press F. Watch the food bar under your stamina.",
 	},
 	{
-		"text": "Stock up before day 10",
-		"hint": "Three places still trade: the watchtower, the convoy and the chapel.",
+		"text": "Find Elmswood and sell what you have",
+		"hint": "West along the road. Wood and meat both fetch coin there.",
+	},
+	{
+		"text": "Buy a bow, and arrows for it",
+		"hint": "The bow is no use empty. Press 4 to draw it.",
 	},
 ]
 
@@ -110,6 +114,10 @@ func _is_done(step: int) -> bool:
 			return GameState.cooked_meat > 0
 		8:
 			return ate_once
+		9:
+			return GameState.coins > 0
+		10:
+			return GameState.bow_owned and GameState.arrows > 0
 		_:
 			return false
 	return false

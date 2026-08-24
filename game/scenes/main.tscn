@@ -1,10 +1,9 @@
-[gd_scene load_steps=56 format=3]
+[gd_scene load_steps=57 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="2_hud"]
 [ext_resource type="Script" path="res://scripts/pause_menu.gd" id="3_pause"]
 [ext_resource type="PackedScene" path="res://scenes/settings_panel.tscn" id="4_settings"]
-[ext_resource type="PackedScene" path="res://scenes/supply_cache.tscn" id="5_supply"]
 [ext_resource type="Script" path="res://scripts/forest_scatter.gd" id="6_forest"]
 [ext_resource type="Script" path="res://scripts/terrain.gd" id="27_terrain"]
 [ext_resource type="PackedScene" path="res://scenes/axe_pickup.tscn" id="28_axe"]
@@ -16,6 +15,8 @@
 [ext_resource type="Script" path="res://scripts/campfire.gd" id="34_campfire"]
 [ext_resource type="Script" path="res://scripts/inventory_screen.gd" id="35_pack"]
 [ext_resource type="Script" path="res://scripts/wildlife.gd" id="36_wildlife"]
+[ext_resource type="Script" path="res://scripts/village.gd" id="38_village"]
+[ext_resource type="Script" path="res://scripts/trade_screen.gd" id="39_trade"]
 [ext_resource type="Script" path="res://scripts/objectives.gd" id="37_guide"]
 [ext_resource type="Script" path="res://scripts/landmarks.gd" id="7_landmarks"]
 [ext_resource type="Shader" path="res://shaders/ocean.gdshader" id="8_water"]
@@ -1043,30 +1044,6 @@ scale = Vector3(2.2, 0.9, 0.12)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("Mat_wood")
 
-[node name="Supply1" parent="." instance=ExtResource("5_supply")]
-position = Vector3(-90, 12.9, -95)
-
-[node name="Supply2" parent="." instance=ExtResource("5_supply")]
-position = Vector3(-40, 7.1, -130)
-
-[node name="Supply3" parent="." instance=ExtResource("5_supply")]
-position = Vector3(95, 0.9, -85)
-
-[node name="Supply4" parent="." instance=ExtResource("5_supply")]
-position = Vector3(126, 0.9, 44)
-
-[node name="Supply5" parent="." instance=ExtResource("5_supply")]
-position = Vector3(-120, 0.9, -95)
-
-[node name="Supply6" parent="." instance=ExtResource("5_supply")]
-position = Vector3(-144, 0.9, -30)
-
-[node name="Supply7" parent="." instance=ExtResource("5_supply")]
-position = Vector3(30, 0.9, 140)
-
-[node name="Supply8" parent="." instance=ExtResource("5_supply")]
-position = Vector3(60, 0.9, -52)
-
 [node name="HomeFloor" type="StaticBody3D" parent="."]
 
 [node name="HomeFloorMesh" type="MeshInstance3D" parent="HomeFloor"]
@@ -1444,6 +1421,12 @@ script = ExtResource("33_mapscreen")
 
 [node name="InventoryScreen" type="CanvasLayer" parent="." groups=["inventory_screen"]]
 script = ExtResource("35_pack")
+
+[node name="TradeScreen" type="CanvasLayer" parent="." groups=["trade_screen"]]
+script = ExtResource("39_trade")
+
+[node name="Village" type="Node3D" parent="."]
+script = ExtResource("38_village")
 
 [node name="Wildlife" type="Node3D" parent="."]
 script = ExtResource("36_wildlife")
