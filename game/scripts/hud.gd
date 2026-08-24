@@ -762,7 +762,7 @@ func _on_hit_marker_triggered() -> void:
 
 func _on_landmark_discovered(landmark_name: String) -> void:
 	show_toast("Discovered  ·  %s" % landmark_name)
-	Sound.play_ui("ui_toggle", -4.0)
+	Sound.play_ui("ui_discover", -5.0)
 
 func _on_coins_changed(amount: int) -> void:
 	coin_value.text = "%d" % amount

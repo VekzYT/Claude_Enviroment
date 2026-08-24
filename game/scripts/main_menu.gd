@@ -29,6 +29,7 @@ var mist_a_home := 0.0
 var mist_b_home := 0.0
 
 func _ready() -> void:
+	Sound.set_in_menu(true)
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	theme = UITheme.menu_theme()
 
@@ -76,7 +77,7 @@ func _ready() -> void:
 	settings_panel.back_pressed.connect(_on_settings_back)
 	for button in [play_button, settings_button, quit_button]:
 		(button as Button).mouse_entered.connect(func() -> void:
-			Sound.play_ui("ui_toggle", -18.0)
+			Sound.play_ui("ui_hover", -8.0)
 		)
 	play_button.grab_focus()
 
@@ -151,12 +152,13 @@ func _build_mist(tint: Color) -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 func _on_play_pressed() -> void:
-	Sound.play_ui("reload_click", -6.0)
+	Sound.play_ui("ui_click", -5.0)
 	GameState.reset()
+	Sound.set_in_menu(false)
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 func _on_settings_pressed() -> void:
-	Sound.play_ui("reload_click", -6.0)
+	Sound.play_ui("ui_click", -5.0)
 	button_box.visible = false
 	settings_panel.visible = true
 

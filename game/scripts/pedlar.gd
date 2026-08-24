@@ -89,7 +89,7 @@ func _arrive() -> void:
 	_pick_target()
 	timer = rng.randf_range(3.0, 7.0)
 	GameState.announce("A pedlar has come by the cabin. Press E to see what he has.")
-	Sound.play_ui("ui_toggle", -6.0)
+	Sound.play_ui("ui_discover", -5.0)
 
 func _ground(x: float, z: float) -> float:
 	if terrain == null:

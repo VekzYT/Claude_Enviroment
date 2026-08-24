@@ -338,16 +338,27 @@ func hit(damage: int) -> void:
 		return
 	health -= damage
 	_spook()
+	Sound.play_3d("animal_hurt", global_position + Vector3(0, 0.8, 0), -5.0)
 	Effects.spawn_blood(global_position + Vector3(0, 0.8, 0), Vector3.UP)
 	if health <= 0:
 		_die()
 	else:
-		Sound.play_3d("bot_alert", global_position, -6.0)
+		Sound.play_3d(_alert_sound(), global_position, -8.0)
+
+# Each species has its own voice, so a startled hare and a startled boar do not
+# make the same noise.
+func _alert_sound() -> String:
+	match species:
+		"boar":
+			return "boar_grunt"
+		"hare":
+			return "hare_squeak"
+	return "deer_call"
 
 func _die() -> void:
 	state = State.DEAD
 	velocity = Vector3.ZERO
-	Sound.play_3d("bot_death", global_position, -4.0)
+	Sound.play_3d("animal_death", global_position, -4.0)
 	GameState.announce("%s down. Take the meat." % species.capitalize())
 
 	# Topple onto its side, then leave meat where it fell.

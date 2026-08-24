@@ -86,7 +86,7 @@ func interact(_player: Node) -> void:
 	taken = true
 	GameState.add_apples(1)
 	GameState.announce("Apple picked up.")
-	Sound.play_ui("weapon_switch", -10.0)
+	Sound.play_ui("pickup_food", -8.0)
 	var tween: Tween = create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(self, "position:y", position.y + 0.5, 0.2)

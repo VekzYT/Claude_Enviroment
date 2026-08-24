@@ -15,6 +15,8 @@ const RES := 192
 func _ready() -> void:
 	add_to_group("pond")
 	_bake_bed()
+	# Heard from the bank rather than across the whole valley.
+	Sound.attach_loop("amb_water", self, -20.0, 30.0)
 
 func _bake_bed() -> void:
 	var terrain: Node = get_tree().get_first_node_in_group("terrain")

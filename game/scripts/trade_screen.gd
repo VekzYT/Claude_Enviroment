@@ -245,7 +245,7 @@ func _sell(id: String) -> void:
 	var price: int = int(row["price"])
 	_take(id)
 	GameState.add_coins(price)
-	Sound.play_ui("ui_toggle", -9.0)
+	Sound.play_ui("ui_buy", -8.0)
 	note.text = "Sold for %d coins." % price
 	_refresh()
 
@@ -264,7 +264,7 @@ func _buy(id: String) -> void:
 			GameState.add_arrows(ARROW_BUNDLE)
 		"lamp":
 			GameState.give_flashlight()
-	Sound.play_ui("ui_toggle", -7.0)
+	Sound.play_ui("ui_buy", -5.0)
 	note.text = String(item["note"])
 	_refresh()
 
@@ -333,7 +333,7 @@ func open_trade() -> void:
 	tween.set_parallel(true)
 	tween.tween_property(panel, "modulate:a", 1.0, 0.14)
 	tween.tween_property(panel, "scale", Vector2.ONE, 0.16).set_ease(Tween.EASE_OUT)
-	Sound.play_ui("ui_toggle", -10.0)
+	Sound.play_ui("ui_open", -9.0)
 
 func close_trade() -> void:
 	open = false

@@ -16,6 +16,7 @@ var velocity := Vector3.ZERO
 var damage := 46
 var age := 0.0
 var stuck := false
+var hit_was_ground := false
 var shooter: Node = null
 
 func _ready() -> void:
@@ -118,13 +119,21 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# A tree, a wall or the ground: stick in it.
+	hit_was_ground = float(hit.get("normal", Vector3.UP).y) > 0.7
 	_embed(point)
+
+# What the arrow struck, for the thump it makes. Whatever it hit is already
+# gone from the query by this point, so it is decided from the surface angle:
+# anything close to level under the arrow is ground, anything else is timber.
+func _impact_sound() -> String:
+	return "arrow_hit_ground" if hit_was_ground else "arrow_hit_wood"
+
 
 func _embed(point: Vector3) -> void:
 	stuck = true
 	global_position = point - velocity.normalized() * EMBED
 	velocity = Vector3.ZERO
-	Sound.play_3d("knife_hit", global_position, -14.0)
+	Sound.play_3d(_impact_sound(), global_position, -6.0)
 	# Left lying a while so a missed shot is visible, then cleaned up.
 	var tween: Tween = create_tween()
 	tween.tween_interval(12.0)

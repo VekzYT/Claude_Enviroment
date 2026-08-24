@@ -114,7 +114,7 @@ func _announce_day() -> void:
 		GameState.announce("Day %d. %d days until they come." % [GameState.day, left])
 	else:
 		GameState.announce("Day %d." % GameState.day)
-	Sound.play_ui("ui_toggle", -6.0)
+	Sound.play_ui("day_change", -7.0)
 
 # Samples a keyframe list by time of day, wrapping at midnight.
 func _sample(keys: Array, t: float) -> Dictionary:

@@ -74,7 +74,7 @@ func interact(_player: Node) -> void:
 	else:
 		GameState.add_raw_meat(1)
 		GameState.announce("Raw meat taken. Cook it over a fire.")
-	Sound.play_ui("weapon_switch", -10.0)
+	Sound.play_ui("pickup_meat", -8.0)
 	var tween: Tween = create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(self, "position:y", position.y + 0.4, 0.18)

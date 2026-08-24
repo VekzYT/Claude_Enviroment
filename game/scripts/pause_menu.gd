@@ -67,7 +67,7 @@ func open() -> void:
 	dimmer.visible = true
 	menu_box.visible = true
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	Sound.play_ui("ui_toggle", -8.0)
+	Sound.play_ui("ui_open", -8.0)
 	# The panel drops in even while the tree is paused, which is why the tween
 	# has to be told to ignore the pause it was opened by.
 	menu_box.modulate.a = 0.0

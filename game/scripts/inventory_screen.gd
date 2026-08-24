@@ -381,7 +381,7 @@ func open_pack() -> void:
 	tween.set_parallel(true)
 	tween.tween_property(panel, "modulate:a", 1.0, 0.14)
 	tween.tween_property(panel, "scale", Vector2.ONE, 0.16).set_ease(Tween.EASE_OUT)
-	Sound.play_ui("ui_toggle", -10.0)
+	Sound.play_ui("ui_open", -9.0)
 
 func close_pack() -> void:
 	open = false

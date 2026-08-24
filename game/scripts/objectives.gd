@@ -135,7 +135,7 @@ func note_ate() -> void:
 
 func _advance() -> void:
 	GameState.objective_completed.emit(String(STEPS[index]["text"]))
-	Sound.play_ui("ui_toggle", -8.0)
+	Sound.play_ui("ui_objective", -7.0)
 	index += 1
 	if index >= STEPS.size():
 		finished = true

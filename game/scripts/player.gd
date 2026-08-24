@@ -161,6 +161,24 @@ const GRIP_LOW := Vector3(0.0, -0.06, 0.0)
 const ARM_TWIST_L := 52.0
 const ARM_TWIST_R := -52.0
 
+# The bow arm closes on the riser, in the bow's own space, and stays there --
+# that one is a real grip on a real point of the model.
+const BOW_GRIP := Vector3(0.012, -0.012, 0.0)
+# The string hand is not. Aiming it at the model's nock put both hands on the
+# same few centimetres in the middle of the screen, and the two forearms crossed
+# into a V that hid the entire bow. On screen the drawing hand belongs beside
+# the jaw -- right of centre and close to the eye -- so it is posed there
+# directly and travels between these two points with the draw.
+# Depth matters more than it looks: a hand twenty centimetres from the lens
+# fills the whole corner of the screen, so the draw is nearly all lift and
+# barely any travel toward the eye.
+const BOW_HAND_READY := Vector3(0.245, -0.445, -0.30)
+const BOW_HAND_DRAWN := Vector3(0.265, -0.27, -0.38)
+# Rolled the other way from the axe: the bow hand is knuckles-out around the
+# riser, the string hand palm-in beside the jaw.
+const BOW_TWIST_L := 14.0
+const BOW_TWIST_R := -30.0
+
 var arm_left_rest: Transform3D
 var arm_right_rest: Transform3D
 var grip_blend := 0.0
@@ -275,7 +293,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.keycode == KEY_L:
 			if GameState.flashlight_owned:
 				GameState.set_flashlight_on(not GameState.flashlight_on)
-				Sound.play_ui("ui_toggle", -12.0)
+				Sound.play_ui("lamp_on" if GameState.flashlight_on else "lamp_off", -6.0)
 			else:
 				GameState.announce("You have no lamp. The pedlar sells one.")
 		elif event.keycode == KEY_B:
@@ -669,6 +687,38 @@ func _build_flashlight() -> void:
 	camera.add_child(flashlight)
 
 # A lit lamp is the least stealthy thing in the forest.
+# What is under your boots, for the footstep set. The ray is short and starts
+# just above the feet, so it reports the thing you are standing on rather than
+# whatever the camera happens to be pointing at.
+func surface_under_foot() -> String:
+	if global_position.y < TerrainGrid.WATER_LEVEL + 0.35 and _near_pond():
+		return "water"
+	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	var from: Vector3 = global_position + Vector3(0, 0.3, 0)
+	var query := PhysicsRayQueryParameters3D.create(from, from + Vector3(0, -1.4, 0))
+	query.exclude = [get_rid()]
+	var hit: Dictionary = space.intersect_ray(query)
+	if hit.is_empty():
+		return "dirt"
+	var body: Object = hit.get("collider")
+	if body is Node:
+		var node: Node = body as Node
+		if node.is_in_group("player_wall") or String(node.name).begins_with("Home") \
+				or String(node.name).begins_with("Built"):
+			return "wood"
+		if node.is_in_group("rocks"):
+			return "stone"
+	# Bare ground: the terrain paints dirt into roads and clearings, so use the
+	# same test the map does rather than guessing from the height.
+	var terrain: Node = get_tree().get_first_node_in_group("terrain")
+	if terrain != null and terrain.has_method("in_clearing"):
+		if bool(terrain.call("in_clearing", Vector2(global_position.x, global_position.z), 0.0, 7.0)):
+			return "dirt"
+	return "grass"
+
+func _near_pond() -> bool:
+	return Vector2(global_position.x - 60.0, global_position.z + 30.0).length() < 18.0
+
 func stealth_factor() -> float:
 	var pace: float = Vector2(velocity.x, velocity.z).length()
 	var factor: float = 1.0
@@ -701,7 +751,10 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= GRAVITY * delta
 
 	if is_on_floor() and not was_on_floor:
-		Sound.play_3d("land", global_position, -6.0)
+		# Hard landings are the ones you feel, so they get their own sound.
+		var drop: float = absf(velocity.y)
+		Sound.play_3d("land_hard" if drop > 7.0 else "land_soft", global_position,
+			-8.0 + clampf(drop * 0.4, 0.0, 5.0))
 	was_on_floor = is_on_floor()
 
 	# Edge-triggered: holding space used to re-fire every frame you touched down.
@@ -725,7 +778,10 @@ func _physics_process(delta: float) -> void:
 	input_dir = input_dir.normalized()
 
 	var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+	var was_crouching: bool = crouching
 	crouching = Input.is_physical_key_pressed(KEY_CTRL) and not carrying_log
+	if crouching != was_crouching:
+		Sound.play_ui("crouch_down" if crouching else "crouch_up", -16.0)
 	var wants_sprint: bool = Input.is_physical_key_pressed(KEY_SHIFT) and direction.length_squared() > 0.01
 	# A log on your shoulder is too heavy to run with, and you cannot sprint
 	# out of a crouch without standing up first.
@@ -845,7 +901,8 @@ func update_view_bob(delta: float, moving: bool, horizontal_speed: float, strafe
 		var step: int = int(bob_time / PI)
 		if step != footstep_step:
 			footstep_step = step
-			Sound.play_3d("footstep", global_position, -10.0)
+			Sound.play_step(surface_under_foot(), global_position,
+				-13.0 if crouching else -9.0)
 	else:
 		bob_fade = move_toward(bob_fade, 0.0, delta * 4.0)
 
@@ -894,7 +951,7 @@ func start_reload() -> void:
 	is_reloading = true
 	reload_progress = 0.0
 	can_shoot = false
-	Sound.play_ui("bolt_cycle" if idx == WEAPON_SNIPER else "reload_click", -4.0)
+	Sound.play_ui("weapon_switch", -6.0)
 
 func update_reload(delta: float) -> void:
 	if is_reloading:
@@ -943,21 +1000,34 @@ func primary_action() -> void:
 		shoot()
 
 const ARROW_SCENE: PackedScene = preload("res://scenes/arrow.tscn")
-const BOW_DRAW_TIME := 0.42
+# Slow to draw, quick to loose.
+const BOW_DRAW_TIME := 0.55
+const BOW_SNAP_TIME := 0.16
+# How far the nock travels back, in the bow model's own units.
+const BOW_DRAW_LENGTH := 0.26
+const BOW_ARROW_REST := -0.30
 
-var bow_draw := 0.0
+var bow_pull := 0.0
+var bow_released := 0.0
+var bow_hum := 0.0
 var bow_cooldown := 0.0
+var bow_drew_sound := true
 
 func loose_arrow() -> void:
-	if bow_cooldown > 0.0:
+	# Not until the string is back. Without this you could click faster than the
+	# draw and fire a bow that is visibly still hanging at your side.
+	if bow_cooldown > 0.0 or bow_pull < 0.85:
 		return
 	if GameState.arrows <= 0:
 		GameState.announce("No arrows. The pedlar sells them.")
-		Sound.play_ui("reload_click", -10.0)
+		Sound.play_ui("ui_denied", -8.0)
 		return
 	GameState.add_arrows(-1)
 	bow_cooldown = float(weapon_fire_cooldown[ITEM_BOW])
-	bow_draw = 1.0
+	bow_released = 1.0
+	bow_pull = 0.0
+	bow_hum = 1.0
+	bow_drew_sound = false
 
 	var arrow: Node3D = ARROW_SCENE.instantiate() as Node3D
 	get_tree().current_scene.add_child(arrow)
@@ -966,25 +1036,98 @@ func loose_arrow() -> void:
 	var origin: Vector3 = camera.global_position + camera.global_transform.basis.z * -0.5
 	arrow.call("launch", origin, -camera.global_transform.basis.z,
 		int(weapon_damage[ITEM_BOW]), self)
-	Sound.play_3d("knife_swing", global_position, -6.0)
+	Sound.play_3d("axe_swing" if current_weapon_index == ITEM_AXE else "swing_light",
+		global_position, -8.0)
 	camera_kick += deg_to_rad(1.2)
 
 # The bow is drawn back as it recovers, so the string and the nocked arrow show
 # the shot being readied rather than snapping between two poses.
+# The bow's whole animation.
+#
+# `bow_pull` is 0 the instant an arrow leaves and climbs back to 1 as the next
+# one is drawn, which is the opposite of the value the first version tracked and
+# the reason the old animation played backwards: the string crept forward as you
+# nocked and snapped back as you loosed.
+#
+# Five things move together, because moving only the string is what made it read
+# as a prop rather than a bow: the string's nock point, the arrow riding on it,
+# both limb tips flexing, and the bow itself coming up to the eye.
 func update_bow(delta: float) -> void:
 	if bow_cooldown > 0.0:
 		bow_cooldown = maxf(bow_cooldown - delta, 0.0)
-	bow_draw = move_toward(bow_draw, 0.0, delta / BOW_DRAW_TIME)
+
+	var drawing: bool = current_weapon_index == ITEM_BOW and GameState.arrows > 0
+	# Loosing is fast and drawing is slow, which is most of what sells it.
+	if bow_released > 0.0:
+		bow_released = maxf(bow_released - delta / BOW_SNAP_TIME, 0.0)
+		bow_pull = 0.0
+	elif drawing:
+		bow_pull = move_toward(bow_pull, 1.0, delta / BOW_DRAW_TIME)
+	else:
+		bow_pull = move_toward(bow_pull, 0.0, delta / BOW_DRAW_TIME)
+
+	if not bow_drew_sound and bow_pull > 0.45 and drawing:
+		bow_drew_sound = true
+		Sound.play_2d("bow_draw", -15.0, 0.05)
+
+	# The string keeps ringing for a moment after the shot.
+	bow_hum = maxf(bow_hum - delta * 3.4, 0.0)
+
 	if weapon_bow == null:
 		return
-	var nocked: Node3D = weapon_bow.get_node_or_null("NockedArrow")
+
+	# Eased so the last of the draw is slower than the first, the way the last
+	# inch of a real draw is the hardest.
+	var pull: float = bow_pull * bow_pull * (3.0 - 2.0 * bow_pull)
+	var ring: float = sin(bow_hum * 46.0) * bow_hum * 0.012
+
 	var string_root: Node3D = weapon_bow.get_node_or_null("String")
-	var ready_shot: bool = GameState.arrows > 0 and bow_cooldown <= 0.0
-	if nocked != null:
-		nocked.visible = ready_shot and current_weapon_index == ITEM_BOW
-		nocked.position.z = -0.16 + bow_draw * 0.1
+	var upper: Node3D = weapon_bow.get_node_or_null("StringUpper")
+	var lower: Node3D = weapon_bow.get_node_or_null("StringLower")
 	if string_root != null:
-		string_root.position.z = bow_draw * 0.06
+		upper = string_root.get_node_or_null("StringUpper")
+		lower = string_root.get_node_or_null("StringLower")
+		# The nock travels back toward the cheek, plus the ring after release.
+		string_root.position.z = pull * BOW_DRAW_LENGTH + ring
+	# Each half of the string leans in to meet the drawn nock, so the string
+	# forms a V instead of staying a straight line that has slid backwards.
+	var lean: float = deg_to_rad(26.0) * pull
+	if upper != null:
+		upper.rotation.x = lean
+	if lower != null:
+		lower.rotation.x = -lean
+
+	# Limbs bend toward the archer as the string comes back.
+	var flex: float = deg_to_rad(13.0) * pull
+	for pair in [["LimbUpper", 1.0], ["TipUpper", 1.6], ["LimbLower", -1.0], ["TipLower", -1.6]]:
+		var limb: Node3D = weapon_bow.get_node_or_null(String(pair[0]))
+		if limb != null:
+			limb.rotation.x = flex * float(pair[1])
+
+	var shown: bool = drawing and bow_released <= 0.0
+	var shaft_z: float = BOW_ARROW_REST + pull * BOW_DRAW_LENGTH + ring
+	var nocked: Node3D = weapon_bow.get_node_or_null("NockedArrow")
+	if nocked != null:
+		# Visible from the moment you have one to draw until it leaves.
+		nocked.visible = shown
+		nocked.position.z = shaft_z
+	# The head sits at the front of the shaft and travels with it.
+	var head_node: Node3D = weapon_bow.get_node_or_null("ArrowHead")
+	if head_node != null:
+		head_node.visible = shown
+		head_node.position.z = shaft_z - 0.32
+
+	# The bow itself: dropped and turned out at rest, up in front of the eye at
+	# full draw, with a kick back and up on release.
+	var rest_pos: Vector3 = weapon_hip_positions[ITEM_BOW]
+	var rest_rot: Vector3 = weapon_hip_rotations[ITEM_BOW]
+	# Drawn, it comes up and across in front of the eye and squares up to the
+	# target; at rest it drops away and turns out.
+	var aimed_pos: Vector3 = rest_pos + Vector3(-0.03, 0.09, 0.07)
+	var aimed_rot: Vector3 = rest_rot + Vector3(0.0, deg_to_rad(-9.0), deg_to_rad(-4.0))
+	var kick: float = bow_released * bow_released
+	weapon_bow.position = rest_pos.lerp(aimed_pos, pull) + Vector3(0.0, 0.012, 0.05) * kick
+	weapon_bow.rotation = rest_rot.lerp(aimed_rot, pull) + Vector3(deg_to_rad(-4.0) * kick, 0.0, 0.0)
 
 func start_melee() -> void:
 	if is_meleeing or is_switching:
@@ -1003,7 +1146,7 @@ func start_melee() -> void:
 		knife_dash_timer = KNIFE_DASH_DURATION
 		knife_dash_direction = -transform.basis.z
 		knife_cooldown_timer = KNIFE_COOLDOWN
-	Sound.play_3d("knife_swing", camera.global_position, -4.0)
+	Sound.play_3d("bow_release", camera.global_position, -4.0)
 
 func update_melee(delta: float) -> void:
 	chop_shake = move_toward(chop_shake, 0.0, delta * 6.0)
@@ -1081,14 +1224,14 @@ func perform_melee_hit() -> void:
 			outcome = forest.call("chop", shape_node, AXE_CHOP_DAMAGE)
 		if bool(outcome.get("hit", false)):
 			Effects.spawn_wood_chips(result.position, result.normal)
-			Sound.play_3d("knife_hit", result.position, -1.0)
+			Sound.play_3d("axe_hit_wood", result.position, -2.0)
 			camera_kick += deg_to_rad(3.4)
 			chop_shake = 1.0
 			GameState.trigger_hit_marker()
 			if bool(outcome.get("felled", false)):
 				GameState.report_tree_felled()
 				GameState.announce("Timber! Carry the log to your block.")
-				Sound.play_3d("land", result.position, 2.0)
+				Sound.play_3d("tree_fall", result.position, 0.0, 0.04, 90.0)
 				camera_kick += deg_to_rad(6.0)
 			return
 
@@ -1099,7 +1242,7 @@ func perform_melee_hit() -> void:
 		if forest == null:
 			forest = get_tree().get_first_node_in_group("forest")
 		if forest != null and bool(forest.call("is_tree", bare_shape)):
-			Sound.play_3d("knife_hit", result.position, -12.0)
+			Sound.play_3d("axe_hit_wood", result.position, -14.0)
 			camera_kick += deg_to_rad(1.2)
 			GameState.announce("You need an axe to fell this.")
 			return
@@ -1113,7 +1256,7 @@ func perform_melee_hit() -> void:
 			chop_shake = 0.6
 			return
 		Effects.spawn_blood(result.position, result.normal)
-		Sound.play_3d("knife_hit", result.position, -2.0)
+		Sound.play_3d("arrow_hit_flesh", result.position, -4.0)
 		camera_kick += deg_to_rad(5.0)
 		GameState.trigger_hit_marker()
 
@@ -1219,18 +1362,40 @@ func update_hands(delta: float) -> void:
 	hands.position = hands.position.lerp(target_pos, clampf(delta * settle, 0.0, 1.0))
 	hands.rotation = hands.rotation.lerp(target_rot, clampf(delta * settle, 0.0, 1.0))
 
-	# With the axe out, both hands leave their resting pose and take hold of the
-	# haft. update_weapon_transform() has already placed the axe for this frame,
-	# so the grip points below are exactly where the wood is right now.
+	# Whatever is in hand, the arms go and take hold of it rather than hanging in
+	# their resting pose while the weapon floats in front of them.
+	# update_weapon_transform() has already placed the weapon for this frame, so
+	# the grip points below are exactly where the wood is right now.
 	var want_grip: float = 0.0
+	# Default to each arm's own resting palm, so that while the grip is fading
+	# out after a weapon is put away the arms ease back to rest instead of
+	# swinging at the origin of the hand rig.
+	var grip_l: Vector3 = arm_left_rest.origin
+	var grip_r: Vector3 = arm_right_rest.origin
+	var twist_l: float = ARM_TWIST_L
+	var twist_r: float = ARM_TWIST_R
+	var to_hands: Transform3D = hands.transform.affine_inverse()
+
 	if idx == ITEM_AXE and not carrying_log:
 		want_grip = 1.0
+		var axe_xf: Transform3D = weapon_axe.transform
+		grip_l = to_hands * (axe_xf * GRIP_LOW)
+		grip_r = to_hands * (axe_xf * GRIP_HIGH)
+	elif idx == ITEM_BOW and not carrying_log and weapon_bow != null:
+		want_grip = 1.0
+		# The bow arm reaches the riser wherever the animation has put it, so it
+		# stays on the grip through the whole draw and the recoil after it.
+		grip_l = to_hands * (weapon_bow.transform * BOW_GRIP)
+		# The string arm is posed, not tracked: it comes up beside the jaw as
+		# the draw fills and drops back when there is nothing nocked.
+		var pull: float = clampf(bow_pull, 0.0, 1.0)
+		grip_r = BOW_HAND_READY.lerp(BOW_HAND_DRAWN, pull * pull * (3.0 - 2.0 * pull))
+		twist_l = BOW_TWIST_L
+		twist_r = BOW_TWIST_R
 	grip_blend = move_toward(grip_blend, want_grip, delta * 5.0)
 
-	var to_hands: Transform3D = hands.transform.affine_inverse()
-	var axe_xf: Transform3D = weapon_axe.transform
-	pose_arm(arm_left, arm_left_rest, to_hands * (axe_xf * GRIP_LOW), ARM_TWIST_L, delta)
-	pose_arm(arm_right, arm_right_rest, to_hands * (axe_xf * GRIP_HIGH), ARM_TWIST_R, delta)
+	pose_arm(arm_left, arm_left_rest, grip_l, twist_l, delta)
+	pose_arm(arm_right, arm_right_rest, grip_r, twist_r, delta)
 	# The fingers close as the hands arrive, so the grip is a fist on the haft
 	# rather than an open palm resting against it.
 	arm_left.call("set_grip", grip_blend)

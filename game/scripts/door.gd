@@ -93,7 +93,7 @@ func _process(delta: float) -> void:
 
 func toggle() -> void:
 	is_open = not is_open
-	Sound.play_3d("land", global_position, -12.0)
+	Sound.play_3d("door_open" if is_open else "door_close", global_position, -6.0)
 
 func interact_point() -> Vector3:
 	return global_position + Vector3(0.0, 0.2, 0.0)

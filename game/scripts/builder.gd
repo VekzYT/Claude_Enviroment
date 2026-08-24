@@ -131,7 +131,7 @@ func start() -> void:
 	placing_item = ""
 	ghost.visible = true
 	GameState.set_build_mode(true)
-	Sound.play_ui("ui_toggle", -10.0)
+	Sound.play_ui("ui_open", -11.0)
 
 # Called from the pack: arms the ghost with an item instead of a build piece.
 func begin_placing(item: String) -> void:
@@ -146,7 +146,7 @@ func begin_placing(item: String) -> void:
 	GameState.set_build_mode(true)
 	GameState.announce("Setting down %s. Left click to place, B to stop." %
 		String(PLACEABLES[item]["name"]).to_lower())
-	Sound.play_ui("ui_toggle", -12.0)
+	Sound.play_ui("ui_open", -12.0)
 
 func stop() -> void:
 	active = false
@@ -161,13 +161,13 @@ func cycle(step: int) -> void:
 	# time rather than scrolling through your pack in the world.
 	placing_item = ""
 	piece = wrapi(piece + step, 0, PIECES.size())
-	Sound.play_ui("ui_toggle", -16.0)
+	Sound.play_ui("build_cycle", -10.0)
 
 func rotate_ghost() -> void:
 	if not active:
 		return
 	yaw_step = (yaw_step + 1) % 4
-	Sound.play_ui("ui_toggle", -16.0)
+	Sound.play_ui("build_cycle", -10.0)
 
 func _has_item(item: String) -> bool:
 	match item:
@@ -290,7 +290,7 @@ func place() -> void:
 			_build_wall(body, spec)
 
 	built.append(body)
-	Sound.play_3d("land", body.global_position, -4.0)
+	Sound.play_3d("build_place", body.global_position, -3.0)
 	GameState.announce("%s up. %d wood left." % [String(spec["name"]), GameState.wood])
 
 func _place_item() -> void:
@@ -307,7 +307,7 @@ func _place_item() -> void:
 	node.set("kind", item)
 	get_tree().current_scene.add_child(node)
 	node.global_transform = ghost_xf
-	Sound.play_3d("land", node.global_position, -12.0)
+	Sound.play_3d("place_item", node.global_position, -8.0)
 	if not _has_item(item):
 		stop()
 
@@ -427,4 +427,4 @@ func remove() -> void:
 	target.queue_free()
 	GameState.add_wood(back)
 	GameState.announce("Pulled down. %d wood back." % back)
-	Sound.play_ui("ui_toggle", -12.0)
+	Sound.play_ui("ui_open", -12.0)

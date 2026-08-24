@@ -24,6 +24,8 @@ var cooking := 0
 var cook_progress := 0.0
 var ready_meat := 0
 var spit: Node3D = null
+var fire_voice: AudioStreamPlayer3D = null
+var cook_voice: AudioStreamPlayer3D = null
 
 func _ready() -> void:
 	add_to_group("interactable")
@@ -35,6 +37,7 @@ func _ready() -> void:
 	_build_embers()
 	_build_particles()
 	_build_light()
+	_start_loops()
 	_build_interaction_volume()
 
 func _material(colour: Color, roughness: float) -> StandardMaterial3D:
@@ -241,6 +244,10 @@ func _build_particles() -> void:
 	smoke.position = Vector3(0, 0.4, 0)
 	add_child(smoke)
 
+# The fire holds its own voice for as long as it burns.
+func _start_loops() -> void:
+	fire_voice = Sound.attach_loop("fire_loop", self, -13.0, 26.0)
+
 func _build_light() -> void:
 	light = OmniLight3D.new()
 	light.name = "FireLight"
@@ -279,7 +286,7 @@ func interact(_player: Node) -> void:
 		GameState.announce("%d cooked meat taken." % ready_meat)
 		ready_meat = 0
 		_clear_spit()
-		Sound.play_ui("weapon_switch", -8.0)
+		Sound.play_ui("pickup_meat", -7.0)
 		return
 	if cooking > 0 or GameState.raw_meat <= 0:
 		return
@@ -291,6 +298,8 @@ func interact(_player: Node) -> void:
 
 func _build_spit() -> void:
 	_clear_spit()
+	# The sizzle lives with the spit, so it stops when the meat comes off.
+	cook_voice = Sound.attach_loop("cook_sizzle", self, -16.0, 16.0)
 	spit = Node3D.new()
 	spit.name = "Spit"
 	spit.position = Vector3(0, 0.62, 0)
@@ -333,6 +342,9 @@ func _build_spit() -> void:
 		spit.add_child(cut)
 
 func _clear_spit() -> void:
+	if cook_voice != null and is_instance_valid(cook_voice):
+		cook_voice.queue_free()
+	cook_voice = null
 	if spit != null:
 		spit.queue_free()
 		spit = null
@@ -358,7 +370,7 @@ func _cook(delta: float) -> void:
 		ready_meat = cooking
 		cooking = 0
 		GameState.announce("The meat is done.")
-		Sound.play_ui("ui_toggle", -8.0)
+		Sound.play_ui("cook_done", -6.0)
 
 # Something for the interaction ray to actually strike. Tall enough to be hit
 # from standing height and wide enough to cover the whole ring.

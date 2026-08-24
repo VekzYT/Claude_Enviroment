@@ -52,7 +52,7 @@ func interact(player: Node) -> void:
 	splits_left = SPLITS_PER_LOG
 	_build_round()
 	GameState.announce("Log on the block. Split it with the axe.")
-	Sound.play_3d("land", global_position + Vector3(0, block_top, 0), -2.0)
+	Sound.play_3d("build_place", global_position + Vector3(0, block_top, 0), -3.0)
 
 func _build_round() -> void:
 	if round_node != null:
@@ -100,7 +100,7 @@ func split(hit_point: Vector3) -> int:
 	splits_left -= 1
 	shake = 1.0
 	Effects.spawn_wood_chips(hit_point, Vector3.UP)
-	Sound.play_3d("knife_hit", hit_point, 0.0)
+	Sound.play_3d("axe_split", hit_point, -1.0)
 	GameState.add_wood(WOOD_PER_SPLIT)
 	if splits_left <= 0:
 		loaded = false

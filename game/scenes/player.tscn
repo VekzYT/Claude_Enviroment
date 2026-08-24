@@ -8,8 +8,8 @@ radius = 0.4
 height = 1.8
 
 [sub_resource type="StandardMaterial3D" id="StdMat_bowstave"]
-albedo_color = Color(0.42, 0.28, 0.16, 1)
-roughness = 0.86
+albedo_color = Color(0.6, 0.42, 0.24, 1)
+roughness = 0.7
 
 [sub_resource type="StandardMaterial3D" id="StdMat_bowstring"]
 albedo_color = Color(0.86, 0.84, 0.76, 1)
@@ -371,66 +371,81 @@ mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_leather")
 
 [node name="WeaponBow" type="Node3D" parent="Head/Camera3D"]
-position = Vector3(0.2, -0.26, -0.55)
-rotation_degrees = Vector3(0, -8, 6)
+position = Vector3(0.03, -0.16, -0.92)
+rotation_degrees = Vector3(0, 13, 6)
+scale = Vector3(0.62, 0.62, 0.62)
 
 [node name="Riser" type="MeshInstance3D" parent="Head/Camera3D/WeaponBow"]
-scale = Vector3(0.03, 0.19, 0.035)
+scale = Vector3(0.036, 0.22, 0.046)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_bowstave")
 
 [node name="Grip" type="MeshInstance3D" parent="Head/Camera3D/WeaponBow"]
-scale = Vector3(0.038, 0.09, 0.044)
+position = Vector3(0.006, -0.01, 0)
+scale = Vector3(0.046, 0.1, 0.056)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_polymer_black")
+
+[node name="Shelf" type="MeshInstance3D" parent="Head/Camera3D/WeaponBow"]
+position = Vector3(-0.03, 0.05, 0)
+scale = Vector3(0.05, 0.016, 0.05)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_polymer_black")
 
 [node name="LimbUpper" type="MeshInstance3D" parent="Head/Camera3D/WeaponBow"]
-position = Vector3(-0.026, 0.2, 0)
-rotation_degrees = Vector3(0, 0, 16)
-scale = Vector3(0.022, 0.24, 0.028)
+position = Vector3(-0.048, 0.245, 0)
+rotation_degrees = Vector3(0, 0, 21)
+scale = Vector3(0.026, 0.3, 0.036)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_bowstave")
 
 [node name="LimbLower" type="MeshInstance3D" parent="Head/Camera3D/WeaponBow"]
-position = Vector3(-0.026, -0.2, 0)
-rotation_degrees = Vector3(0, 0, -16)
-scale = Vector3(0.022, 0.24, 0.028)
+position = Vector3(-0.048, -0.245, 0)
+rotation_degrees = Vector3(0, 0, -21)
+scale = Vector3(0.026, 0.3, 0.036)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_bowstave")
 
 [node name="TipUpper" type="MeshInstance3D" parent="Head/Camera3D/WeaponBow"]
-position = Vector3(-0.088, 0.305, 0)
-rotation_degrees = Vector3(0, 0, 34)
-scale = Vector3(0.016, 0.07, 0.02)
+position = Vector3(-0.156, 0.398, 0)
+rotation_degrees = Vector3(0, 0, 48)
+scale = Vector3(0.02, 0.11, 0.028)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_bowstave")
 
 [node name="TipLower" type="MeshInstance3D" parent="Head/Camera3D/WeaponBow"]
-position = Vector3(-0.088, -0.305, 0)
-rotation_degrees = Vector3(0, 0, -34)
-scale = Vector3(0.016, 0.07, 0.02)
+position = Vector3(-0.156, -0.398, 0)
+rotation_degrees = Vector3(0, 0, -48)
+scale = Vector3(0.02, 0.11, 0.028)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_bowstave")
 
 [node name="String" type="Node3D" parent="Head/Camera3D/WeaponBow"]
 
 [node name="StringUpper" type="MeshInstance3D" parent="Head/Camera3D/WeaponBow/String"]
-position = Vector3(-0.055, 0.165, 0)
-rotation_degrees = Vector3(0, 0, -19)
-scale = Vector3(0.006, 0.35, 0.006)
+position = Vector3(-0.1, 0.213, 0)
+rotation_degrees = Vector3(0, 0, -24)
+scale = Vector3(0.008, 0.46, 0.008)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_bowstring")
 
 [node name="StringLower" type="MeshInstance3D" parent="Head/Camera3D/WeaponBow/String"]
-position = Vector3(-0.055, -0.165, 0)
-rotation_degrees = Vector3(0, 0, 19)
-scale = Vector3(0.006, 0.35, 0.006)
+position = Vector3(-0.1, -0.213, 0)
+rotation_degrees = Vector3(0, 0, 24)
+scale = Vector3(0.008, 0.46, 0.008)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_bowstring")
 
 [node name="NockedArrow" type="MeshInstance3D" parent="Head/Camera3D/WeaponBow"]
-position = Vector3(-0.03, 0, -0.16)
+position = Vector3(-0.038, 0.062, -0.3)
 rotation_degrees = Vector3(90, 0, 0)
-scale = Vector3(0.012, 0.62, 0.012)
+scale = Vector3(0.014, 0.7, 0.014)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("StdMat_haft")
+
+[node name="ArrowHead" type="MeshInstance3D" parent="Head/Camera3D/WeaponBow"]
+position = Vector3(-0.038, 0.062, -0.62)
+rotation_degrees = Vector3(90, 0, 45)
+scale = Vector3(0.026, 0.07, 0.026)
+mesh = SubResource("BoxMesh_unit")
+surface_material_override/0 = SubResource("StdMat_blade")

@@ -81,7 +81,7 @@ func interact(_player: Node) -> void:
 		GameState.add_flint(1)
 	else:
 		GameState.add_wood(3)
-	Sound.play_ui("ui_toggle", -12.0)
+	Sound.play_ui("pickup_flint" if kind == "flint" else "pickup_wood", -8.0)
 	queue_free()
 
 # Struck with the axe. If there is firewood beside it, that is a fire.
@@ -100,7 +100,7 @@ func hit(_damage: int) -> void:
 
 	if fuel == null:
 		Effects.spawn_leaf_burst(global_position + Vector3(0, 0.2, 0), Color(1.0, 0.82, 0.4), 6)
-		Sound.play_3d("knife_hit", global_position, -10.0)
+		Sound.play_3d("axe_hit_stone", global_position, -4.0)
 		GameState.announce("Sparks, but nothing to catch. Set firewood down beside it.")
 		return
 
@@ -110,7 +110,7 @@ func hit(_damage: int) -> void:
 	get_tree().current_scene.add_child(fire)
 	fire.global_position = spot
 	Effects.spawn_leaf_burst(spot + Vector3(0, 0.3, 0), Color(1.0, 0.72, 0.3), 22)
-	Sound.play_3d("land", spot, -4.0)
+	Sound.play_3d("fire_ignite", spot, -4.0)
 	GameState.announce("The fire catches. You can cook on it now.")
 	GameState.report_fire_lit()
 	queue_free()
