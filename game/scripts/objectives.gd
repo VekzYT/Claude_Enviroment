@@ -38,16 +38,16 @@ const STEPS := [
 		"hint": "Deer and boar wander the forest. Two or three axe blows will do it.",
 	},
 	{
-		"text": "Cook the meat on a campfire",
-		"hint": "The camp fire is north of your cabin. Look at it and press E.",
+		"text": "Light a fire, then cook on it",
+		"hint": "Find flint, set it down beside firewood, and strike it with the axe.",
 	},
 	{
 		"text": "Eat, and keep eating",
 		"hint": "Press F. Watch the food bar under your stamina.",
 	},
 	{
-		"text": "Find Elmswood and sell what you have",
-		"hint": "West along the road. Wood and meat both fetch coin there.",
+		"text": "Trade with the pedlar",
+		"hint": "He comes past the cabin from day 2. Wood and meat both fetch coin.",
 	},
 	{
 		"text": "Buy a bow, and arrows for it",
@@ -111,7 +111,7 @@ func _is_done(step: int) -> bool:
 		6:
 			return GameState.raw_meat > 0 or GameState.cooked_meat > 0
 		7:
-			return GameState.cooked_meat > 0
+			return GameState.cooked_meat > 0 and GameState.any_fire_lit
 		8:
 			return ate_once
 		9:

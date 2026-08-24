@@ -108,6 +108,7 @@ func _ready() -> void:
 	GameState.coins_changed.connect(_on_coins_changed)
 	GameState.arrows_changed.connect(_on_arrows_changed)
 	GameState.build_mode_changed.connect(_on_build_mode_changed)
+	GameState.flint_changed.connect(func(_c: int) -> void: _refresh_build_banner())
 	GameState.wood_changed.connect(func(_w: int) -> void: _refresh_build_banner())
 	GameState.bow_acquired.connect(func() -> void:
 		if arrow_chip != null:
@@ -512,11 +513,11 @@ func _build_build_banner() -> void:
 	build_banner = _panel_box(UITheme.BG_DEEP, UITheme.ACCENT_DIM, 2)
 	build_banner.name = "BuildBanner"
 	build_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	build_banner.position = Vector2(-320, 100)
-	build_banner.custom_minimum_size = Vector2(640, 0)
+	build_banner.position = Vector2(-400, 100)
+	build_banner.custom_minimum_size = Vector2(800, 0)
 	build_banner.visible = false
 	var holder := Control.new()
-	holder.custom_minimum_size = Vector2(640, 24)
+	holder.custom_minimum_size = Vector2(800, 24)
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	build_banner.add_child(holder)
 	build_text = _label("", UITheme.body_light(), 14, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
@@ -526,7 +527,7 @@ func _build_build_banner() -> void:
 
 func _build_hints() -> void:
 	hint_label = _label(
-		"WASD move    SHIFT sprint    CTRL crouch    LMB swing    E interact    B build    TAB pack    M map    F eat    ESC pause",
+		"WASD move   SHIFT sprint   CTRL crouch   LMB swing   E interact   B build   L lamp   TAB pack   M map   F eat   ESC pause",
 		UITheme.body_light(), 14, UITheme.TEXT_FAINT, HORIZONTAL_ALIGNMENT_CENTER)
 	hint_label.name = "Hints"
 	hint_label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -623,6 +624,11 @@ func _build_scope() -> void:
 func _process(delta: float) -> void:
 	if player == null or not is_instance_valid(player):
 		player = get_tree().get_first_node_in_group("player") as Node3D
+
+	# The wheel changes the build piece without emitting anything, so the banner
+	# is repainted from the builder each frame while it is up. It is one label.
+	if build_banner != null and build_banner.visible:
+		_refresh_build_banner()
 
 	if last_health > 0 and last_health <= 30:
 		pulse_time += delta
@@ -772,17 +778,22 @@ func _on_build_mode_changed(on: bool) -> void:
 func _refresh_build_banner() -> void:
 	if build_banner == null or not build_banner.visible:
 		return
-	var cost: int = 6
 	var builder: Node = get_tree().get_first_node_in_group("builder")
-	if builder != null:
-		cost = int(builder.get("WALL_COST"))
-	if GameState.wood >= cost:
-		build_text.text = "BUILDING   ·   wall %d wood   ·   you have %d   ·   LMB place   RMB remove   R turn   B done" % [
-			cost, GameState.wood]
+	if builder == null:
+		return
+	var piece_name: String = String(builder.call("current_name"))
+	var cost: int = int(builder.call("current_cost"))
+	if cost <= 0:
+		# Setting an item down out of the pack rather than building.
+		build_text.text = "PLACING   ·   %s   ·   LMB set down   B stop" % piece_name
+		build_text.add_theme_color_override("font_color", UITheme.TEXT)
+	elif GameState.wood >= cost:
+		build_text.text = "%s   ·   %d wood   ·   you have %d   ·   WHEEL piece   R turn   LMB place   RMB remove   B done" % [
+			piece_name.to_upper(), cost, GameState.wood]
 		build_text.add_theme_color_override("font_color", UITheme.TEXT)
 	else:
-		build_text.text = "BUILDING   ·   wall %d wood   ·   you have %d   ·   not enough" % [
-			cost, GameState.wood]
+		build_text.text = "%s   ·   %d wood   ·   you have %d   ·   not enough" % [
+			piece_name.to_upper(), cost, GameState.wood]
 		build_text.add_theme_color_override("font_color", UITheme.WARN)
 
 func _on_arrows_changed(count: int) -> void:

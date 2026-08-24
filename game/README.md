@@ -1,4 +1,4 @@
-# Syfon v2.10.0 — Palisade
+# Syfon v2.11.0 — Flint
 
 A first-person survival-horror explorer built for the **Godot Engine** (not a browser/HTML game — it runs as a real desktop application). The setting is a zombie apocalypse, and this release gives it a clock and a reason to hurry.
 
@@ -7,6 +7,45 @@ You wake outside a log cabin in a forest of rolling hills and four mountain mass
 There is a map on the cabin table showing the whole valley, including the three places where people are still living and still trading. The sun rises and sets, the days count up, and **on day 10 they come**.
 
 **Zombies are not in yet** — the countdown is real, the horde is not there to meet it. Everything else is built around its arrival.
+
+## What's new in v2.11.0
+
+**Elmswood is gone.** The village, its villagers, its palisade and the widened pad it sat on have all been removed, and the chapel ruins are back where the village was.
+
+**A pedlar comes to you instead.** Tomas turns up outside your cabin on **day 2**, walks a slow circuit around it for the rest of the week, stops to talk when you come near, and is **gone on day 10** — which is the day the horde is due, so his leaving is the last warning you get.
+
+| He sells | |
+|---|---|
+| Hunting bow | 70 coins |
+| Arrows ×6 | 14 coins |
+| **Oil lamp** | **45 coins** |
+
+He still buys wood, meat and apples.
+
+**Fixed: the trade screen opened and shut on the same keypress.** The player sits later in the scene and is offered input first, so `E` opened the stall — and then the stall's own handler saw the same press, found itself open, and closed it again. That is the third time this exact shape of bug has appeared; the player now consumes `E` when it interacts, and the stall keeps only `ESC`.
+
+**The lamp** is on `L`. It lights where you look and it is the least stealthy thing you can carry: animals notice you at nearly twice the usual distance while it is lit.
+
+**A fire has to be built now.** There is no campfire waiting for you at the start. Flint is scattered through the forest — **45 pieces**, several of them within twenty metres of the cabin. Set firewood down out of your pack, set flint down beside it, and **strike the flint with your axe**. Sparks with no fuel nearby just spark.
+
+**Placing things from your pack.** Every slot that can be set down has a **Place** button. It closes the pack and hands you the same ghost preview the builder uses, so you put the thing exactly where you meant to instead of dropping it at your feet. Anything on the ground goes back in your pack with `E`.
+
+**Five things to build**, cycled with the mouse wheel:
+
+| | Cost | Refund |
+|---|---|---|
+| Wall | 6 wood | 3 |
+| **Doorway** (with a door that opens on `E`) | 10 wood | 5 |
+| Floor | 5 wood | 2 |
+| Ramp | 7 wood | 3 |
+| Torch post (lit) | 4 wood | 2 |
+
+The door is hinged at the jamb rather than spun about its middle, and its interaction volume stands in front of the leaf so the thing you are aiming at does not swing out from under your crosshair as it opens.
+
+Two bugs found while building this:
+
+- **The axe could not strike a placed flint.** The melee ray stepped over every `Area3D` except the chopping block, and a piece of flint on the ground is an Area3D. It now steps over pickups but not over anything that knows how to be struck.
+- **Every scattered flint failed to spawn, silently.** They were parented during the forest's own `_ready`, and the scene root is still setting up children at that point, so Godot refuses `add_child` outright. They are positioned before entering the tree and parented on a deferred call now.
 
 ## What's new in v2.10.0
 

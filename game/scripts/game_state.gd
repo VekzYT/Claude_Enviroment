@@ -10,6 +10,10 @@ signal landmark_discovered(landmark_name: String)
 signal coins_changed(amount: int)
 signal arrows_changed(count: int)
 signal bow_acquired
+signal flashlight_acquired
+signal flint_changed(count: int)
+signal fire_lit
+signal flashlight_toggled(on: bool)
 signal trade_visibility_changed(open: bool)
 signal build_mode_changed(active: bool)
 signal held_item_changed(title: String)
@@ -39,10 +43,14 @@ var player_health := 100
 var current_weapon := 1
 var scope_active := false
 var knife_cooldown_fraction := 0.0
-# What the village trades in. Wood and meat go out, a bow and arrows come
+# What the pedlar trades in. Wood and meat go out, a bow, arrows and a lamp
 # back. Everything you sell is priced in these.
 var coins := 0
 var bow_owned := false
+var flashlight_owned := false
+var flint := 0
+var any_fire_lit := false
+var flashlight_on := false
 var arrows := 0
 var trade_open := false
 var build_mode := false
@@ -110,6 +118,26 @@ func spend_wood(cost: int) -> bool:
 	wood -= cost
 	wood_changed.emit(wood)
 	return true
+
+func add_flint(count: int) -> void:
+	flint = maxi(flint + count, 0)
+	flint_changed.emit(flint)
+
+func report_fire_lit() -> void:
+	any_fire_lit = true
+	fire_lit.emit()
+
+func give_flashlight() -> void:
+	if flashlight_owned:
+		return
+	flashlight_owned = true
+	flashlight_acquired.emit()
+
+func set_flashlight_on(value: bool) -> void:
+	if not flashlight_owned:
+		return
+	flashlight_on = value
+	flashlight_toggled.emit(flashlight_on)
 
 func give_bow() -> void:
 	if bow_owned:
@@ -224,6 +252,11 @@ func reset() -> void:
 	coins = 0
 	coins_changed.emit(coins)
 	build_mode = false
+	flint = 0
+	flint_changed.emit(flint)
+	any_fire_lit = false
+	flashlight_owned = false
+	flashlight_on = false
 	bow_owned = false
 	arrows = 0
 	arrows_changed.emit(arrows)

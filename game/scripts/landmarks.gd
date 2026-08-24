@@ -9,7 +9,7 @@ const LANDMARK_NAMES: Array[String] = [
 	"Ranger Watchtower",
 	"Abandoned Cabin",
 	"Crashed Convoy",
-	"Elmswood",
+	"Chapel Ruins",
 	"Radio Tower",
 	"The Graves",
 	"Blackwater Pond",

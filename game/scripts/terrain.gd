@@ -40,18 +40,18 @@ const POI_CENTERS: Array[Vector2] = [
 	Vector2(-40.0, -130.0),   # ranger watchtower
 	Vector2(95.0, -85.0),     # abandoned cabin
 	Vector2(130.0, 40.0),     # crashed convoy
-	Vector2(-120.0, 95.0),    # elmswood village
+	Vector2(-120.0, 95.0),    # chapel ruins
 	Vector2(-150.0, -30.0),   # radio tower
 	Vector2(30.0, 140.0),     # grave clearing
 	Vector2(60.0, -30.0),     # pond
 	Vector2(-90.0, -95.0),    # rocky lookout (raised)
 ]
-const POI_RADII: Array[float] = [24.0, 15.0, 17.0, 20.0, 30.0, 15.0, 19.0, 27.0, 26.0]
-const POI_BLENDS: Array[float] = [18.0, 14.0, 14.0, 16.0, 20.0, 14.0, 16.0, 18.0, 22.0]
+const POI_RADII: Array[float] = [24.0, 15.0, 17.0, 20.0, 21.0, 15.0, 19.0, 27.0, 26.0]
+const POI_BLENDS: Array[float] = [18.0, 14.0, 14.0, 16.0, 16.0, 14.0, 16.0, 18.0, 22.0]
 const POI_HEIGHTS: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 12.0]
 # How bare each pad is. Roads and camps are worn to dirt; the lookout stays
 # rocky and the pond bed is mud.
-const POI_DIRT: Array[float] = [1.0, 0.85, 0.8, 0.9, 0.92, 0.8, 0.95, 0.8, 0.0]
+const POI_DIRT: Array[float] = [1.0, 0.85, 0.8, 0.9, 0.7, 0.8, 0.95, 0.8, 0.0]
 
 # The pond was a flat pad with a sheet of water floating sixteen centimetres
 # over it, which is exactly why it read as a slab. This digs a real bowl. The

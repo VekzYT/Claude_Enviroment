@@ -7,7 +7,7 @@ extends CanvasLayer
 # Items are drawn rather than swatched. A coloured square next to the word
 # "Axe" is a placeholder; a little axe is an inventory.
 
-const PANEL := Vector2(680, 620)
+const PANEL := Vector2(680, 700)
 const GEAR_ROW := 36.0
 const GEAR_ROWS := 4
 const CELL := Vector2(202, 82)
@@ -41,6 +41,7 @@ func _ready() -> void:
 	GameState.carry_changed.connect(func(_c: bool) -> void: _refresh())
 	GameState.weapon_changed.connect(func(_i: int) -> void: _refresh())
 	GameState.arrows_changed.connect(func(_c: int) -> void: _refresh())
+	GameState.flint_changed.connect(func(_c: int) -> void: _refresh())
 
 func _label(text: String, font: Font, size: int, colour: Color, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
@@ -82,11 +83,14 @@ func _bar(width: float, height: float, colour: Color) -> Array:
 func _build() -> void:
 	root = Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# STOP so a click that misses a Place button is swallowed here rather than
+	# reaching the player, who would take the mouse back and strand the pack.
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(root)
 
 	var dimmer: ColorRect = _rect(Color(0, 0, 0, 0.72), Vector2.ZERO)
 	dimmer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dimmer.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.add_child(dimmer)
 
 	panel = PanelContainer.new()
@@ -94,12 +98,11 @@ func _build() -> void:
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.position = -PANEL * 0.5
 	panel.custom_minimum_size = PANEL
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(panel)
 
 	var canvas := Control.new()
 	canvas.custom_minimum_size = PANEL
-	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.mouse_filter = Control.MOUSE_FILTER_PASS
 	panel.add_child(canvas)
 
 	var title: Label = _label("PACK", UITheme.display(), 26, UITheme.TEXT)
@@ -133,19 +136,25 @@ func _build() -> void:
 
 	grid = Control.new()
 	grid.position = Vector2(24, supplies_y + 22.0)
-	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grid.mouse_filter = Control.MOUSE_FILTER_PASS
 	canvas.add_child(grid)
 
 	# Two rows of three. Everything the world can hand you has a home here, so
 	# an empty slot reads as "none yet" rather than the item not existing.
-	_add_cell("wood", 0, 0, "Wood", "wood", UITheme.WOOD)
+	_add_cell("wood", 0, 0, "Wood", "wood", UITheme.WOOD, "wood")
 	_add_cell("apples", 1, 0, "Apples", "apple", Color(0.72, 0.20, 0.16))
 	_add_cell("raw", 2, 0, "Raw meat", "meat_raw", Color(0.74, 0.32, 0.31))
 	_add_cell("cooked", 3, 0, "Cooked meat", "meat_cooked", Color(0.60, 0.38, 0.22))
 	_add_cell("arrows", 4, 0, "Arrows", "arrow", Color(0.70, 0.66, 0.58))
-	_add_cell("coins", 5, 0, "Coins", "coin", UITheme.ACCENT)
+	_add_cell("flint", 5, 0, "Flint", "flint", Color(0.55, 0.57, 0.60), "flint")
+	_add_cell("coins", 6, 0, "Coins", "coin", UITheme.ACCENT)
 
-	var cond_y: float = supplies_y + 22.0 + CELL.y * 2.0 + 10.0 + 18.0
+	# Three rows of slots now, not two. Worth deriving rather than hard-coding:
+	# the last time this was a literal the condition bars slid off the panel the
+	# moment a slot was added.
+	var rows: int = int(ceil(float(cells.size()) / 3.0))
+	var cond_y: float = supplies_y + 22.0 + CELL.y * float(rows) \
+		+ 10.0 * float(maxi(rows - 1, 0)) + 18.0
 	canvas.add_child(_section("CONDITION", cond_y))
 
 	var hunger_label: Label = _label("Food", UITheme.body_light(), 15, UITheme.TEXT_DIM)
@@ -172,7 +181,7 @@ func _build() -> void:
 	condition_fill = cond_bar[1]
 	canvas.add_child(cond_bar[0])
 
-	hint = _label("F  eat the best food you have        TAB / I / ESC  close",
+	hint = _label("F  eat        Place  set an item down in front of you        TAB / I / ESC  close",
 		UITheme.body_light(), 13, UITheme.TEXT_FAINT, HORIZONTAL_ALIGNMENT_CENTER)
 	hint.position = Vector2(24, PANEL.y - 30)
 	hint.size = Vector2(PANEL.x - 48, 18)
@@ -184,7 +193,8 @@ func _section(text: String, y: float) -> Label:
 	return l
 
 # One supply slot: icon, name, and a big count that greys out at zero.
-func _add_cell(id: String, index: int, _unused: int, name_text: String, icon: String, tint: Color) -> void:
+func _add_cell(id: String, index: int, _unused: int, name_text: String, icon: String,
+		tint: Color, placeable: String = "") -> void:
 	var col: int = index % 3
 	var row: int = index / 3
 	var holder := Control.new()
@@ -214,7 +224,32 @@ func _add_cell(id: String, index: int, _unused: int, name_text: String, icon: St
 	value.size = Vector2(CELL.x - 78, 32)
 	holder.add_child(value)
 
-	cells[id] = {"value": value, "icon": icon_node, "name": name_label, "back": back}
+	# Anything that can be set down in the world gets a button that closes the
+	# pack and hands you a ghost to place it with, rather than a drop that
+	# leaves the thing wherever your feet happen to be.
+	var place_button: Button = null
+	if placeable != "":
+		place_button = Button.new()
+		place_button.text = "Place"
+		place_button.theme = UITheme.menu_theme()
+		place_button.position = Vector2(CELL.x - 74, CELL.y - 34)
+		place_button.custom_minimum_size = Vector2(62, 26)
+		place_button.size = Vector2(62, 26)
+		place_button.add_theme_font_size_override("font_size", 13)
+		place_button.pressed.connect(func() -> void: _place(placeable))
+		holder.add_child(place_button)
+		holder.mouse_filter = Control.MOUSE_FILTER_PASS
+
+	cells[id] = {"value": value, "icon": icon_node, "name": name_label, "back": back,
+		"place": place_button}
+
+# Hands the item to the builder's ghost and gets out of the way.
+func _place(item: String) -> void:
+	var builder: Node = get_tree().get_first_node_in_group("builder")
+	if builder == null:
+		return
+	close_pack()
+	builder.call("begin_placing", item)
 
 func _set_cell(id: String, text: String, filled: bool) -> void:
 	var cell: Dictionary = cells[id]
@@ -225,6 +260,9 @@ func _set_cell(id: String, text: String, filled: bool) -> void:
 	# An empty slot stays legible but clearly reads as empty.
 	value.add_theme_color_override("font_color", UITheme.TEXT if filled else UITheme.TEXT_FAINT)
 	icon_node.modulate.a = 1.0 if filled else 0.28
+	var place_button: Variant = cell.get("place")
+	if place_button != null:
+		(place_button as Button).disabled = not filled
 	back.add_theme_stylebox_override("panel", UITheme.panel(
 		Color(0.09, 0.10, 0.085, 0.95) if filled else Color(0.06, 0.065, 0.058, 0.95),
 		UITheme.LINE if filled else UITheme.LINE_SOFT, 2))
@@ -278,6 +316,7 @@ func _refresh() -> void:
 	_set_cell("raw", "%d" % GameState.raw_meat, GameState.raw_meat > 0)
 	_set_cell("cooked", "%d" % GameState.cooked_meat, GameState.cooked_meat > 0)
 	_set_cell("arrows", "%d" % GameState.arrows, GameState.arrows > 0)
+	_set_cell("flint", "%d" % GameState.flint, GameState.flint > 0)
 	_set_cell("coins", "%d" % GameState.coins, GameState.coins > 0)
 
 	var hunger: float = GameState.hunger

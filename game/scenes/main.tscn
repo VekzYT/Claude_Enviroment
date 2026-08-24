@@ -1,4 +1,4 @@
-[gd_scene load_steps=58 format=3]
+[gd_scene load_steps=57 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="2_hud"]
@@ -12,11 +12,10 @@
 [ext_resource type="Script" path="res://scripts/chopping_block.gd" id="31_block"]
 [ext_resource type="Script" path="res://scripts/map_table.gd" id="32_maptable"]
 [ext_resource type="Script" path="res://scripts/map_screen.gd" id="33_mapscreen"]
-[ext_resource type="Script" path="res://scripts/campfire.gd" id="34_campfire"]
 [ext_resource type="Script" path="res://scripts/inventory_screen.gd" id="35_pack"]
 [ext_resource type="Script" path="res://scripts/wildlife.gd" id="36_wildlife"]
-[ext_resource type="Script" path="res://scripts/village.gd" id="38_village"]
 [ext_resource type="Script" path="res://scripts/builder.gd" id="40_builder"]
+[ext_resource type="PackedScene" path="res://scenes/pedlar.tscn" id="41_pedlar"]
 [ext_resource type="Script" path="res://scripts/trade_screen.gd" id="39_trade"]
 [ext_resource type="Script" path="res://scripts/objectives.gd" id="37_guide"]
 [ext_resource type="Script" path="res://scripts/landmarks.gd" id="7_landmarks"]
@@ -315,10 +314,6 @@ rotation_degrees = Vector3(0, -32, -54.06)
 scale = Vector3(2.470, 0.12, 4.4)
 mesh = SubResource("BoxMesh_unit")
 surface_material_override/0 = SubResource("Mat_canvas")
-
-[node name="Campfire" type="Area3D" parent="."]
-position = Vector3(0, 0, -2)
-script = ExtResource("34_campfire")
 
 [node name="CampBarricadeA" type="StaticBody3D" parent="."]
 
@@ -1426,11 +1421,11 @@ script = ExtResource("35_pack")
 [node name="TradeScreen" type="CanvasLayer" parent="." groups=["trade_screen"]]
 script = ExtResource("39_trade")
 
-[node name="Village" type="Node3D" parent="."]
-script = ExtResource("38_village")
-
 [node name="Builder" type="Node3D" parent="." groups=["builder"]]
 script = ExtResource("40_builder")
+
+[node name="Pedlar" parent="." instance=ExtResource("41_pedlar")]
+position = Vector3(-14, 0, 16)
 
 [node name="Wildlife" type="Node3D" parent="."]
 script = ExtResource("36_wildlife")

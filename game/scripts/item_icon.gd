@@ -76,6 +76,21 @@ func _draw() -> void:
 			_poly([[0.16, 0.78], [0.30, 0.26], [0.40, 0.28], [0.28, 0.80]], wood)
 			_poly([[0.44, 0.80], [0.56, 0.24], [0.66, 0.26], [0.56, 0.82]], wood.lightened(0.15))
 			_poly([[0.66, 0.78], [0.78, 0.32], [0.86, 0.36], [0.76, 0.80]], wood.darkened(0.2))
+		"lamp":
+			# A lantern: body, glass, and a handle over the top.
+			_poly([[0.34, 0.34], [0.66, 0.34], [0.70, 0.74], [0.30, 0.74]], tint)
+			_poly([[0.39, 0.40], [0.61, 0.40], [0.63, 0.68], [0.37, 0.68]], Color(1.0, 0.90, 0.60))
+			draw_rect(Rect2(_p(0.30, 0.74), Vector2(0.40 * s, 0.09 * s)), steel.darkened(0.35))
+			draw_rect(Rect2(_p(0.34, 0.26), Vector2(0.32 * s, 0.08 * s)), steel.darkened(0.35))
+			_stroke([0.38, 0.26], [0.50, 0.13], steel, 0.032)
+			_stroke([0.62, 0.26], [0.50, 0.13], steel, 0.032)
+		"flint":
+			# A struck core with a bright fresh face and a couple of sparks.
+			_poly([[0.22, 0.62], [0.34, 0.36], [0.62, 0.30], [0.76, 0.52],
+				[0.64, 0.74], [0.34, 0.76]], tint.darkened(0.25))
+			_poly([[0.34, 0.36], [0.62, 0.30], [0.58, 0.52], [0.36, 0.56]], tint.lightened(0.28))
+			_stroke([0.72, 0.28], [0.86, 0.16], Color(1.0, 0.86, 0.46), 0.03)
+			_stroke([0.78, 0.40], [0.90, 0.36], Color(1.0, 0.78, 0.34), 0.026)
 		"coin":
 			# Three overlapping, so a purse reads as a purse and not a button.
 			draw_circle(_p(0.36, 0.66), 0.20 * s, tint.darkened(0.3))

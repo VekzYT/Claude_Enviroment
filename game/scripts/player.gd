@@ -173,6 +173,7 @@ var crouching := false
 # Eased rather than snapped, so dropping into a crouch is a movement of the
 # camera and not a teleport.
 var crouch_blend := 0.0
+var flashlight: SpotLight3D = null
 var carried_log_tint: Color = Color(0.46, 0.35, 0.23)
 var carried_log_node: Node3D = null
 var log_pickup_scene: PackedScene = preload("res://scenes/log_pickup.tscn")
@@ -218,6 +219,10 @@ func _ready() -> void:
 	GameState.set_current_weapon(current_weapon_index)
 	GameState.set_held_item(weapon_titles[current_weapon_index])
 	GameState.bow_acquired.connect(func() -> void: give_item(ITEM_BOW))
+	_build_flashlight()
+	GameState.flashlight_toggled.connect(func(on: bool) -> void:
+		if flashlight != null:
+			flashlight.visible = on)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
@@ -245,6 +250,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 			else:
 				try_interact()
+			# Consumed either way, so a screen this press just opened cannot see
+			# the same E and close itself again.
+			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_M:
 			# The player owns the toggle. If the screen also listened for M we
 			# would open and close on the same press, so the screens only keep
@@ -264,6 +272,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			request_switch(WEAPON_KNIFE)
 		elif event.keycode == KEY_4:
 			request_switch(ITEM_BOW)
+		elif event.keycode == KEY_L:
+			if GameState.flashlight_owned:
+				GameState.set_flashlight_on(not GameState.flashlight_on)
+				Sound.play_ui("ui_toggle", -12.0)
+			else:
+				GameState.announce("You have no lamp. The pedlar sells one.")
 		elif event.keycode == KEY_B:
 			if not screen_is_open():
 				var builder: Node = get_tree().get_first_node_in_group("builder")
@@ -294,9 +308,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			if screen_is_open():
 				return
-			cycle_item(-1)
+			if GameState.build_mode:
+				_builder_call("cycle", -1)
+			else:
+				cycle_item(-1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			cycle_item(1)
+			if screen_is_open():
+				return
+			if GameState.build_mode:
+				_builder_call("cycle", 1)
+			else:
+				cycle_item(1)
 
 # Scrolling walks the carried items only, so an empty pack never cycles through
 # guns the player has not found.
@@ -595,6 +617,17 @@ func close_pack_screen() -> void:
 
 # True while any full-screen panel has the mouse, which is when the world
 # should ignore clicks and interact presses.
+# Every build action goes through here, so the group lookup and the null check
+# live in one place instead of at five call sites.
+func _builder_call(what: String, arg: Variant = null) -> void:
+	var builder: Node = get_tree().get_first_node_in_group("builder")
+	if builder == null:
+		return
+	if arg == null:
+		builder.call(what)
+	else:
+		builder.call(what, arg)
+
 func screen_is_open() -> bool:
 	return GameState.map_open or GameState.inventory_open or GameState.trade_open
 
@@ -618,9 +651,29 @@ func open_pack_screen() -> void:
 # How loudly you are moving, as a multiplier on how far off an animal notices
 # you. Standing still counts for a lot: a crouched player who has stopped is
 # nearly invisible, and a sprinting one is spotted half again as far out.
+# A lamp clipped to the chest, pointing where the camera points. Carried as a
+# SpotLight3D on the camera rather than a held item, so it lights your way with
+# the axe still in your hands.
+func _build_flashlight() -> void:
+	flashlight = SpotLight3D.new()
+	flashlight.name = "Flashlight"
+	flashlight.position = Vector3(0.12, -0.16, 0.0)
+	flashlight.light_color = Color(1.0, 0.96, 0.86)
+	flashlight.light_energy = 6.5
+	flashlight.spot_range = 32.0
+	flashlight.spot_angle = 34.0
+	flashlight.spot_angle_attenuation = 0.7
+	flashlight.spot_attenuation = 1.1
+	flashlight.shadow_enabled = true
+	flashlight.visible = false
+	camera.add_child(flashlight)
+
+# A lit lamp is the least stealthy thing in the forest.
 func stealth_factor() -> float:
 	var pace: float = Vector2(velocity.x, velocity.z).length()
 	var factor: float = 1.0
+	if GameState.flashlight_on:
+		return 1.9
 	if crouching:
 		factor = 0.42 if pace < 0.4 else 0.58
 	elif pace > SPEED + 0.6:
@@ -899,7 +952,7 @@ func loose_arrow() -> void:
 	if bow_cooldown > 0.0:
 		return
 	if GameState.arrows <= 0:
-		GameState.announce("No arrows. Maren sells them in Elmswood.")
+		GameState.announce("No arrows. The pedlar sells them.")
 		Sound.play_ui("reload_click", -10.0)
 		return
 	GameState.add_arrows(-1)
@@ -991,7 +1044,13 @@ func perform_melee_hit() -> void:
 		if result.is_empty():
 			return
 		var struck: Object = result.collider
-		if struck is Area3D and not (struck as Node).is_in_group("chopping_block"):
+		# Step over pickups, but not the chopping block and not anything that
+		# knows how to be struck. A piece of flint set down on the ground is an
+		# Area3D, and striking it is the whole point of it.
+		var node_hit: Node = struck as Node
+		if struck is Area3D and node_hit != null \
+				and not node_hit.is_in_group("chopping_block") \
+				and not node_hit.has_method("hit"):
 			skip.append((struck as Area3D).get_rid())
 			result = {}
 			continue
@@ -1047,8 +1106,13 @@ func perform_melee_hit() -> void:
 
 	if target and target.has_method("hit"):
 		target.hit(weapon_damage[idx])
-		var normal: Vector3 = result.normal
-		Effects.spawn_blood(result.position, normal)
+		if (target as Node).is_in_group("placed_item"):
+			# Stone, not flesh: sparks and chips rather than blood.
+			Effects.spawn_wood_chips(result.position, result.normal)
+			camera_kick += deg_to_rad(2.4)
+			chop_shake = 0.6
+			return
+		Effects.spawn_blood(result.position, result.normal)
 		Sound.play_3d("knife_hit", result.position, -2.0)
 		camera_kick += deg_to_rad(5.0)
 		GameState.trigger_hit_marker()

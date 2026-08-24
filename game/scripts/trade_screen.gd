@@ -1,7 +1,7 @@
 extends CanvasLayer
 
-# Maren's stall. Two columns: what she will take off you on the left, what she
-# will sell you on the right.
+# The pedlar's pack. Two columns: what he will take off you on the left, what
+# he will sell you on the right.
 #
 # Unlike the map and the pack, this one is clicked rather than keyed, so it uses
 # real Buttons and leaves the mouse visible. Every row re-evaluates itself after
@@ -11,7 +11,7 @@ extends CanvasLayer
 const PANEL := Vector2(860, 600)
 const ROW := Vector2(376, 62)
 
-# What she pays. Cooked meat is worth more than raw because she does not have
+# What he pays. Cooked meat is worth more than raw because she does not have
 # to do anything with it.
 const SELL_TABLE := [
 	{"id": "wood", "name": "Wood", "icon": "wood", "price": 3,
@@ -24,16 +24,25 @@ const SELL_TABLE := [
 		"tint": Color(0.72, 0.20, 0.16)},
 ]
 
-const BOW_PRICE := 70
+# What he carries. Each is something you cannot make for yourself.
+const BUY_TABLE := [
+	{"id": "bow", "name": "Hunting bow", "icon": "bow", "price": 70,
+		"tint": Color(0.66, 0.50, 0.30),
+		"note": "The only way to take a hare. Press 4 to draw it."},
+	{"id": "arrows", "name": "Arrows  ×6", "icon": "arrow", "price": 14,
+		"tint": Color(0.70, 0.66, 0.58),
+		"note": "You can pull them back out of whatever you hit."},
+	{"id": "lamp", "name": "Oil lamp", "icon": "lamp", "price": 45,
+		"tint": Color(0.92, 0.78, 0.42),
+		"note": "Press L for light. Everything in the forest sees you coming."},
+]
 const ARROW_BUNDLE := 6
-const ARROW_PRICE := 14
 
 var root: Control
 var panel: PanelContainer
 var coin_label: Label
 var sell_rows: Dictionary = {}
-var bow_row: Dictionary = {}
-var arrow_row: Dictionary = {}
+var buy_rows: Dictionary = {}
 var note: Label
 var open := false
 
@@ -47,6 +56,7 @@ func _ready() -> void:
 	GameState.meat_changed.connect(func(_r: int, _c: int) -> void: _refresh())
 	GameState.apples_changed.connect(func(_c: int) -> void: _refresh())
 	GameState.arrows_changed.connect(func(_c: int) -> void: _refresh())
+	GameState.flashlight_acquired.connect(func() -> void: _refresh())
 
 func _label(text: String, font: Font, size: int, colour: Color,
 		align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
@@ -92,7 +102,7 @@ func _build() -> void:
 	canvas.mouse_filter = Control.MOUSE_FILTER_PASS
 	panel.add_child(canvas)
 
-	var title: Label = _label("ELMSWOOD  ·  MAREN'S STALL", UITheme.display(), 24, UITheme.TEXT)
+	var title: Label = _label("TOMAS  ·  PEDLAR", UITheme.display(), 24, UITheme.TEXT)
 	title.position = Vector2(28, 12)
 	canvas.add_child(title)
 
@@ -106,10 +116,10 @@ func _build() -> void:
 	rule.size = Vector2(PANEL.x - 56, 1)
 	canvas.add_child(rule)
 
-	var left: Label = _label("SHE BUYS", UITheme.body_light(), 13, UITheme.TEXT_FAINT)
+	var left: Label = _label("HE BUYS", UITheme.body_light(), 13, UITheme.TEXT_FAINT)
 	left.position = Vector2(28, 68)
 	canvas.add_child(left)
-	var right: Label = _label("SHE SELLS", UITheme.body_light(), 13, UITheme.TEXT_FAINT)
+	var right: Label = _label("HE SELLS", UITheme.body_light(), 13, UITheme.TEXT_FAINT)
 	right.position = Vector2(PANEL.x * 0.5 + 14, 68)
 	canvas.add_child(right)
 
@@ -130,18 +140,18 @@ func _build() -> void:
 		(row["button"] as Button).pressed.connect(func() -> void: _sell(id))
 		sell_rows[id] = row
 
-	bow_row = _make_row(canvas, Vector2(PANEL.x * 0.5 + 14, 94),
-		"Hunting bow", "bow", Color(0.66, 0.50, 0.30), "Buy")
-	bow_row["price"] = BOW_PRICE
-	(bow_row["button"] as Button).pressed.connect(_buy_bow)
-
-	arrow_row = _make_row(canvas, Vector2(PANEL.x * 0.5 + 14, 94 + ROW.y + 10.0),
-		"Arrows  ×%d" % ARROW_BUNDLE, "arrow", Color(0.70, 0.66, 0.58), "Buy")
-	arrow_row["price"] = ARROW_PRICE
-	(arrow_row["button"] as Button).pressed.connect(_buy_arrows)
+	for i in BUY_TABLE.size():
+		var item: Dictionary = BUY_TABLE[i]
+		var row: Dictionary = _make_row(canvas,
+			Vector2(PANEL.x * 0.5 + 14, 94 + float(i) * (ROW.y + 10.0)),
+			String(item["name"]), String(item["icon"]), Color(item["tint"]), "Buy")
+		row["price"] = int(item["price"])
+		var id: String = String(item["id"])
+		(row["button"] as Button).pressed.connect(func() -> void: _buy(id))
+		buy_rows[id] = row
 
 	note = _label("", UITheme.body_light(), 14, UITheme.TEXT_DIM)
-	note.position = Vector2(PANEL.x * 0.5 + 14, 94 + (ROW.y + 10.0) * 2.0 + 8.0)
+	note.position = Vector2(PANEL.x * 0.5 + 14, 94 + (ROW.y + 10.0) * 3.0 + 8.0)
 	note.size = Vector2(ROW.x, 92)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	canvas.add_child(note)
@@ -239,21 +249,39 @@ func _sell(id: String) -> void:
 	note.text = "Sold for %d coins." % price
 	_refresh()
 
-func _buy_bow() -> void:
-	if GameState.bow_owned or not GameState.spend_coins(BOW_PRICE):
+# One place that handles every purchase, so a new line of stock is a row in
+# BUY_TABLE rather than another near-copy of this function.
+func _buy(id: String) -> void:
+	var item: Dictionary = _buy_entry(id)
+	if item.is_empty() or _already_owned(id):
 		return
-	GameState.give_bow()
-	Sound.play_ui("ui_toggle", -6.0)
-	note.text = "The bow is yours. Press 4 to draw it. It is no use without arrows."
+	if not GameState.spend_coins(int(item["price"])):
+		return
+	match id:
+		"bow":
+			GameState.give_bow()
+		"arrows":
+			GameState.add_arrows(ARROW_BUNDLE)
+		"lamp":
+			GameState.give_flashlight()
+	Sound.play_ui("ui_toggle", -7.0)
+	note.text = String(item["note"])
 	_refresh()
 
-func _buy_arrows() -> void:
-	if not GameState.spend_coins(ARROW_PRICE):
-		return
-	GameState.add_arrows(ARROW_BUNDLE)
-	Sound.play_ui("ui_toggle", -8.0)
-	note.text = "%d arrows. You can pull them back out of whatever you hit." % ARROW_BUNDLE
-	_refresh()
+func _buy_entry(id: String) -> Dictionary:
+	for item in BUY_TABLE:
+		if String(item["id"]) == id:
+			return item
+	return {}
+
+# Arrows restock; the bow and the lamp are bought once.
+func _already_owned(id: String) -> bool:
+	match id:
+		"bow":
+			return GameState.bow_owned
+		"lamp":
+			return GameState.flashlight_owned
+	return false
 
 # Greys a row out and turns its button off in one place, so a disabled row
 # always looks disabled.
@@ -278,13 +306,18 @@ func _refresh() -> void:
 		var have: int = _held(id)
 		_set_row(sell_rows[id], "You have %d  ·  %d each" % [have, int(entry["price"])], have > 0)
 
-	if GameState.bow_owned:
-		_set_row(bow_row, "Already yours", false)
-		(bow_row["button"] as Button).text = "Bought"
-	else:
-		_set_row(bow_row, "%d coins" % BOW_PRICE, GameState.can_afford(BOW_PRICE))
-	_set_row(arrow_row, "%d coins  ·  you have %d" % [ARROW_PRICE, GameState.arrows],
-		GameState.can_afford(ARROW_PRICE))
+	for item in BUY_TABLE:
+		var id: String = String(item["id"])
+		var row: Dictionary = buy_rows[id]
+		var price: int = int(item["price"])
+		if _already_owned(id):
+			_set_row(row, "Already yours", false)
+			(row["button"] as Button).text = "Bought"
+			continue
+		var detail: String = "%d coins" % price
+		if id == "arrows":
+			detail = "%d coins  ·  you have %d" % [price, GameState.arrows]
+		_set_row(row, detail, GameState.can_afford(price))
 
 func open_trade() -> void:
 	open = true
@@ -292,7 +325,7 @@ func open_trade() -> void:
 	GameState.set_trade_open(true)
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	if note.text == "":
-		note.text = "Wood and meat both fetch coin. A bow is the only way to take a hare."
+		note.text = "Wood and meat both fetch coin. He is gone on day 10."
 	_refresh()
 	panel.modulate.a = 0.0
 	panel.scale = Vector2(0.98, 0.98)
@@ -312,6 +345,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not open:
 		return
 	if event is InputEventKey and event.pressed:
-		if event.keycode == KEY_ESCAPE or event.keycode == KEY_E:
+		# ESC only. E is the player's key: the player sits later in the scene and
+		# is offered input first, so it opens the stall and then this handler saw
+		# the same press, found the stall open, and shut it again in one
+		# keystroke. Exactly what the map and the pack used to do.
+		if event.keycode == KEY_ESCAPE:
 			close_trade()
 			get_viewport().set_input_as_handled()

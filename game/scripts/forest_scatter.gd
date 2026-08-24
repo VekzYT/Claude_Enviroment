@@ -29,6 +29,10 @@ const FLOWER_PATCHES := 260
 const FLOWERS_PER_PATCH := 9
 const HERO_DEAD_TRUNKS := 14
 const HERO_STUMPS := 22
+# Flint to find. A handful sit close to the cabin so the first fire is not a
+# scavenger hunt, and the rest are spread over the valley.
+const FLINT_NEAR_HOME := 7
+const FLINT_SCATTERED := 38
 
 const MAX_TRIES_FACTOR := 30
 const ROAD_CLEARANCE := 6.5
@@ -92,6 +96,7 @@ func _ready() -> void:
 	_scatter_rocks()
 	_scatter_undergrowth()
 	_scatter_flowers()
+	_scatter_flint()
 	_place_hero_props()
 
 # ---------------------------------------------------------------- terrain io
@@ -1028,6 +1033,29 @@ func _scatter_rocks() -> void:
 		_add_multimesh("Boulders%d" % (i + 1), meshes[i], mat, xf_list, col_list, true)
 
 # ---------------------------------------------------------------- hero props
+
+const FLINT_SCENE: PackedScene = preload("res://scenes/placed_item.tscn")
+
+func _scatter_flint() -> void:
+	var home := Vector2(-14.0, 4.0)
+	var spots: Array[Vector2] = []
+	for i in FLINT_NEAR_HOME:
+		var a: float = rng.randf_range(0.0, TAU)
+		var r: float = rng.randf_range(6.0, 20.0)
+		spots.append(home + Vector2(cos(a), sin(a)) * r)
+	for p in _find_spots(FLINT_SCATTERED, 0.0, 1.5, COVER_MAX_SLOPE):
+		spots.append(p)
+
+	for spot in spots:
+		var stone: Node3D = FLINT_SCENE.instantiate() as Node3D
+		stone.set("kind", "flint")
+		# Positioned before it enters the tree, and parented on a deferred call:
+		# this runs inside the forest's own _ready, and the scene root is still
+		# setting up its children at that point, so a direct add_child is
+		# refused outright -- silently, as far as this loop can tell.
+		stone.position = Vector3(spot.x, _ground(spot.x, spot.y) + 0.11, spot.y)
+		stone.rotation.y = rng.randf_range(0.0, TAU)
+		get_parent().add_child.call_deferred(stone)
 
 func _place_hero_props() -> void:
 	# Real scanned meshes used sparingly as detail anchors. If the glTF import
