@@ -11,8 +11,6 @@ All assets sourced from [Poly Haven](https://polyhaven.com) (CC0 — public doma
 | `bark_albedo.jpg`, `bark_normal.jpg`, `bark_rough.jpg` | Bark Brown 02 | https://polyhaven.com/a/bark_brown_02 |
 | `concrete_albedo.jpg`, `concrete_normal.jpg`, `concrete_rough.jpg` | Dirty Concrete | https://polyhaven.com/a/dirty_concrete |
 | `rust_albedo.jpg`, `rust_normal.jpg`, `rust_rough.jpg` | Rusty Metal | https://polyhaven.com/a/rusty_metal |
-| `grass_albedo.jpg`, `grass_normal.jpg`, `grass_rough.jpg` | Leafy Grass | https://polyhaven.com/a/leafy_grass |
-| `sand_albedo.jpg`, `sand_normal.jpg`, `sand_rough.jpg` | Coast Sand 01 | https://polyhaven.com/a/coast_sand_01 |
 | `rock_albedo.jpg`, `rock_normal.jpg`, `rock_rough.jpg` | Rock Face | https://polyhaven.com/a/rock_face |
 | `wood_albedo.jpg`, `wood_normal.jpg`, `wood_rough.jpg` | Wood Planks | https://polyhaven.com/a/wood_planks |
 
