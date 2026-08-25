@@ -16,9 +16,12 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Tuning = require(Shared:WaitForChild("Tuning"))
 local Build = require(Shared:WaitForChild("Build"))
 local Audio = require(Shared:WaitForChild("Audio"))
+local Net = require(Shared:WaitForChild("Net"))
 
 local Run = require(script.Parent:WaitForChild("Run"))
 local Zombies = require(script.Parent:WaitForChild("Zombies"))
+local Wildlife = require(script.Parent:WaitForChild("Wildlife"))
+local Building = require(script.Parent:WaitForChild("Building"))
 
 local Actions = {}
 
@@ -26,6 +29,7 @@ local LOG_COLOUR = Color3.fromRGB(122, 92, 62)
 local SWING_COOLDOWN = 0.45
 
 local lastSwing: { [Player]: number } = {}
+local lastShot: { [Player]: number } = {}
 
 --------------------------------------------------------------------------------
 -- Feel
@@ -297,9 +301,46 @@ function Actions.handlePrompt(promptInstance: ProximityPrompt, player: Player)
 		target:Destroy()
 		Run.announce(run, string.format("Flint. You have %d.", stats.flint))
 
+	elseif tag == "meat" then
+		local amount = (target:GetAttribute("Amount") or 1) :: number
+		stats.rawMeat += amount
+		Audio.play("pickup", target.Position)
+		target:Destroy()
+		Run.announce(run, string.format("+%d raw meat. Cook it on a fire.", amount))
+		if stats.objective == 7 then
+			stats.objective = 8
+		end
+
+	elseif tag == "apple" then
+		stats.apples += 1
+		Audio.play("pickup", target.Position)
+		target:Destroy()
+		Run.announce(run, string.format("An apple. You have %d.", stats.apples))
+
+	elseif tag == "door" then
+		Building.toggleDoor(target)
+
+	elseif tag == "trade" then
+		Net.get("Shop"):FireClient(player, true)
+		Audio.play("uiPick", target)
+
 	elseif tag == "fire" then
+		-- A lit fire is a stove: cooking is what raw meat is for, and cooked
+		-- meat restores five times as much as raw.
 		if target:GetAttribute("Lit") then
-			Run.announce(run, "It is already burning.")
+			if stats.rawMeat > 0 then
+				local cooking = stats.rawMeat
+				stats.rawMeat = 0
+				stats.cookedMeat += cooking
+				Audio.play("ignite", target)
+				Run.announce(run, string.format("Cooked %d meat.", cooking))
+				if stats.objective == 8 then
+					stats.objective = 9
+				end
+			else
+				Run.announce(run, "It is already burning. Bring raw meat to cook.")
+			end
+			Run.sync(player)
 			return
 		end
 		if stats.flint < 1 then
@@ -345,6 +386,15 @@ function Actions.swing(player: Player)
 	if hit then
 		burst(where, Color3.fromRGB(96, 116, 78), 18, 26)
 		Audio.play("hitFlesh", where)
+		Run.sync(player)
+		return
+	end
+
+	-- Then wildlife. Two or three axe blows drops a deer, as in the original.
+	local animalHit, animalWhere = Wildlife.strike(
+		root.Position, root.CFrame.LookVector, run.arena.folder, if stats.hasAxe then 2 else 1, 16)
+	if animalHit then
+		burst(animalWhere, Color3.fromRGB(158, 74, 68), 16, 22)
 		Run.sync(player)
 		return
 	end
@@ -522,6 +572,115 @@ end
 
 function Actions.forget(player: Player)
 	lastSwing[player] = nil
+	lastShot[player] = nil
+end
+
+--------------------------------------------------------------------------------
+-- The bow
+--------------------------------------------------------------------------------
+
+local ARROW_RANGE = 340
+local ARROW_DAMAGE_ZOMBIE = 34
+local ARROW_DAMAGE_ANIMAL = 3
+
+-- A tracer rather than a physics projectile. An arrow that has to be simulated,
+-- replicated and collision-tested is a great deal of machinery for something
+-- that is on screen for a fifth of a second, and it misses at range when the
+-- server and client disagree about where the target is.
+local function drawArrow(from: Vector3, to: Vector3)
+	local delta = to - from
+	local shaft = Instance.new("Part")
+	shaft.Name = "Arrow"
+	shaft.Size = Vector3.new(0.16, 0.16, delta.Magnitude)
+	shaft.CFrame = CFrame.lookAt(from + delta / 2, to)
+	shaft.Color = Color3.fromRGB(196, 176, 138)
+	shaft.Material = Enum.Material.Wood
+	shaft.Anchored = true
+	shaft.CanCollide = false
+	shaft.CanQuery = false
+	shaft.Parent = workspace
+	Debris:AddItem(shaft, 0.12)
+end
+
+function Actions.loose(player: Player)
+	local run = Run.forPlayer(player)
+	local stats = Run.statsFor(player)
+	local root = rootOf(player)
+	if not run or not stats or not stats.alive or not root then
+		return
+	end
+	if not stats.hasBow then
+		return
+	end
+	if stats.arrows <= 0 then
+		Run.announce(run, "No arrows.")
+		return
+	end
+
+	local now = os.clock()
+	if now - (lastShot[player] or 0) < 0.7 then
+		return
+	end
+	lastShot[player] = now
+
+	stats.arrows -= 1
+	Audio.play("strike", root.Position)
+
+	local origin = root.Position + Vector3.new(0, 2, 0)
+	local direction = root.CFrame.LookVector
+
+	local hitZombie, zombieWhere = Zombies.strike(origin, direction, run.arena.folder, ARROW_DAMAGE_ZOMBIE)
+	if hitZombie then
+		drawArrow(origin, zombieWhere)
+		burst(zombieWhere, Color3.fromRGB(96, 116, 78), 16, 24)
+		Run.sync(player)
+		return
+	end
+
+	local hitAnimal, animalWhere = Wildlife.strike(origin, direction, run.arena.folder, ARROW_DAMAGE_ANIMAL, ARROW_RANGE)
+	if hitAnimal then
+		drawArrow(origin, animalWhere)
+		burst(animalWhere, Color3.fromRGB(158, 74, 68), 14, 20)
+		Run.sync(player)
+		return
+	end
+
+	drawArrow(origin, origin + direction * 90)
+	Run.sync(player)
+end
+
+-- Toggle the oil lamp. It is the least stealthy thing you can carry: animals
+-- notice you at nearly twice the range while it is lit.
+function Actions.toggleLamp(player: Player)
+	local run = Run.forPlayer(player)
+	local stats = Run.statsFor(player)
+	if not run or not stats or not stats.hasLamp then
+		return
+	end
+
+	stats.lampOn = not stats.lampOn
+	local character = player.Character
+	local head = if character then character:FindFirstChild("Head") else nil
+
+	if head and head:IsA("BasePart") then
+		local existing = head:FindFirstChild("LampLight")
+		if stats.lampOn and not existing then
+			local light = Instance.new("SpotLight")
+			light.Name = "LampLight"
+			light.Color = Color3.fromRGB(255, 206, 150)
+			light.Range = 68
+			light.Angle = 70
+			light.Brightness = 3
+			light.Face = Enum.NormalId.Front
+			light.Shadows = true
+			light.Parent = head
+		elseif existing and not stats.lampOn then
+			existing:Destroy()
+		end
+	end
+
+	Run.announce(run, if stats.lampOn then "Lamp lit. They will hear you coming." else "Lamp out.")
+	Run.sync(player)
 end
 
 return Actions

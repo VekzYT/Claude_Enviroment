@@ -15,6 +15,9 @@ local Lobby = require(script:WaitForChild("Lobby"))
 local Run = require(script:WaitForChild("Run"))
 local Zombies = require(script:WaitForChild("Zombies"))
 local Actions = require(script:WaitForChild("Actions"))
+local Wildlife = require(script:WaitForChild("Wildlife"))
+local Building = require(script:WaitForChild("Building"))
+local Trading = require(script:WaitForChild("Trading"))
 
 Lobby.build()
 Arenas.build()
@@ -53,6 +56,54 @@ Run.onHorde = function(run)
 		end
 	)
 end
+
+-- Wildlife lives in the arena rather than the run, so the forest is populated
+-- whether or not anybody is currently in it.
+for index = 1, Arenas.count() do
+	local arena = Arenas.at(index)
+	if arena then
+		Wildlife.populate(
+			arena.folder,
+			arena.origin,
+			function(x, z)
+				return Landscape.heightAt(arena.seed, x, z)
+			end,
+			function()
+				local watchers: { { root: BasePart, lamp: boolean } } = {}
+				for _, player in Players:GetPlayers() do
+					local run = Run.forPlayer(player)
+					local stats = Run.statsFor(player)
+					if run and stats and run.arena.index == arena.index then
+						local character = player.Character
+						local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+						if root and root:IsA("BasePart") then
+							table.insert(watchers, { root = root, lamp = stats.lampOn })
+						end
+					end
+				end
+				return watchers
+			end
+		)
+	end
+end
+
+-- The pedlar walks his circuit on the run's own clock.
+task.spawn(function()
+	local last = os.clock()
+	while true do
+		task.wait(0.2)
+		local now = os.clock()
+		local dt = now - last
+		last = now
+		local live = Run.all()
+		Trading.sweep(live)
+		for _, run in live do
+			Trading.update(run, function(x, z)
+				return Landscape.heightAt(run.arena.seed, x, z)
+			end, dt)
+		end
+	end
+end)
 
 Lobby.start()
 
@@ -114,6 +165,30 @@ end)
 
 Net.get("Eat").OnServerEvent:Connect(function(player, foodId)
 	Actions.eat(player, foodId)
+end)
+
+Net.get("Loose").OnServerEvent:Connect(function(player)
+	Actions.loose(player)
+end)
+
+Net.get("Lamp").OnServerEvent:Connect(function(player)
+	Actions.toggleLamp(player)
+end)
+
+Net.get("Place").OnServerEvent:Connect(function(player, pieceId, point, rotation)
+	Building.place(player, pieceId, point, rotation)
+end)
+
+Net.get("Unplace").OnServerEvent:Connect(function(player, point)
+	Building.remove(player, point)
+end)
+
+Net.get("Sell").OnServerEvent:Connect(function(player, itemId)
+	Trading.sell(player, itemId)
+end)
+
+Net.get("Buy").OnServerEvent:Connect(function(player, itemId)
+	Trading.buy(player, itemId)
 end)
 
 Net.get("Sprint").OnServerEvent:Connect(function(player, sprinting)

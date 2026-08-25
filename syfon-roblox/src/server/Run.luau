@@ -38,6 +38,7 @@ export type Stats = {
 	hasAxe: boolean,
 	hasBow: boolean,
 	hasLamp: boolean,
+	lampOn: boolean,
 	carryingLog: boolean,
 
 	objective: number,
@@ -85,6 +86,7 @@ local function newStats(): Stats
 		hasAxe = false,
 		hasBow = false,
 		hasLamp = false,
+		lampOn = false,
 		carryingLog = false,
 		objective = 1,
 		alive = true,
@@ -141,6 +143,7 @@ function Run.sync(player: Player)
 		hasAxe = stats.hasAxe,
 		hasBow = stats.hasBow,
 		hasLamp = stats.hasLamp,
+		lampOn = stats.lampOn,
 		carryingLog = stats.carryingLog,
 		objective = stats.objective,
 	})

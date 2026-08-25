@@ -14,6 +14,13 @@ local REMOTE_NAMES = {
 	"Swing", -- client -> server: swing whatever is held
 	"Eat", -- client -> server: eat (foodId)
 	"Sprint", -- client -> server: sprinting or not
+	"Loose", -- client -> server: loose an arrow
+	"Lamp", -- client -> server: toggle the oil lamp
+	"Place", -- client -> server: (pieceId, point, rotation)
+	"Unplace", -- client -> server: (point)
+	"Sell", -- client -> server: (itemId)
+	"Buy", -- client -> server: (itemId)
+	"Shop", -- server -> client: open or close the pedlar's screen
 }
 
 local Net = {}

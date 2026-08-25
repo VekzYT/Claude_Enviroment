@@ -17,6 +17,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Build = require(Shared:WaitForChild("Build"))
 local Audio = require(Shared:WaitForChild("Audio"))
 
+local Building = require(script.Parent:WaitForChild("Building"))
+
 local Zombies = {}
 
 local BASE_COUNT = 14 -- per player in the run
@@ -217,21 +219,38 @@ function Zombies.unleash(runId: number, arenaFolder: Folder, origin: Vector3,
 						local toTarget = targetRoot.Position - zombie.root.Position
 						local distance = toTarget.Magnitude
 
-						if distance <= ATTACK_RANGE then
+						local direction = Vector3.new(toTarget.X, 0, toTarget.Z)
+						direction = if direction.Magnitude > 0.01 then direction.Unit else zombie.root.CFrame.LookVector
+
+						-- Anything built between it and its target is hit first.
+						-- This is what makes ten days of chopping worth
+						-- something: they have to come through what you put up.
+						local blocking = Building.blockingAt(arenaFolder, zombie.root.Position, direction, math.min(distance, 9))
+						if blocking then
+							if now >= zombie.nextAttack then
+								zombie.nextAttack = now + ATTACK_COOLDOWN
+								Building.damage(blocking, ATTACK_DAMAGE * 1.6)
+								if blocking.PrimaryPart then
+									Audio.play("chop", blocking.PrimaryPart.Position)
+								end
+							end
+							zombie.root.AssemblyLinearVelocity =
+								Vector3.new(0, zombie.root.AssemblyLinearVelocity.Y, 0)
+
+						elseif distance <= ATTACK_RANGE then
 							if now >= zombie.nextAttack then
 								zombie.nextAttack = now + ATTACK_COOLDOWN
 								damage(target, ATTACK_DAMAGE)
 							end
 							zombie.root.AssemblyLinearVelocity = Vector3.new(0, zombie.root.AssemblyLinearVelocity.Y, 0)
+
 						else
 							local speed = if distance < 26 then LUNGE_SPEED else WALK_SPEED
-							local direction = Vector3.new(toTarget.X, 0, toTarget.Z).Unit
 							zombie.root.AssemblyLinearVelocity = Vector3.new(
 								direction.X * speed,
 								zombie.root.AssemblyLinearVelocity.Y,
 								direction.Z * speed
 							)
-							-- Face the way they are going.
 							local look = CFrame.lookAt(zombie.root.Position, zombie.root.Position + direction)
 							zombie.root.CFrame = CFrame.new(zombie.root.Position) * (look - look.Position)
 						end

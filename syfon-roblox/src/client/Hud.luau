@@ -33,6 +33,7 @@ local stockLabel: TextLabel
 local objectiveLabel: TextLabel
 local hintLabel: TextLabel
 local bannerLabel: TextLabel
+local buildLabel: TextLabel
 local flash: Frame
 
 local atmosphere: Atmosphere
@@ -258,6 +259,13 @@ function Hud.build()
 	bannerLabel.TextStrokeTransparency = 1
 	bannerLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
 
+	-- Build mode's own status line, above the objective.
+	buildLabel = text("BuildStatus", screen, 15)
+	buildLabel.Size = UDim2.new(0, 860, 0, 22)
+	buildLabel.Position = UDim2.new(0.5, -430, 1, -92)
+	buildLabel.TextXAlignment = Enum.TextXAlignment.Center
+	buildLabel.Visible = false
+
 	setupWorldLook()
 
 	-- Camera shake, driven by whatever set `shake`.
@@ -325,14 +333,16 @@ function Hud.update(state: { [string]: any })
 			state.daysLeft, if state.daysLeft == 1 then "" else "s")
 	end
 
-	stockLabel.Text = string.format("%d wood  ·  %d flint  ·  %d coins%s",
-		state.wood, state.flint, state.coins,
-		if state.carryingLog then "   <font color='#CAA058'>carrying a log</font>" else "")
+	stockLabel.Text = string.format(
+		"%d wood  ·  %d flint  ·  %d coins  ·  %d arrows%s%s",
+		state.wood, state.flint, state.coins, state.arrows,
+		if state.carryingLog then "   <font color='#CAA058'>carrying a log</font>" else "",
+		if state.lampOn then "   <font color='#E2BC68'>lamp lit</font>" else "")
 
 	local step = Tuning.Objectives[state.objective]
 	if horde then
 		objectiveLabel.Text = "Survive until dawn"
-		hintLabel.Text = "swing with the axe  ·  they do not stop coming"
+		hintLabel.Text = "swing with the axe  ·  R looses an arrow  ·  they do not stop coming"
 	elseif step then
 		objectiveLabel.Text = step.text
 		hintLabel.Text = step.hint
@@ -342,6 +352,10 @@ function Hud.update(state: { [string]: any })
 	end
 
 	applySky(state.timeOfDay, horde)
+end
+
+function Hud.buildStatus(): TextLabel
+	return buildLabel
 end
 
 function Hud.announce(message: string)

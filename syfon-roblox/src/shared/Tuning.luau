@@ -88,12 +88,16 @@ Tuning.ShopStock = {
 Tuning.BUILD_GRID = 2.0 * STUDS_PER_METRE
 Tuning.BUILD_REACH = 8.0 * STUDS_PER_METRE
 
+-- Sizes live here so the client's ghost and the server's real piece cannot
+-- disagree about how big a wall is.
+local G = Tuning.BUILD_GRID
+
 Tuning.Pieces = {
-	{ id = "wall", name = "Wall", cost = 6, refund = 3 },
-	{ id = "door", name = "Doorway", cost = 10, refund = 5 },
-	{ id = "floor", name = "Floor", cost = 5, refund = 2 },
-	{ id = "ramp", name = "Ramp", cost = 7, refund = 3 },
-	{ id = "post", name = "Torch post", cost = 4, refund = 2 },
+	{ id = "wall", name = "Wall", cost = 6, refund = 3, size = Vector3.new(G, G * 1.6, 1.2), health = 260 },
+	{ id = "door", name = "Doorway", cost = 10, refund = 5, size = Vector3.new(G, G * 1.6, 1.2), health = 200 },
+	{ id = "floor", name = "Floor", cost = 5, refund = 2, size = Vector3.new(G, 1.2, G), health = 180 },
+	{ id = "ramp", name = "Ramp", cost = 7, refund = 3, size = Vector3.new(G, G * 0.9, G), health = 180 },
+	{ id = "post", name = "Torch post", cost = 4, refund = 2, size = Vector3.new(1.4, G * 1.5, 1.4), health = 90 },
 }
 
 Tuning.FIREWOOD_COST = 3

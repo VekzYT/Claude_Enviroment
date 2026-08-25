@@ -97,22 +97,52 @@ use — the same snap is a chop at 0.8 and a splitting log at 0.5. That needs no
 upload and no moderation, which is the only way to have audio at all before the
 real assets go up.
 
+## Controls
+
+| | |
+|---|---|
+| **E** | Whatever the prompt in front of you says |
+| **Left click** | Swing |
+| **R** | Loose an arrow |
+| **B** | Build mode — scroll to change piece, R to turn, right click removes |
+| **F** | Eat the best food you have |
+| **L** | Oil lamp |
+| **Shift** | Sprint |
+
+## The ten days
+
+**Days 1–2.** Take the axe off the block. Fell a tree, shoulder the log, carry it
+home, split it. Twelve wood a log, and wood is the only currency that matters.
+
+**Day 2.** Tomas arrives and walks a circuit past the cabin. He buys wood, meat
+and apples; he sells the bow, arrows and the oil lamp. He is the only ranged
+weapon in the valley.
+
+**Days 2–9.** Hunt — deer, boar, hare and elk, which notice you at 16 metres and
+bolt for seven seconds. A boar turns and charges instead. Light a fire with flint
+and wood, cook on it, eat. And build: five pieces on a grid, paid for in the wood
+you chopped.
+
+**Day 10, nightfall.** They come. The screen drains of colour, the fog closes in,
+and the horde walks in from every direction in waves that do not stop. **They go
+through your walls, not around them** — every piece has health and they chew.
+Survive until sunrise.
+
+**Day 10 is also the day Tomas leaves.** His going is the last warning.
+
 ## In
 
-Lobby and matchmaking · three sculpted arenas with cabin, forest, pond, rocks
-and flint · the ten-day clock with day/night · felling, carrying, splitting,
-wood · lighting a fire with flint · hunger, stamina, starvation · the objective
-chain · **the day-10 horde**, waves that never stop until dawn · melee against
-them · win and loss.
+Lobby with solo, duo, trio and squad pads · three sculpted arenas · the ten-day
+clock · felling, carrying, splitting · flint, fire and cooking · hunting four
+species · apples · the pedlar, buying and selling · the bow · the oil lamp ·
+**building, with walls the horde has to break** · the day-10 horde · win and loss.
 
 ## Not in yet
 
-Wildlife and hunting · the pedlar and trading · cooking on the fire
-· the bow · building · the lamp · the map screen. All of their numbers are
-already in `Tuning.luau`, so each is a system to write rather than a design to
-redo.
+The map screen, and the carried-log model on your shoulder.
 
-Audio and models are the other gap: Syfon's 81 sounds and its `.glb` models
+Audio and models are the real gap: Syfon's 81 sounds and its `.glb` models
 cannot be referenced from here — Roblox assets have to be uploaded through the
-Creator Dashboard and moderated before a script can use them. Everything you
-see now is built from primitives.
+Creator Dashboard and moderated before a script may use them. Everything you
+hear now is Roblox's own built-in `rbxasset://` audio, pitched and levelled per
+use, and everything you see is built from primitives.

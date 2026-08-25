@@ -20,6 +20,7 @@ local ARENA_SPACING = 3000
 local TREE_COUNT = 130
 local ROCK_COUNT = 34
 local FLINT_COUNT = 22
+local APPLE_COUNT = 26
 local TUFT_COUNT = 260
 
 local COLOURS = {
@@ -191,6 +192,54 @@ end
 -- Scatter
 --------------------------------------------------------------------------------
 
+-- Flint and apples are used up during a run, so they are scattered separately
+-- and re-scattered when the arena is handed back.
+local function scatterConsumables(arena: Arena)
+	local rng = Build.rng(math.floor(arena.seed * 104729) + os.time() % 1000)
+	local shape = Landscape.shape()
+
+	local props = Instance.new("Folder")
+	props.Name = "Props"
+	props.Parent = arena.folder
+
+	local function findGround(minRadius: number, maxRadius: number, maxHeight: number): Vector3?
+		for _ = 1, 24 do
+			local angle = rng:NextNumber(0, math.pi * 2)
+			local radius = rng:NextNumber(minRadius, maxRadius)
+			local x, z = math.cos(angle) * radius, math.sin(angle) * radius
+			local y = Landscape.heightAt(arena.seed, x, z)
+			if y > shape.waterLevel + 3 and y < maxHeight then
+				return Vector3.new(arena.origin.X + x, y, arena.origin.Z + z)
+			end
+		end
+		return nil
+	end
+
+	for i = 1, FLINT_COUNT do
+		local point = if i <= 7 then findGround(14, 46, 80) else findGround(50, shape.radius - 70, 90)
+		if point then
+			local flint = Build.part({ name = "Flint", size = Vector3.new(1.8, 0.9, 1.5),
+				cframe = CFrame.new(point + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
+				colour = COLOURS.flint, material = Enum.Material.Slate, canCollide = false }, props)
+			prompt(flint, "Pick up", "Flint", "flint")
+		end
+	end
+
+	for _ = 1, APPLE_COUNT do
+		local point = findGround(shape.clearingRadius, shape.radius - 80, 70)
+		if point then
+			local apple = Build.part({ name = "Apple", size = Vector3.new(1.4, 1.4, 1.4),
+				cframe = CFrame.new(point + Vector3.new(0, 0.8, 0)),
+				colour = Color3.fromRGB(178, 58, 48), material = Enum.Material.SmoothPlastic,
+				canCollide = false }, props)
+			local mesh = Instance.new("SpecialMesh")
+			mesh.MeshType = Enum.MeshType.Sphere
+			mesh.Parent = apple
+			prompt(apple, "Pick up", "Apple", "apple")
+		end
+	end
+end
+
 local function scatter(arena: Arena, parent: Instance)
 	local rng = Build.rng(math.floor(arena.seed * 7919))
 	local shape = Landscape.shape()
@@ -199,9 +248,9 @@ local function scatter(arena: Arena, parent: Instance)
 	trees.Name = "Trees"
 	trees.Parent = parent
 
-	local props = Instance.new("Folder")
-	props.Name = "Props"
-	props.Parent = parent
+	local rocks = Instance.new("Folder")
+	rocks.Name = "Rocks"
+	rocks.Parent = parent
 
 	local detail = Instance.new("Folder")
 	detail.Name = "Detail"
@@ -238,21 +287,7 @@ local function scatter(arena: Arena, parent: Instance)
 	for _ = 1, ROCK_COUNT do
 		local point = findGround(shape.clearingRadius + 6, shape.radius - 50, 110)
 		if point then
-			Flora.rock(point, props, rng)
-		end
-	end
-
-	for i = 1, FLINT_COUNT do
-		-- A third of it close to the cabin: the fire step should be findable
-		-- without a twenty-minute hunt, which was true in the original too.
-		local point = if i <= 7
-			then findGround(14, 46, 80)
-			else findGround(50, shape.radius - 70, 90)
-		if point then
-			local flint = Build.part({ name = "Flint", size = Vector3.new(1.8, 0.9, 1.5),
-				cframe = CFrame.new(point + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
-				colour = COLOURS.flint, material = Enum.Material.Slate, canCollide = false }, props)
-			prompt(flint, "Pick up", "Flint", "flint")
+			Flora.rock(point, rocks, rng)
 		end
 	end
 
@@ -283,6 +318,7 @@ local function buildArena(index: number): Arena
 	arena.spawnCFrame = buildCabin(arena, folder)
 	buildFirePit(arena, folder)
 	scatter(arena, folder)
+	scatterConsumables(arena)
 
 	return arena
 end
@@ -332,14 +368,29 @@ function Arenas.release(arena: Arena)
 		end
 	end
 
-	for _, name in { "Logs", "Zombies", "Animals" } do
+	for _, name in { "Logs", "Zombies", "Drops", "Structures" } do
 		local group = arena.folder:FindFirstChild(name)
 		if group then
 			group:Destroy()
 		end
 	end
 
+	-- Animals are deliberately left alone: the herd belongs to the arena, not
+	-- to the run, so the forest is alive whether or not anyone is in it.
+
+	-- Flint and apples are consumed during a run and have to come back, or the
+	-- second party to use this arena finds a valley picked clean.
+	local props = arena.folder:FindFirstChild("Props")
+	if props then
+		props:Destroy()
+		scatterConsumables(arena)
+	end
+
 	arena.inUse = false
+end
+
+function Arenas.at(index: number): Arena?
+	return arenas[index]
 end
 
 function Arenas.count(): number
