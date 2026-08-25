@@ -7,6 +7,7 @@ const { Swarm } = require('./lib/swarm')
 const { commands } = require('./lib/commands')
 const brain = require('./lib/brain')
 
+const VERSION = require('./package.json').version
 const log = (...a) => console.log(`[${new Date().toISOString().slice(11, 19)}]`, ...a)
 
 // Words that address the whole crew rather than one bot.
@@ -125,6 +126,13 @@ function controlServer () {
 }
 
 async function main () {
+  console.log('')
+  console.log('  ==============================')
+  console.log(`   Claude bot  v${VERSION}`)
+  console.log('  ==============================')
+  console.log(`   AI chat: ${brain.enabled() ? brain.providerName() : 'off (no API key set)'}`)
+  console.log('  ==============================')
+  console.log('')
   if (!cfg.direct) {
     try { via = await viaproxy.start(cfg, log) } catch (e) {
       log('ViaProxy failed:', e.message)
@@ -138,7 +146,7 @@ async function main () {
     const p = leader.bot.entity.position
     log(`ready at ${p.x.toFixed(0)},${p.y.toFixed(0)},${p.z.toFixed(0)} (${leader.bot.game.gameMode})`)
     if (brain.enabled()) {
-      log('AI chat is on - the bots understand plain English')
+      log(`AI chat is ON via ${brain.providerName()} - they understand plain English`)
       leader.bot.chat(`ready - just talk to me, e.g. "${cfg.prefix} build us a house"`)
     } else {
       leader.bot.chat(`ready - say "${cfg.prefix} help", or "${cfg.prefix} spawn 3" for company`)

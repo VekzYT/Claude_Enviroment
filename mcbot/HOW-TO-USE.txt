@@ -13,9 +13,16 @@ TO START
 
 
 TALKING TO THEM IN PLAIN ENGLISH (optional)
-  Open run-bot.bat in Notepad and put an API key on the line that says
-  set ANTHROPIC_API_KEY=
-  Get one at https://console.anthropic.com -> API keys.
+  Open run-bot.bat in Notepad. Fill in ONE of these three, then save:
+
+    set ANTHROPIC_API_KEY=      Claude   https://console.anthropic.com
+    set OPENAI_API_KEY=         ChatGPT  https://platform.openai.com
+    set GEMINI_API_KEY=         Gemini   https://aistudio.google.com
+
+  Any one of them works - use whichever you already have. When the bot
+  starts it prints which one it picked up:
+
+    AI chat: openai (gpt-4o-mini)
 
   Then you can just talk to them:
 
@@ -24,9 +31,12 @@ TALKING TO THEM IN PLAIN ENGLISH (optional)
     claude get me some wood and then follow me
     claude split up and build three towers
 
-  Anything it does not recognise as a command gets worked out by Claude,
-  which then runs the right commands. Without a key it still works, but
-  only understands the exact commands below.
+  If your provider rejects the default model name, set a different one:
+
+    set MC_AI_MODEL=gpt-5
+
+  Without any key it still works, but only understands the exact
+  commands below.
 
 
 TALKING TO THEM
