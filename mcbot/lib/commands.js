@@ -490,6 +490,12 @@ const commands = {
 
   say: { desc: 'say <text>', run: ({ bot, args }) => bot.chat(args.join(' ')) },
 
+  version: {
+    desc: 'which version of me is running',
+    run: ({ reply, swarm }) => reply(
+      `v${require('../package.json').version}, ${swarm.members.length} of us running`)
+  },
+
   dance: {
     desc: 'dance',
     run: async ({ bot, reply }) => {

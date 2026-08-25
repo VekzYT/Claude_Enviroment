@@ -181,9 +181,9 @@ async function main () {
     log(`ready at ${p.x.toFixed(0)},${p.y.toFixed(0)},${p.z.toFixed(0)} (${leader.bot.game.gameMode})`)
     if (brain.enabled()) {
       log(`AI chat is ON via ${brain.providerName()} - they understand plain English`)
-      leader.bot.chat(`ready - just talk to me, e.g. "${cfg.prefix} build us a house"`)
+      leader.bot.chat(`ready v${VERSION} - just talk to me, e.g. "${cfg.prefix} build us a house"`)
     } else {
-      leader.bot.chat(`ready - say "${cfg.prefix} help", or "${cfg.prefix} spawn 3" for company`)
+      leader.bot.chat(`ready v${VERSION} - say "${cfg.prefix} help" or "${cfg.prefix} spawn 3"`)
     }
   } catch (e) {
     log('could not join:', e.message)
