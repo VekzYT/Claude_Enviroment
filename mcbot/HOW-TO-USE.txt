@@ -1,36 +1,84 @@
-Claude's Minecraft bot
-======================
+Claude's Minecraft bots
+=======================
 
 WHAT YOU NEED
-  1. Your server already running (start-server.bat, window left open)
-  2. Java 25  - you already installed this for the server
-  3. Node.js  - https://nodejs.org  (click the LTS button, install, done)
+  1. Your server running (start-server.bat, window left open)
+  2. Java 25   - already installed for the server
+  3. Node.js   - https://nodejs.org  (click the LTS button)
 
-TO START THE BOT
+TO START
   Double-click  run-bot.bat
-  Leave the window open. Close it and the bot leaves the game.
+  Leave the window open. Close it and the bots leave.
+  First run downloads what it needs, once.
 
-The first run downloads two things by itself and then never again.
 
-TALKING TO IT
-  Type in normal Minecraft chat, starting with the word "claude":
+TALKING TO THEM
+  Type in normal Minecraft chat.
 
-    claude help              list everything it can do
-    claude come              walks to you
-    claude follow            follows you around
-    claude stop              stops what it is doing
-    claude mine wood 10      finds trees, chops them, picks the logs up
-    claude mine iron 5       same for iron ore
-    claude give oak_log      throws you what it is carrying
-    claude tower 10          pillars straight up
-    claude place stone       places a block
-    claude guard             fights hostile mobs near it
-    claude attack zombie     attacks the closest zombie
-    claude craft stick       crafts (needs a crafting table within 6 blocks)
-    claude where             says where it is
-    claude look              says what is around it
-    claude inv               lists what it is carrying
-    claude sleep             finds a bed and sleeps
+  claude help            what it can do
+  claude spawn 3         three more of them show up
+  claude crew            who is here
+  claude dismiss all     send the extras home
 
-IF IT SAYS IT CANNOT CONNECT
+  Once there is more than one, address them by name:
+    claude2 come         just that one
+    all follow           every one of them
+
+
+BUILDING
+  claude build list          everything it can build
+  claude build house 9 9     a house, 9x9
+  claude build tower 15      a tower 15 high
+  claude build pyramid 11
+  claude build bridge 20
+  claude build farm 9
+  claude stop                cancel a build in progress
+
+  Also: wall, box, platform, stairs, road, pool
+
+  Building is SLOW right now - a house takes a few minutes.
+  It works, it just is not quick yet.
+
+  Try:  all build tower 10    (they each build one)
+
+
+GETTING THINGS (creative)
+  claude bring diamond_sword     hands you any item
+  claude bring oak_log 64
+  claude give <item>             gives you what it carries
+  claude inv                     what it is holding
+
+
+JOBS
+  claude mine wood 10        finds trees, chops, picks up
+  claude mine iron 5
+  claude collect             picks up dropped items
+  claude harvest             harvests ripe crops
+  claude clear 5             flattens the area around it
+  claude chest               dumps its things in a nearby chest
+
+
+MOVING
+  claude come / follow / stop
+  claude goto 100 70 -200
+  claude fly 100 90 -200     (creative)
+  claude explore 60
+
+
+FIGHTING
+  claude guard               fights hostiles that come near
+  claude attack zombie
+  claude hunt skeleton
+
+
+ODDS AND ENDS
+  claude where / look / eat / sleep / dance
+  claude light 8             rings it with torches
+  claude tower 10            pillars straight up
+  claude place stone
+  claude craft stick
+  claude wear diamond_helmet
+
+
+IF IT WILL NOT CONNECT
   Make sure the server window is open and says Done.
