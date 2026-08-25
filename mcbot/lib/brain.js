@@ -166,10 +166,27 @@ async function think ({ message, sender, bot, swarm, self, commands, history }) 
   return plan
 }
 
+/** Turn a provider's error into something a player can act on. */
+function explain (err) {
+  const status = err && err.status
+  const msg = String((err && err.message) || err)
+  const provider = detect()
+  if (status === 401 || status === 403) return 'my API key was rejected - check it in run-bot.bat'
+  if (status === 429 && /credit|quota|billing|insufficient/i.test(msg)) {
+    return provider === 'openai'
+      ? 'no credits on the OpenAI account - add some at platform.openai.com/billing'
+      : 'the AI account is out of credit or quota'
+  }
+  if (status === 429) return 'being rate limited - try again in a moment'
+  if (status === 404 && /model/i.test(msg)) return 'that model is not on this account - set MC_AI_MODEL to one that is'
+  if (status >= 500) return 'the AI service is having trouble - try again shortly'
+  return msg.slice(0, 70)
+}
+
 const enabled = () => Boolean(getClient())
 const providerName = () => {
   const g = getClient()
   return g ? `${g.provider} (${process.env.MC_AI_MODEL || DEFAULT_MODEL[g.provider]})` : 'none'
 }
 
-module.exports = { think, enabled, providerName, detect }
+module.exports = { think, enabled, providerName, detect, explain }

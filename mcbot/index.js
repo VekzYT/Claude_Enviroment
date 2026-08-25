@@ -6,6 +6,7 @@ const viaproxy = require('./lib/viaproxy')
 const { Swarm } = require('./lib/swarm')
 const { commands } = require('./lib/commands')
 const brain = require('./lib/brain')
+const builder = require('./lib/builder')
 
 const VERSION = require('./package.json').version
 const log = (...a) => console.log(`[${new Date().toISOString().slice(11, 19)}]`, ...a)
@@ -57,7 +58,7 @@ async function askBrain (member, text, sender) {
     }
   } catch (e) {
     log('brain error:', e.message)
-    reply('my head is not working: ' + String(e.message).slice(0, 50))
+    reply(brain.explain(e))
   }
 }
 
@@ -83,8 +84,13 @@ function dispatch (message, sender, allowBrain = true) {
   const name = parts[1].toLowerCase()
   const args = parts.slice(2)
 
-  // Not a command we know - if there is an API key, let Claude interpret it.
-  if (!commands[name] && allowBrain && brain.enabled()) {
+  // Hand it to the AI when we do not know the command at all, or when we know it
+  // but the arguments are plainly prose ("build me something nice").
+  const unknownCommand = !commands[name]
+  const nonsenseBuild = name === 'build' && args[0] &&
+    args[0].toLowerCase() !== 'list' &&
+    !builder.blueprints.includes(args[0].toLowerCase())
+  if ((unknownCommand || nonsenseBuild) && allowBrain && brain.enabled()) {
     askBrain(targets[0], parts.slice(1).join(' '), sender)
     return
   }
