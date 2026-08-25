@@ -12,6 +12,23 @@ TO START
   First run downloads what it needs, once.
 
 
+TALKING TO THEM IN PLAIN ENGLISH (optional)
+  Open run-bot.bat in Notepad and put an API key on the line that says
+  set ANTHROPIC_API_KEY=
+  Get one at https://console.anthropic.com -> API keys.
+
+  Then you can just talk to them:
+
+    claude build us a house next to the lake
+    claude what are you carrying
+    claude get me some wood and then follow me
+    claude split up and build three towers
+
+  Anything it does not recognise as a command gets worked out by Claude,
+  which then runs the right commands. Without a key it still works, but
+  only understands the exact commands below.
+
+
 TALKING TO THEM
   Type in normal Minecraft chat.
 

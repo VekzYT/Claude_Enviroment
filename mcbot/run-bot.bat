@@ -2,6 +2,13 @@
 cd /d "%~dp0"
 title Claude bot
 
+rem ===================================================================
+rem  OPTIONAL - talk to the bots in plain English instead of commands.
+rem  Get a key at  https://console.anthropic.com  ->  API keys,
+rem  then put it between the quotes below and save this file.
+rem ===================================================================
+set ANTHROPIC_API_KEY=
+
 where node >nul 2>&1
 if errorlevel 1 (
   echo.
@@ -27,8 +34,13 @@ set MC_PREFIX=claude
 set MC_BACKEND_PROXY=
 
 echo.
-echo Starting the bot. First run downloads ViaProxy (47MB), one time.
-echo Leave this window open. Close it to make the bot leave.
+if "%ANTHROPIC_API_KEY%"=="" (
+  echo Running with fixed commands only. Say "claude help" in game.
+  echo To talk to them in plain English, put an API key in this file.
+) else (
+  echo AI chat is ON - just talk to them normally.
+)
+echo Leave this window open. Close it to make the bots leave.
 echo.
 node index.js
 pause
