@@ -1,49 +1,84 @@
 'use strict'
 // Natural-language understanding.
 //
-// Works with whichever API key you have. Set exactly one of:
-//   ANTHROPIC_API_KEY   - Claude
-//   OPENAI_API_KEY      - ChatGPT
-//   GEMINI_API_KEY      - Google Gemini
+// Works with whichever provider you have. Set one key and it is picked up:
+//   GROQ_API_KEY        Groq        free, no card
+//   OPENROUTER_API_KEY  OpenRouter  free models, no card
+//   GEMINI_API_KEY      Gemini      free tier
+//   ANTHROPIC_API_KEY   Claude      paid
+//   OPENAI_API_KEY      ChatGPT     paid
+//   XAI_API_KEY         Grok        paid (sign-up credits)
+// Or run a model on this PC with no key at all: MC_AI_PROVIDER=ollama
 // With none of them the bot still runs, but only answers exact commands.
 
 const builder = require('./builder')
 
-// Gemini exposes an OpenAI-shaped endpoint, so one client library covers both.
-const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai/'
+// Everything except Anthropic speaks the OpenAI protocol, so one client library
+// covers them all - only the base URL and the default model differ.
+const PROVIDERS = {
+  anthropic: {
+    env: ['ANTHROPIC_API_KEY'], model: 'claude-opus-5', free: false, label: 'Claude'
+  },
+  groq: {
+    env: ['GROQ_API_KEY'], base: 'https://api.groq.com/openai/v1',
+    model: 'llama-3.3-70b-versatile', free: true, label: 'Groq'
+  },
+  openrouter: {
+    env: ['OPENROUTER_API_KEY'], base: 'https://openrouter.ai/api/v1',
+    model: 'meta-llama/llama-3.3-70b-instruct:free', free: true, label: 'OpenRouter'
+  },
+  gemini: {
+    env: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+    base: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+    model: 'gemini-2.0-flash', free: true, label: 'Gemini'
+  },
+  xai: {
+    env: ['XAI_API_KEY', 'GROK_API_KEY'], base: 'https://api.x.ai/v1',
+    model: 'grok-3-mini', free: false, label: 'Grok'
+  },
+  openai: {
+    env: ['OPENAI_API_KEY'], model: 'gpt-4o-mini', free: false, label: 'ChatGPT'
+  },
+  // Runs on this PC. No key, no account, no limits - needs ollama installed.
+  ollama: {
+    env: [], base: process.env.OLLAMA_URL || 'http://127.0.0.1:11434/v1',
+    model: 'llama3.2', free: true, local: true, label: 'Ollama (on this PC)'
+  }
+}
 
-function detect () {
-  if (process.env.ANTHROPIC_API_KEY) return 'anthropic'
-  if (process.env.OPENAI_API_KEY) return 'openai'
-  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) return 'gemini'
+const ORDER = ['anthropic', 'groq', 'openrouter', 'gemini', 'xai', 'openai']
+
+const keyFor = name => {
+  for (const e of PROVIDERS[name].env) if (process.env[e]) return process.env[e]
   return null
 }
 
-const DEFAULT_MODEL = {
-  anthropic: 'claude-opus-5',
-  openai: 'gpt-4o-mini',
-  gemini: 'gemini-2.0-flash'
+function detect () {
+  const forced = (process.env.MC_AI_PROVIDER || '').toLowerCase()
+  if (forced && PROVIDERS[forced]) return forced
+  for (const name of ORDER) if (keyFor(name)) return name
+  return null
 }
+
+const modelFor = name => process.env.MC_AI_MODEL || PROVIDERS[name].model
 
 let cached = null
 function getClient () {
   if (cached) return cached
-  const provider = detect()
-  if (!provider) return null
+  const name = detect()
+  if (!name) return null
   try {
-    if (provider === 'anthropic') {
+    if (name === 'anthropic') {
       const Anthropic = require('@anthropic-ai/sdk')
-      cached = { provider, client: new Anthropic() }
+      cached = { provider: name, client: new Anthropic() }
     } else {
       const OpenAI = require('openai')
       cached = {
-        provider,
-        client: new OpenAI(provider === 'gemini'
-          ? { apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY, baseURL: GEMINI_BASE }
-          : { apiKey: process.env.OPENAI_API_KEY })
+        provider: name,
+        client: new OpenAI({ apiKey: keyFor(name) || 'local', baseURL: PROVIDERS[name].base })
       }
     }
-  } catch (e) { return null }
+  } catch { return null }
   return cached
 }
 
@@ -102,14 +137,16 @@ Reply with JSON only, in exactly this shape:
 {"say": "<short line>", "commands": ["<command>", ...]}`
 }
 
+/** Smaller models fence their JSON or pad it with a sentence; dig it out anyway. */
 function coerce (raw) {
   if (!raw) return null
   let text = String(raw).trim()
-  // Models sometimes wrap JSON in a code fence.
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/)
   if (fenced) text = fenced[1].trim()
   const brace = text.indexOf('{')
   if (brace > 0) text = text.slice(brace)
+  const close = text.lastIndexOf('}')
+  if (close > 0) text = text.slice(0, close + 1)
   try {
     const o = JSON.parse(text)
     return {
@@ -127,7 +164,7 @@ async function think ({ message, sender, bot, swarm, self, commands, history }) 
   const got = getClient()
   if (!got) return { error: 'no-provider' }
   const { provider, client } = got
-  const model = process.env.MC_AI_MODEL || DEFAULT_MODEL[provider]
+  const model = modelFor(provider)
   const system = systemPrompt(commands, bot, swarm, self)
   const turn = `${sender} says: ${message}`
 
@@ -144,16 +181,18 @@ async function think ({ message, sender, bot, swarm, self, commands, history }) 
     })
     raw = res.content.filter(b => b.type === 'text').map(b => b.text).join('')
   } else {
-    const res = await client.chat.completions.create({
+    const req = {
       model,
       max_tokens: 1000,
-      response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: system },
         ...history.slice(-6),
         { role: 'user', content: turn }
       ]
-    })
+    }
+    // Local models are often served without JSON mode; the parser copes either way.
+    if (!PROVIDERS[provider].local) req.response_format = { type: 'json_object' }
+    const res = await client.chat.completions.create(req)
     raw = res.choices?.[0]?.message?.content
   }
 
@@ -171,13 +210,16 @@ function explain (err) {
   const status = err && err.status
   const msg = String((err && err.message) || err)
   const provider = detect()
+  if (/ECONNREFUSED|fetch failed/i.test(msg) && PROVIDERS[provider || '']?.local) {
+    return 'ollama is not running on this PC - start it and try again'
+  }
   if (status === 401 || status === 403) return 'my API key was rejected - check it in run-bot.bat'
   if (status === 429 && /credit|quota|billing|insufficient/i.test(msg)) {
     return provider === 'openai'
-      ? 'no credits on the OpenAI account - add some at platform.openai.com/billing'
-      : 'the AI account is out of credit or quota'
+      ? 'no credits on the OpenAI account - add some, or use a free provider instead'
+      : 'that account is out of credit - try a free provider instead'
   }
-  if (status === 429) return 'being rate limited - try again in a moment'
+  if (status === 429) return 'hitting the rate limit - give it a few seconds'
   if (status === 404 && /model/i.test(msg)) return 'that model is not on this account - set MC_AI_MODEL to one that is'
   if (status >= 500) return 'the AI service is having trouble - try again shortly'
   return msg.slice(0, 70)
@@ -186,7 +228,7 @@ function explain (err) {
 const enabled = () => Boolean(getClient())
 const providerName = () => {
   const g = getClient()
-  return g ? `${g.provider} (${process.env.MC_AI_MODEL || DEFAULT_MODEL[g.provider]})` : 'none'
+  return g ? `${PROVIDERS[g.provider].label} (${modelFor(g.provider)})` : 'none'
 }
 
-module.exports = { think, enabled, providerName, detect, explain }
+module.exports = { think, enabled, providerName, detect, explain, PROVIDERS }

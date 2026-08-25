@@ -13,30 +13,35 @@ TO START
 
 
 TALKING TO THEM IN PLAIN ENGLISH (optional)
-  Open run-bot.bat in Notepad. Fill in ONE of these three, then save:
+  Open run-bot.bat in Notepad, fill in ONE key, save, run it again.
 
-    set ANTHROPIC_API_KEY=      Claude   https://console.anthropic.com
-    set OPENAI_API_KEY=         ChatGPT  https://platform.openai.com
-    set GEMINI_API_KEY=         Gemini   https://aistudio.google.com
+  FREE - no credit card:
+    set GROQ_API_KEY=          console.groq.com      <- best free choice
+    set OPENROUTER_API_KEY=    openrouter.ai/keys    free models
+    set GEMINI_API_KEY=        aistudio.google.com   free tier
 
-  Any one of them works - use whichever you already have. When the bot
-  starts it prints which one it picked up:
+  PAID:
+    set ANTHROPIC_API_KEY=     console.anthropic.com
+    set OPENAI_API_KEY=        platform.openai.com   needs credits
+    set XAI_API_KEY=           console.x.ai          Grok, no free tier
 
-    AI chat: openai (gpt-4o-mini)
+  Note: Grok (xAI) has NO free API tier - only $25 credits when you
+  sign up. Groq is a different company and IS free.
 
-  Then you can just talk to them:
+  Or no key at all - run it on your own PC. Install from ollama.com,
+  run "ollama pull llama3.2" once, then uncomment this in run-bot.bat:
+    set MC_AI_PROVIDER=ollama
+  Free forever, but a small local model is noticeably less clever.
 
+  On startup it tells you which one it found:
+    AI chat: Groq (llama-3.3-70b-versatile)
+
+  Then just talk to them:
     claude build us a house next to the lake
     claude what are you carrying
-    claude get me some wood and then follow me
-    claude split up and build three towers
+    claude go get some wood and follow me
 
-  If your provider rejects the default model name, set a different one:
-
-    set MC_AI_MODEL=gpt-5
-
-  Without any key it still works, but only understands the exact
-  commands below.
+  If a model name is rejected, set MC_AI_MODEL to one your account has.
 
 
 TALKING TO THEM

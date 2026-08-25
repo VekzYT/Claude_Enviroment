@@ -40,7 +40,35 @@ const historyFor = who => {
   return histories.get(who)
 }
 
-/** Hand a sentence we did not recognise to Claude, then run whatever it decides. */
+/**
+ * Smaller models sometimes split one command across several array entries
+ * (["build", "tower", "11"]). Anything whose first word is not a real command
+ * or bot name is a fragment of the line before it.
+ */
+// These do nothing without an argument, so a bare one is always an unfinished line.
+const NEEDS_ARG = new Set(['build', 'mine', 'place', 'bring', 'give', 'equip', 'wear',
+  'craft', 'goto', 'fly', 'attack', 'hunt', 'dismiss', 'say', 'follow'])
+
+function joinFragments (lines) {
+  const out = []
+  for (const raw of lines) {
+    const line = String(raw).trim()
+    if (!line) continue
+    const prev = out[out.length - 1]
+    // A previous line that is nothing but an argument-hungry command is unfinished.
+    if (prev && NEEDS_ARG.has(prev.toLowerCase())) {
+      out[out.length - 1] = prev + ' ' + line
+      continue
+    }
+    const head = line.split(/\s+/)[0].toLowerCase()
+    const starts = commands[head] || ALL_WORDS.includes(head) || swarm.find(head)
+    if (starts || !out.length) out.push(line)
+    else out[out.length - 1] += ' ' + line
+  }
+  return out
+}
+
+/** Hand a sentence we did not recognise to the AI, then run whatever it decides. */
 async function askBrain (member, text, sender) {
   const reply = t => { try { member.bot.chat(t) } catch {} }
   try {
@@ -50,7 +78,7 @@ async function askBrain (member, text, sender) {
     })
     if (plan.error) return reply(`I only know set commands right now - try "${cfg.prefix} help"`)
     if (plan.say) reply(plan.say)
-    for (const line of (plan.commands || []).slice(0, 8)) {
+    for (const line of joinFragments(plan.commands || []).slice(0, 8)) {
       const first = String(line).split(/\s+/)[0].toLowerCase()
       const addressed = ALL_WORDS.includes(first) || swarm.find(first)
       dispatch(addressed ? line : `${member.name} ${line}`, sender, false)

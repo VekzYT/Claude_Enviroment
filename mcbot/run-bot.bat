@@ -4,18 +4,31 @@ title Claude bot
 
 rem ===================================================================
 rem  OPTIONAL - talk to the bots in plain English instead of commands.
-rem  Fill in ONE of these three, then save the file. Any of them works.
+rem  Fill in ONE of these, then save the file.
 rem
-rem   Claude   https://console.anthropic.com   -> API keys
-rem   ChatGPT  https://platform.openai.com     -> API keys
-rem   Gemini   https://aistudio.google.com     -> Get API key
+rem  FREE, no card needed:
+rem    GROQ        console.groq.com          <- best free option
+rem    OPENROUTER  openrouter.ai/keys        free models, slower limits
+rem    GEMINI      aistudio.google.com       free tier
+rem
+rem  PAID:
+rem    ANTHROPIC   console.anthropic.com
+rem    OPENAI      platform.openai.com       (needs credits, not Plus)
+rem    XAI / Grok  console.x.ai              (no free tier, $25 signup)
 rem ===================================================================
+set GROQ_API_KEY=
+set OPENROUTER_API_KEY=
+set GEMINI_API_KEY=
 set ANTHROPIC_API_KEY=
 set OPENAI_API_KEY=
-set GEMINI_API_KEY=
+set XAI_API_KEY=
 
-rem Optional: pick a different model than the default for your provider.
+rem Optional: a different model than the default for your provider.
 set MC_AI_MODEL=
+
+rem Optional: no key at all - run a model on this PC. Install from ollama.com,
+rem then run "ollama pull llama3.2" once and uncomment the next line.
+rem set MC_AI_PROVIDER=ollama
 
 where node >nul 2>&1
 if errorlevel 1 (
