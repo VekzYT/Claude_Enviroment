@@ -33,5 +33,7 @@ module.exports = {
 
   // Chat prefix the bot answers to.
   prefix: (process.env.MC_PREFIX || 'claude').toLowerCase(),
+  // How many bots may be in the world at once.
+  maxBots: parseInt(process.env.MC_MAX_BOTS || '10', 10),
   owner: process.env.MC_OWNER || ''
 }

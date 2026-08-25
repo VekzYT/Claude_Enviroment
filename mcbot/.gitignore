@@ -1,3 +1,9 @@
 node_modules/
 vendor/
 bot.log
+
+# ViaProxy scatters its config and logs into the working directory.
+logs/
+saves.json
+via*.yml
+viabedrock/
