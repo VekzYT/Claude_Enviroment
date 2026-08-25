@@ -1,0 +1,36 @@
+Claude's Minecraft bot
+======================
+
+WHAT YOU NEED
+  1. Your server already running (start-server.bat, window left open)
+  2. Java 25  - you already installed this for the server
+  3. Node.js  - https://nodejs.org  (click the LTS button, install, done)
+
+TO START THE BOT
+  Double-click  run-bot.bat
+  Leave the window open. Close it and the bot leaves the game.
+
+The first run downloads two things by itself and then never again.
+
+TALKING TO IT
+  Type in normal Minecraft chat, starting with the word "claude":
+
+    claude help              list everything it can do
+    claude come              walks to you
+    claude follow            follows you around
+    claude stop              stops what it is doing
+    claude mine wood 10      finds trees, chops them, picks the logs up
+    claude mine iron 5       same for iron ore
+    claude give oak_log      throws you what it is carrying
+    claude tower 10          pillars straight up
+    claude place stone       places a block
+    claude guard             fights hostile mobs near it
+    claude attack zombie     attacks the closest zombie
+    claude craft stick       crafts (needs a crafting table within 6 blocks)
+    claude where             says where it is
+    claude look              says what is around it
+    claude inv               lists what it is carrying
+    claude sleep             finds a bed and sleeps
+
+IF IT SAYS IT CANNOT CONNECT
+  Make sure the server window is open and says Done.
