@@ -115,13 +115,21 @@ func start_new_world(name: String, seed_text: String) -> void:
 
 
 func load_world(name: String) -> bool:
+	if not load_world_headless(name):
+		return false
+	get_tree().change_scene_to_file("res://scenes/game.tscn")
+	return true
+
+
+## Reads a save into memory and points the next game scene at it, without
+## changing scene. Split out so the loading path can be exercised on its own.
+func load_world_headless(name: String) -> bool:
 	var clean := _sanitise(name)
 	if not SaveManager.load_world(clean):
 		return false
 	world_name = clean
 	world_seed = SaveManager.world_seed
 	load_existing = true
-	get_tree().change_scene_to_file("res://scenes/game.tscn")
 	return true
 
 

@@ -44,8 +44,9 @@ func _build_environment() -> void:
 	_sky.sky_top_color = DAY_TOP
 	_sky.sky_horizon_color = DAY_HORIZON
 	_sky.sky_curve = 0.15
-	_sky.ground_bottom_color = DAY_HORIZON.darkened(0.7)
-	_sky.ground_horizon_color = DAY_HORIZON.darkened(0.45)
+	_sky.ground_bottom_color = DAY_HORIZON.darkened(0.16)
+	_sky.ground_horizon_color = DAY_HORIZON
+	_sky.ground_curve = 0.12
 	_sky.sun_angle_max = 6.0
 	_sky.sun_curve = 0.12
 
@@ -122,8 +123,11 @@ func _apply(_delta: float) -> void:
 	if _sky != null:
 		_sky.sky_top_color = top
 		_sky.sky_horizon_color = horizon
-		_sky.ground_bottom_color = horizon.darkened(0.7)
-		_sky.ground_horizon_color = horizon.darkened(0.45)
+		# The half of the sky below the horizon is what you see past the last
+		# loaded chunk. Keeping it near the fog colour makes the world fade out
+		# into haze instead of ending against a dark slab.
+		_sky.ground_bottom_color = horizon.darkened(0.16)
+		_sky.ground_horizon_color = horizon
 		_sky.sun_angle_max = 6.0
 		_sky.sun_curve = 0.12
 
@@ -141,6 +145,6 @@ func configure_fog(render_distance_chunks: int) -> void:
 	var far := float(render_distance_chunks) * 16.0
 	_env.fog_enabled = true
 	_env.fog_mode = Environment.FOG_MODE_DEPTH
-	_env.fog_depth_begin = maxf(32.0, far * 0.55)
-	_env.fog_depth_end = maxf(64.0, far * 0.98)
+	_env.fog_depth_begin = maxf(48.0, far * 0.74)
+	_env.fog_depth_end = maxf(96.0, far * 1.02)
 	_env.fog_density = 1.0

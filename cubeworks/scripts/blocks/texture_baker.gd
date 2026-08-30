@@ -208,12 +208,14 @@ static func _paint(img: Image, slot: int) -> void:
 						rng.randf_range(0.9, 1.8), Color(0.13, 0.25, 0.12), rng)
 
 		T_WATER:
+			# Opaque enough that a dark sea bed does not drag the surface to
+			# grey, but still clearly see-through up close.
 			for y in TILE:
 				var band := sin(float(y) * 0.55) * 0.05
 				for xx in TILE:
-					var wob := sin(float(xx) * 0.4 + float(y) * 0.2) * 0.03
+					var wob := sin(float(xx) * 0.4 + float(y) * 0.2) * 0.035
 					img.set_pixel(ox + xx, oy + y, Color(
-							0.16 + band + wob, 0.36 + band + wob, 0.72 + band + wob, 0.68))
+							0.20 + band + wob, 0.52 + band + wob, 0.86 + band + wob, 0.88))
 
 		T_BEDROCK:
 			_noise_fill(img, ox, oy, Color(0.24, 0.24, 0.27), 0.05, rng)

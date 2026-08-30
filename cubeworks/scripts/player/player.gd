@@ -518,9 +518,9 @@ func _update_held_item(delta: float) -> void:
 	var bob_y := absf(cos(_bob)) * 0.012 * minf(speed, 7.0) * 0.4
 
 	var swing := sin(_swing * PI) * 0.35
-	held_item.position = Vector3(0.34 + bob_x, -0.27 + bob_y - swing * 0.26, -0.70 + swing * 0.10)
+	held_item.position = Vector3(0.38 + bob_x, -0.30 + bob_y - swing * 0.24, -0.74 + swing * 0.10)
 	held_item.rotation = Vector3(-0.18 - swing * 0.9, 0.72, 0.18)
-	held_item.scale = Vector3.ONE * 0.155
+	held_item.scale = Vector3.ONE * 0.145
 
 
 # ----------------------------------------------------------------- damage

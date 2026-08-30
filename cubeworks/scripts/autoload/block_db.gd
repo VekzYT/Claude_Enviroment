@@ -231,7 +231,10 @@ func _build_materials() -> void:
 	material_transparent.vertex_color_use_as_albedo = true
 	material_transparent.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material_transparent.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material_transparent.roughness = 0.15
+	# No metallic: without reflection probes a metallic surface just reads as a
+	# dark hole, which is exactly what open water must not look like.
+	material_transparent.roughness = 0.32
+	material_transparent.metallic = 0.0
 	material_transparent.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
 	material_transparent.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 

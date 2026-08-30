@@ -9,6 +9,10 @@ Everything here is original: the code, the block names, the interface, and the
 artwork — every texture is painted procedurally in `texture_baker.gd` at
 startup, so the project ships with no image files at all.
 
+![Woodland and highlands at mid-morning](docs/screenshot-day.jpg)
+![Sunset over the hills](docs/screenshot-sunset.jpg)
+![The backpack and crafting screen](docs/screenshot-pack.jpg)
+
 ---
 
 ## Running it
@@ -94,6 +98,7 @@ cubeworks/
 │       ├── pause_menu.gd             Pause and settings
 │       └── main_menu.gd              Title screen
 │
+├── docs/                             Screenshots used by this file
 ├── assets/                           (empty by design - art is generated in code)
 └── saves/                            (placeholder - real saves live in user://saves)
 ```
@@ -229,9 +234,9 @@ on collision layer 4; the player's attack ray looks for that layer and calls
 
 Measured on the development machine, single-threaded, for one full chunk:
 
-* terrain generation: ~8 ms
-* meshing (worst case, no neighbours loaded): ~27 ms
-* a typical chunk produces roughly 5,000 triangles
+* terrain generation: ~11 ms
+* meshing (worst case, every border face exposed): ~36 ms
+* a typical chunk produces roughly 5,500 triangles
 
 With six worker threads, a draw distance of 7 chunks (225 chunks) streams in
 within a few seconds and then costs nothing until you move.

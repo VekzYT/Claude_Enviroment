@@ -20,6 +20,10 @@ var _spawn_point := Vector3.ZERO
 
 func _ready() -> void:
 	randomize()
+	# The pause menu really does pause: the tree stops, so chunk streaming,
+	# physics and creatures all stand still. These two keep running so Esc can
+	# be pressed again and the menu's buttons stay clickable.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 
 	world.render_distance = GameState.render_distance
 	world.setup(player)
@@ -34,6 +38,7 @@ func _ready() -> void:
 	player.died.connect(_on_player_died)
 	inventory_ui.bind(player.inventory)
 	inventory_ui.closed.connect(_on_inventory_closed)
+	pause_menu.process_mode = Node.PROCESS_MODE_ALWAYS
 	pause_menu.setup(self)
 
 	_place_player()
@@ -62,10 +67,14 @@ func _place_player() -> void:
 
 func _on_spawn_ready() -> void:
 	hud.set_loading(false)
-	# The terrain exists now, so put the player exactly on top of it.
-	var settled := world.settle_on_ground(player.global_position)
-	player.teleport(settled)
-	_spawn_point = settled
+	# A new world drops the player neatly onto the surface. A loaded one keeps
+	# the position it saved -- unless the terrain has swallowed it, in which
+	# case dig them out rather than suffocating them.
+	var here := player.global_position
+	if not GameState.load_existing or world.is_position_blocked(here):
+		here = world.settle_on_ground(here)
+		player.teleport(here)
+	_spawn_point = here
 	player.unfreeze()
 	if not _paused and not _inventory_open:
 		_capture_mouse()
@@ -117,6 +126,7 @@ func set_paused(value: bool) -> void:
 	_paused = value
 	pause_menu.visible = value
 	sky.paused = value
+	get_tree().paused = value
 	if value:
 		_release_mouse()
 		player.input_enabled = false
@@ -145,7 +155,7 @@ func _release_mouse() -> void:
 # ------------------------------------------------------------------ update
 
 func _process(delta: float) -> void:
-	if _paused:
+	if _paused or player.frozen:
 		return
 	_autosave -= delta
 	if _autosave <= 0.0:
@@ -181,8 +191,13 @@ func save_and_quit() -> void:
 	GameState.return_to_menu()
 
 
+func quit_requested() -> void:
+	get_tree().paused = false
+
+
 func quit_to_desktop() -> void:
 	save_now(false)
+	get_tree().paused = false
 	get_tree().quit()
 
 

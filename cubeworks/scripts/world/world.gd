@@ -554,6 +554,14 @@ func find_spawn(around: Vector2i = Vector2i.ZERO) -> Vector3:
 	return Vector3(0.5, TerrainGenerator.SEA_LEVEL + 24, 0.5)
 
 
+## True when a standing position is buried in blocks and needs rescuing.
+func is_position_blocked(pos: Vector3) -> bool:
+	var bx := floori(pos.x)
+	var bz := floori(pos.z)
+	var by := floori(pos.y)
+	return BlockDB.is_solid(get_block(bx, by, bz)) or BlockDB.is_solid(get_block(bx, by + 1, bz))
+
+
 ## Drops a position onto the first solid block beneath it that has room to
 ## stand. Used once the chunks around the spawn have actually loaded, so the
 ## player never starts inside terrain or inside a tree.

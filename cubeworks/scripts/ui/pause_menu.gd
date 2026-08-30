@@ -93,13 +93,17 @@ func _build() -> void:
 	box.add_child(fov)
 	_update_fov_label()
 
-	var invert := CheckBox.new()
-	invert.text = "Invert vertical look"
+	# A plain toggle button reads far better than the default checkbox glyph,
+	# which all but vanishes against a dark panel.
+	var invert := Button.new()
+	invert.toggle_mode = true
 	invert.button_pressed = GameState.invert_y
-	invert.add_theme_color_override("font_color", UITheme.TEXT)
+	invert.text = _invert_text()
+	UITheme.style_button(invert)
 	invert.toggled.connect(func(on: bool) -> void:
 		GameState.invert_y = on
-		GameState.save_settings())
+		GameState.save_settings()
+		invert.text = _invert_text())
 	box.add_child(invert)
 
 	box.add_child(_separator())
@@ -121,6 +125,10 @@ func _build() -> void:
 	UITheme.style_button(quit)
 	quit.pressed.connect(func() -> void: game.quit_to_desktop())
 	box.add_child(quit)
+
+
+func _invert_text() -> String:
+	return "Invert vertical look: %s" % ("on" if GameState.invert_y else "off")
 
 
 func _separator() -> Control:
