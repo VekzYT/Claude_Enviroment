@@ -112,7 +112,7 @@ func save_world() -> bool:
 	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
 	var file := FileAccess.open(path_for(world_name), FileAccess.WRITE)
 	if file == null:
-		push_error("Cubeworks: could not write save file %s" % path_for(world_name))
+		push_error("MC Copy: could not write save file %s" % path_for(world_name))
 		return false
 
 	_mutex.lock()
@@ -149,7 +149,7 @@ func load_world(name: String) -> bool:
 	var payload = file.get_var(false)
 	file.close()
 	if typeof(payload) != TYPE_DICTIONARY:
-		push_error("Cubeworks: save file %s is unreadable" % path)
+		push_error("MC Copy: save file %s is unreadable" % path)
 		return false
 
 	world_name = name

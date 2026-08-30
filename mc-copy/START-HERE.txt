@@ -1,0 +1,115 @@
+MC Copy v1.0
+An original first-person voxel sandbox for Godot 4.
+
+
+HOW TO RUN IT  (about 30 seconds)
+=================================
+
+1. Install Godot 4.3 or newer from https://godotengine.org/download
+   Get the normal build -- you do NOT need the ".NET" / C# version.
+
+2. Open Godot. The Project Manager window appears.
+
+3. Click "Import".
+
+4. Click "Browse" and select this project's  project.godot  file.
+   (If you are looking at the .zip in Godot's file browser, you can pick the
+   .zip itself -- Godot will unpack it for you and ask where to put it.)
+
+5. Click "Import & Edit". The editor opens. Wait a few seconds the first
+   time while Godot builds its import cache.
+
+6. Press F5, or click the ▶ Play button in the top-right corner.
+
+7. On the title screen, type a seed if you like, then click
+   "Shape the world". Wait a moment for "Shaping the world" to disappear.
+
+That's it. There is nothing to install, nothing to download, and nothing to
+set up. All the artwork is drawn by the game itself when it starts.
+
+
+CONTROLS
+========
+
+  W A S D ....... walk
+  Space ......... jump / swim up
+  Shift ......... sprint
+  Ctrl .......... sneak (slower, and you will not walk off a ledge)
+  Mouse ......... look around
+  Left mouse .... hold to break the block you are aiming at
+                  (also hits creatures)
+  Right mouse ... place the block you have selected
+  1 - 9 ......... choose a hotbar slot
+  Mouse wheel ... cycle hotbar slots
+  E ............. open / close the backpack (with crafting)
+  Q ............. drop one block   (Shift+Q drops the whole stack)
+  Esc ........... pause menu -- settings, save, and quit
+  F3 ............ debug readout (position, biome, chunk counts, clock)
+  F11 ........... fullscreen
+
+
+FIRST THINGS TO TRY
+===================
+
+  * Break some turf, then place it back somewhere else.
+  * Chop a Timber Log out of a tree, open the backpack with E, and craft
+    it into Planks.
+  * Dig straight down. You will hit soil, then stone, then ore, and you
+    will probably break into a cave.
+  * Wait for nightfall. Gloomkin come out after dark. They burn away at
+    dawn under open sky, but they survive in caves.
+  * Press Esc and click "Save now", then quit and load the world again --
+    everything you changed will still be there.
+
+
+IF SOMETHING GOES WRONG
+=======================
+
+  Nothing happens when I press Play
+    Make sure Godot is version 4.3 or newer. Older 4.x versions are
+    missing a couple of things this project uses.
+
+  It runs slowly
+    Press Esc and drag "Draw distance" down to 4 or 5 chunks.
+    The very first few seconds are always the slowest, because that is
+    when the world around you is being built.
+
+  I fell through the floor / I am stuck
+    Press Esc, then "Save and return to menu", then load the world again.
+    You will be put back on solid ground.
+
+
+WHERE YOUR WORLDS ARE SAVED
+===========================
+
+Saves go into Godot's user folder, not into the project folder, so you can
+move or re-import the project without losing anything:
+
+  Windows   %APPDATA%\Godot\app_userdata\MC Copy v1.0\saves\
+  macOS     ~/Library/Application Support/Godot/app_userdata/MC Copy v1.0/saves/
+  Linux     ~/.local/share/godot/app_userdata/MC Copy v1.0/saves/
+
+
+WANT TO CHANGE SOMETHING?
+=========================
+
+README.md next to this file explains how the whole project fits together:
+the file tree, what every script does, the exact node layout of each scene,
+and how to add a new block or a new crafting recipe.
+
+The quickest wins:
+
+  New block ........ scripts/blocks/texture_baker.gd  (draw it)
+                     scripts/autoload/block_db.gd     (describe it)
+  New recipe ....... scripts/ui/inventory_ui.gd, in _make_recipes()
+  Different world .. scripts/world/terrain_generator.gd
+  Longer days ...... scripts/world/day_night.gd, the day_length value
+
+
+A NOTE ON THE NAME
+==================
+
+"MC Copy" is just the working name you asked for. None of the game's
+contents are copied: every texture is painted in code by texture_baker.gd
+when the game starts, and the block names, interface and code are all
+original. If you ever publish or share this, give it a name of its own.

@@ -1,12 +1,13 @@
-; Cubeworks -- an original voxel sandbox built with Godot 4.
+; MC Copy v1.0 -- an original voxel sandbox built with Godot 4.
 ; Engine configuration file.
 
 config_version=5
 
 [application]
 
-config/name="Cubeworks"
-config/description="An original first-person voxel sandbox."
+config/name="MC Copy v1.0"
+config/version="1.0"
+config/description="An original first-person voxel sandbox. Dig, build, and last the night."
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 config/icon="res://icon.svg"

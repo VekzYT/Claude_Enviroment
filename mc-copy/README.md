@@ -1,4 +1,4 @@
-# Cubeworks
+# MC Copy v1.0
 
 An original first-person voxel sandbox built with **Godot 4.3** and GDScript.
 Chunked infinite terrain, block breaking and placing, a hotbar and backpack,
@@ -19,9 +19,14 @@ startup, so the project ships with no image files at all.
 
 1. Install Godot **4.3** or newer (standard build, not .NET) from godotengine.org.
 2. Open the Godot project manager, click **Import**, and pick
-   `cubeworks/project.godot`.
-3. Press **F5** (Run Project). The title screen appears; choose a seed and
-   click **Shape the world**.
+   `MC-Copy-v1.0/project.godot`. (Godot will also accept the release zip
+   directly and unpack it for you.)
+3. Click **Import & Edit**, then press **F5**. The title screen appears; choose
+   a seed and click **Shape the world**.
+
+`START-HERE.txt` next to this file is the short, non-technical version of the
+same thing, with the controls and a troubleshooting list. A packaged zip of this
+project lives at `dist/MC-Copy-v1.0.zip` in the repository root.
 
 There is nothing to assemble by hand — the scenes are complete. The
 "How the scenes are put together" section below explains the node trees anyway,
@@ -51,7 +56,7 @@ so you can rebuild or extend them.
 ## File tree
 
 ```
-cubeworks/
+MC-Copy-v1.0/
 ├── project.godot                     Engine config, autoloads, window, rendering
 ├── icon.svg                          Project icon
 ├── README.md                         This file
@@ -105,9 +110,9 @@ cubeworks/
 
 Saved worlds are written to Godot's user directory, not into the project:
 
-* Linux: `~/.local/share/godot/app_userdata/Cubeworks/saves/`
-* Windows: `%APPDATA%\Godot\app_userdata\Cubeworks\saves\`
-* macOS: `~/Library/Application Support/Godot/app_userdata/Cubeworks/saves/`
+* Linux: `~/.local/share/godot/app_userdata/MC Copy v1.0/saves/`
+* Windows: `%APPDATA%\Godot\app_userdata\MC Copy v1.0\saves\`
+* macOS: `~/Library/Application Support/Godot/app_userdata/MC Copy v1.0/saves/`
 
 ---
 

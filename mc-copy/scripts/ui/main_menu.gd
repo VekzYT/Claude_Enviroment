@@ -40,7 +40,7 @@ func _build() -> void:
 	root.alignment = BoxContainer.ALIGNMENT_CENTER
 	add_child(root)
 
-	var title := UITheme.make_label("CUBEWORKS", 58, UITheme.ACCENT)
+	var title := UITheme.make_label("MC COPY", 58, UITheme.ACCENT)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(title)
 

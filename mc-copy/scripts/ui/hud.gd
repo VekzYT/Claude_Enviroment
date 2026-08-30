@@ -319,7 +319,7 @@ func _update_debug() -> void:
 		clock = day_night.clock_string()
 
 	_debug_label.text = "\n".join([
-		"Cubeworks  ·  %.0f fps" % _fps_shown,
+		"MC Copy v1.0  ·  %.0f fps" % _fps_shown,
 		"seed %d" % GameState.world_seed,
 		"pos %.1f, %.1f, %.1f" % [p.x, p.y, p.z],
 		"chunk %d, %d  ·  biome %s" % [chunk.x, chunk.y, biome_name],

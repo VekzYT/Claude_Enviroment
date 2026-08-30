@@ -1,9 +1,9 @@
 # Godot's import cache -- regenerated on first open.
 game/.godot/
-cubeworks/.godot/
+mc-copy/.godot/
 
 # Throwaway harnesses used while validating the voxel project.
-cubeworks/dev/
+mc-copy/dev/
 
 # Release output: the zip and the audio preview are built by tools, not tracked.
 game/build/

@@ -78,7 +78,7 @@ func _on_spawn_ready() -> void:
 	player.unfreeze()
 	if not _paused and not _inventory_open:
 		_capture_mouse()
-	hud.show_status("Welcome to Cubeworks")
+	hud.show_status("Welcome to MC Copy")
 
 
 # ------------------------------------------------------------------- input
