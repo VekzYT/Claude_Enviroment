@@ -3,7 +3,7 @@
 
 Usage:
     python3 editmaker.py clips1.mp4 [clips2.mp4 ...] -o edit.mp4
-        [--music song.mp3] [--duration 20] [--aspect 16:9|9:16|1:1] [--seed 7]
+        [--music song.mp3] [--duration 20] [--aspect 9:16|16:9|1:1] [--stretch 1.15] [--seed 7]
 
 What it does:
   1. Finds the beats in the music (spectral-flux onsets + dynamic-programming beat tracker).
@@ -250,13 +250,15 @@ def make_plan(music, start_i, duration, shots, rng):
 
 def pick_effects(mode, downbeat, rng):
     fx = dict(speed=1.0, zoom="none", shake=0, flash=False, blur=False)
-    if mode in ("intro", "outro"):
-        fx.update(speed=0.5, zoom="push" if mode == "intro" else "pull")  # smooth slow-mo (60fps source)
+    if mode == "intro":
+        fx.update(speed=0.5, zoom="slowin")  # smooth slow-mo (60fps source)
+    elif mode == "outro":
+        fx.update(speed=0.5, zoom="slowout")
     elif mode == "mid":
-        fx.update(speed=rng.choice([0.6, 0.8, 1.0]), zoom=rng.choice(["push", "pull", "punch"]),
+        fx.update(speed=rng.choice([0.6, 0.8, 1.0]), zoom=rng.choice(["slowin", "slowout", "drift"]),
                   shake=rng.choice([0, 0, 5]), flash=downbeat and rng.random() < 0.5)
     elif mode == "hype":
-        fx.update(speed=rng.choice([1.0, 1.0, 1.25]), zoom=rng.choice(["punch", "punch", "pull"]),
+        fx.update(speed=rng.choice([1.0, 1.0, 1.25]), zoom=rng.choice(["punch", "punch", "slowin", "drift"]),
                   shake=rng.choice([6, 10, 14]), flash=downbeat, blur=True)
     else:  # stutter
         fx.update(zoom="punch", shake=12, flash=downbeat, blur=True)
@@ -275,40 +277,47 @@ def grade_filter():
             "vignette=PI/6,noise=alls=4:allf=t")
 
 
-def segment_filter(seg, W, H, rng):
+ZOOMS = {
+    # z(p) with p = 0..1 through the cut; eased so the motion starts/ends smoothly
+    "slowin": "1.02+0.20*(0.5-0.5*cos(PI*{p}))",
+    "slowout": "1.22-0.20*(0.5-0.5*cos(PI*{p}))",
+    "drift": "1.10+0.10*{p}",
+    "punch": "1.05+0.30*exp(-on/4)+0.04*{p}",
+    "none": "1.05",
+}
+
+
+def segment_filter(seg, W, H, rng, stretch):
     s, fx = seg["shot"], seg["fx"]
     cw, ch, cx, cy = s["crop"]
     n = max(1, round(seg["length"] * FPS))
     f = [f"crop={cw}:{ch}:{cx}:{cy}"]
-    # fill the output aspect from the content (centre crop)
+    # fill the output aspect: crop what we must, stretch the rest (up to `stretch`)
     target = W / H
-    if cw / ch > target:
-        nw = int(ch * target) // 2 * 2
+    src = cw / ch
+    if src > target * stretch:
+        nw = int(ch * target * stretch) // 2 * 2
         f.append(f"crop={nw}:{ch}:(iw-{nw})/2:0")
-    else:
-        nh = int(cw / target) // 2 * 2
+    elif src < target / stretch:
+        nh = int(cw / target * stretch) // 2 * 2
         f.append(f"crop={cw}:{nh}:0:(ih-{nh})/2")
     if fx["blur"]:
         f.append("tmix=frames=3:weights='1 2 1'")
     f.append(f"setpts=PTS/{fx['speed']}")
     f.append(f"fps={FPS}")
-    # zoom / shake via zoompan on an upscaled frame (upscaling avoids zoompan jitter)
-    UW, UH = W * 3 // 2 // 2 * 2, H * 3 // 2 // 2 * 2
-    f.append(f"scale={UW}:{UH}:flags=bicubic")
-    N = n
-    if fx["zoom"] == "punch":
-        z = "1.06+0.28*exp(-on/4)"
-    elif fx["zoom"] == "pull":
-        z = f"1.06+0.18*(on/{N})"
-    elif fx["zoom"] == "push":
-        z = f"1.12-0.08*(on/{N})"
-    else:
-        z = "1.06"
-    a = fx["shake"] * 2
+    f.append(f"scale={W}:{H}:flags=lanczos,setsar=1")
+    # sub-pixel smooth zoom + shake + pan with the perspective filter (no zoompan jitter)
+    z = "(" + ZOOMS[fx["zoom"]].replace("{p}", f"(on/{n})") + ")"
+    a = fx["shake"] * W / 1080
     ph = rng.uniform(0, 6)
-    sx = f"+{a}*sin(on*2.3+{ph:.2f})*exp(-on/8)" if a else ""
-    sy = f"+{a}*cos(on*3.1+{ph:.2f})*exp(-on/8)" if a else ""
-    f.append(f"zoompan=z='{z}':x='iw/2-iw/zoom/2{sx}':y='ih/2-ih/zoom/2{sy}':d=1:s={W}x{H}:fps={FPS}")
+    pan = rng.choice([-1, 1]) * W * 0.04 if fx["zoom"] == "drift" else 0
+    sx = f"+{a:.1f}*sin(on*2.3+{ph:.2f})*exp(-on/8)+{pan:.1f}*(on/{n}-0.5)"
+    sy = f"+{a:.1f}*cos(on*3.1+{ph:.2f})*exp(-on/8)"
+    mx, my = f"W*(1-1/{z})/2", f"H*(1-1/{z})/2"
+    L, R = f"{mx}{sx}", f"W-{mx}{sx}"
+    T, B = f"{my}{sy}", f"H-{my}{sy}"
+    f.append(f"perspective=x0='{L}':y0='{T}':x1='{R}':y1='{T}':x2='{L}':y2='{B}':x3='{R}':y3='{B}'"
+             ":interpolation=cubic:eval=frame")
     f.append(grade_filter())
     if fx["flash"]:
         f.append("fade=in:st=0:d=0.12:color=white")
@@ -316,11 +325,11 @@ def segment_filter(seg, W, H, rng):
     return ",".join(f), n
 
 
-def render(plan, music_path, music_start, out, aspect, tmp, rng):
+def render(plan, music_path, music_start, out, aspect, tmp, rng, stretch):
     W, H = out_size(aspect)
     jobs = []
     for k, seg in enumerate(plan):
-        vf, n = segment_filter(seg, W, H, rng)
+        vf, n = segment_filter(seg, W, H, rng, stretch)
         p = os.path.join(tmp, f"seg{k:03d}.mp4")
         src_len = seg["length"] * seg["fx"]["speed"] + 0.3
         jobs.append((p, ["ffmpeg", "-y", "-v", "error", "-ss", f"{seg['src_start']:.3f}", "-t", f"{src_len:.3f}",
@@ -352,7 +361,9 @@ def main():
     ap.add_argument("--music", help="song to cut to (default: audio of the first clip)")
     ap.add_argument("--music-start", type=float, help="where in the song to start (default: auto-pick the hype part)")
     ap.add_argument("--duration", type=float, default=20, help="edit length in seconds")
-    ap.add_argument("--aspect", default="16:9", choices=["16:9", "9:16", "1:1"])
+    ap.add_argument("--aspect", default="9:16", choices=["9:16", "16:9", "1:1"])
+    ap.add_argument("--stretch", type=float, default=1.15,
+                    help="how much the picture may be stretched to fill the frame instead of cropped (1 = never)")
     ap.add_argument("--seed", type=int, default=None, help="same seed = same edit; change it for a new variation")
     args = ap.parse_args()
 
@@ -392,7 +403,7 @@ def main():
     plan = make_plan(music, start_i, args.duration, shots, rng)
     print(f"edit plan: {len(plan)} cuts")
     with tempfile.TemporaryDirectory() as tmp:
-        total = render(plan, music_path, music_start, args.output, args.aspect, tmp, rng)
+        total = render(plan, music_path, music_start, args.output, args.aspect, tmp, rng, args.stretch)
     print(f"done: {args.output} ({total:.1f}s)")
 
 
