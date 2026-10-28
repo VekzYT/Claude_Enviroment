@@ -6,3 +6,9 @@ game/build/
 
 __pycache__/
 *.pyc
+
+# YouTube channel studio: dependencies, renders and secrets stay out of git.
+channel/studio/node_modules/
+channel/studio/out/
+.env
+.env.*
