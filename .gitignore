@@ -12,3 +12,7 @@ channel/studio/node_modules/
 channel/studio/out/
 .env
 .env.*
+
+# Local voice models (Chatterbox, Kokoro): the virtualenv and generated audio stay out of git.
+channel/voice/.venv/
+channel/voice/out/

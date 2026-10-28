@@ -47,9 +47,29 @@ latest `episodes/*/results.md`, and the log below.
     }
   }
   ```
-- Voice: the person chose to try free voices first: Chatterbox (MIT) and Kokoro (Apache 2.0), run locally on CPU
-  (no GPU here). Make samples of the episode 1 cold open in both and let them pick by ear. ElevenLabs stays the
-  fallback. Free sound effects: YouTube Audio Library, Pixabay, or synthesised in code. Same install block applies.
+- Voice: the person chose free voices over ElevenLabs. On 28 Oct four samples of the episode 1 cold open were
+  sent (A Kokoro `am_michael`, B Kokoro `af_heart`, C Chatterbox Turbo built-in, D Chatterbox Turbo cloning A),
+  all checked with Whisper (96% word match each). **Waiting for their pick.** Then adapt the skill's voice step to
+  the chosen engine: `voice.wav` plus `words.json` word timings from Whisper (`channel/voice/check.py` shows how).
+  Free sound effects: YouTube Audio Library, Pixabay, or synthesised in code (the skill's `sfx.py` needs ElevenLabs).
+
+## Setting up a fresh container
+
+Containers are temporary: every new session reinstalls this (about 10 minutes, mostly downloads).
+
+- **Studio:** `cd channel/studio && npm ci`. Fonts are bundled in `public/fonts` (the headless browser can't fetch
+  Google Fonts through the proxy: ERR_CERT_AUTHORITY_INVALID; never disable TLS checks to get round it).
+  `remotion.config.ts` and `stills.mjs` find the pre-installed Chromium in `/opt/pw-browsers` by themselves.
+  Verified 28 Oct: the example episode `rewind` rendered and mastered end to end (`master.py rewind`). Rendering
+  is CPU-bound, about 22 s per second of video (18.8 s took 7 min), so a 5-minute episode is 1.5–2 h: run it in
+  the background.
+- **Voices** (repo root): `uv venv channel/voice/.venv --python 3.11`, then
+  `uv pip install --python channel/voice/.venv/bin/python --torch-backend cpu torch==2.6.0 torchaudio==2.6.0`
+  (without the CPU backend uv pulls the 5 GB CUDA build), then `chatterbox-tts==0.1.7 kokoro==0.9.4 soundfile
+  faster-whisper "setuptools<81"` (Chatterbox's watermarker needs `pkg_resources`), then spaCy's model from
+  `https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl`
+  (Hugging Face's copy has an unversioned filename uv rejects). Models download from Hugging Face on first use.
+  Chatterbox Turbo makes about 21 s of speech in 90 s on CPU; Kokoro is near-instant.
 - ElevenLabs: no key yet. `api.elevenlabs.io` is reachable from the cloud environment. The scripts read
   `ELEVENLABS_API_KEY` from the environment; the person adds it in the environment settings. Never ask for the
   key in chat, never print it.

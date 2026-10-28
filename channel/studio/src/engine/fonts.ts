@@ -1,21 +1,18 @@
 import { loadFont } from '@remotion/fonts';
 import { staticFile } from 'remotion';
-import { loadFont as loadBricolage } from '@remotion/google-fonts/BricolageGrotesque';
-import { loadFont as loadMono } from '@remotion/google-fonts/FragmentMono';
-import { loadFont as loadHand } from '@remotion/google-fonts/Kalam';
 import { STUDIO } from '../studio.config';
 
-// Three faces: a heavy display face for the title card, a mono for on-screen readouts (timers, labels, chips),
-// and a handwriting face for chalk and notes. The Google faces load at render time (they need a connection);
-// a local title face from studio.config.ts loads from public/ and works offline.
+// Three faces, all loaded from public/fonts so renders need no connection: GAMERULE's heavy display face for the
+// title card (Poppins), its pixel face for on-screen readouts and the HUD (Pixelify Sans), and a handwriting face
+// for chalk and notes (Kalam). All three are SIL Open Font License, from Google Fonts.
 
-loadBricolage('normal', { weights: ['600', '700', '800'], subsets: ['latin'] });
-loadMono('normal', { weights: ['400'], subsets: ['latin'] });
-loadHand('normal', { weights: ['400', '700'], subsets: ['latin'] });
+for (const weight of ['600', '700', '800', '900']) loadFont({ family: 'Poppins', url: staticFile(`fonts/Poppins-${weight}.woff2`), weight });
+loadFont({ family: 'Pixelify Sans', url: staticFile('fonts/PixelifySans-500.woff2'), weight: '400 700' });
+for (const weight of ['400', '700']) loadFont({ family: 'Kalam', url: staticFile(`fonts/Kalam-${weight}.woff2`), weight });
 if (STUDIO.titleFont) loadFont({ family: STUDIO.titleFont.family, url: staticFile(STUDIO.titleFont.file), weight: STUDIO.titleFont.weight });
 
 export const FONT = {
-  title: STUDIO.titleFont ? STUDIO.titleFont.family : 'Bricolage Grotesque',
-  ui: 'Fragment Mono',
+  title: STUDIO.titleFont ? STUDIO.titleFont.family : 'Poppins',
+  ui: 'Pixelify Sans',
   hand: 'Kalam',
 };
