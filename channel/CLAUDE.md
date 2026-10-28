@@ -17,8 +17,14 @@ latest `episodes/*/results.md`, and the log below.
 - Claude plan: the person upgrades to **Max on 31 Oct 2026**. Do the heavy work (full animation, renders) from then.
 - First upload target: **Friday 6 Nov 2026, 3pm ET** (20:00 UTC; US clocks change on 1 Nov).
 - Episode 1 (*What If You Could Mine Anything?*): script, science, Shorts and package written. Not animated.
-- Studio: **not installed.** Installing the third-party skill needs the person's explicit OK (an install attempt
-  on 28 Oct was blocked for that reason). Don't install it without that OK.
+- Studio: the person approved it on 28 Oct, and its files are now in the repo (`channel/studio/`,
+  `channel/.claude/skills/what-if-animation/`, unmodified upstream commit 3725a22). **Not installed yet:** Auto mode's
+  safety check blocked `npm ci` even with the approval in chat. The person was offered two fixes: switch the session
+  to "Accept edits" and approve each command, or have Claude add narrow allow rules to `.claude/settings.json`. Wait
+  for their answer; don't route around the block.
+- Voice: the person chose to try free voices first: Chatterbox (MIT) and Kokoro (Apache 2.0), run locally on CPU
+  (no GPU here). Make samples of the episode 1 cold open in both and let them pick by ear. ElevenLabs stays the
+  fallback. Free sound effects: YouTube Audio Library, Pixabay, or synthesised in code. Same install block applies.
 - ElevenLabs: no key yet. `api.elevenlabs.io` is reachable from the cloud environment. The scripts read
   `ELEVENLABS_API_KEY` from the environment; the person adds it in the environment settings. Never ask for the
   key in chat, never print it.

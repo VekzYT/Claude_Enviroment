@@ -33,6 +33,7 @@ run the account (uploads, comments, numbers) and keep the game details honest.
 | `research/` | The evidence behind the decisions |
 | `art/` | Channel art; `node channel/art/build.cjs` re-renders it |
 | `CLAUDE.md` | Notes for Claude, so every session picks up where the last one stopped |
+| `studio/`, `.claude/skills/what-if-animation/` | The animation pipeline: [what-if-animation](https://github.com/kelano86/what-if-animation) by FreshStack, MIT licence (see `studio/LICENSE`). We restyle it as our own cast and look. |
 
 ## Starting a session
 
