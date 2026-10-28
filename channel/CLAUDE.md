@@ -19,9 +19,34 @@ latest `episodes/*/results.md`, and the log below.
 - Episode 1 (*What If You Could Mine Anything?*): script, science, Shorts and package written. Not animated.
 - Studio: the person approved it on 28 Oct, and its files are now in the repo (`channel/studio/`,
   `channel/.claude/skills/what-if-animation/`, unmodified upstream commit 3725a22). **Not installed yet:** Auto mode's
-  safety check blocked `npm ci` even with the approval in chat. The person was offered two fixes: switch the session
-  to "Accept edits" and approve each command, or have Claude add narrow allow rules to `.claude/settings.json`. Wait
-  for their answer; don't route around the block.
+  safety check blocks installing or running third-party code, and Claude may not write `.claude/settings.json` itself
+  (self-modification). The person was asked to create the file below at the repo root on GitHub (branch
+  `claude/friendly-carson-lah8d7`), or to switch the session to "Accept edits" and approve each command. Once
+  `.claude/settings.json` exists (`git pull`), carry on: `npm ci` in `channel/studio`; the voice venv at
+  `channel/voice/.venv` (`uv venv --python 3.11`, then `uv pip install`); voice scripts in `channel/voice/`, run from
+  the repo root as `channel/voice/.venv/bin/python channel/voice/<script>.py`. A settings file created mid-session may
+  only load in a new session. Don't route around the block.
+
+  The settings file to hand them (`.claude/settings.json`):
+
+  ```json
+  {
+    "permissions": {
+      "allow": [
+        "Bash(npm ci *)",
+        "Bash(npm install *)",
+        "Bash(npx remotion *)",
+        "Bash(npx tsc *)",
+        "Bash(node ../.claude/skills/what-if-animation/scripts/*)",
+        "Bash(python ../.claude/skills/what-if-animation/scripts/*)",
+        "Bash(python3 ../.claude/skills/what-if-animation/scripts/*)",
+        "Bash(uv venv *)",
+        "Bash(uv pip install *)",
+        "Bash(channel/voice/.venv/bin/python channel/voice/*)"
+      ]
+    }
+  }
+  ```
 - Voice: the person chose to try free voices first: Chatterbox (MIT) and Kokoro (Apache 2.0), run locally on CPU
   (no GPU here). Make samples of the episode 1 cold open in both and let them pick by ear. ElevenLabs stays the
   fallback. Free sound effects: YouTube Audio Library, Pixabay, or synthesised in code. Same install block applies.
