@@ -35,10 +35,11 @@ is the minimum, not the ideal.
 
 ## Phases
 
-### Phase 0: launch (this week)
+### Phase 0: launch
 
-- [ ] Create the channel (checklist below).
-- [ ] Episode 1, *What If You Could Mine Anything?*, produced and uploaded on a Friday.
+- [x] Create the channel (28 Oct). Finish the setup checklist below.
+- [ ] Episode 1, *What If You Could Mine Anything?*: studio and cast by 30 Oct, animation from 31 Oct (Max plan),
+  upload **Friday 6 Nov, 3pm ET**.
 - [ ] Episode 2's rule teased at the end of episode 1 (`fallDamage false`).
 
 ### Phase 1: find the hook (weeks 1–4)

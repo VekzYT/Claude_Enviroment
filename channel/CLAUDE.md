@@ -11,7 +11,11 @@ latest `episodes/*/results.md`, and the log below.
 
 ## Current state
 
-- Channel: **not created yet** (name GAMERULE, handle @gamerule, free on 28 Oct 2026).
+- Channel: **created 28 Oct 2026** as "GameRule" with the handle @GameRuleEducation (YouTube's suggestion). Asked
+  the person to rename it GAMERULE, switch the handle to @gamerule (still free that day; backups @GameruleIRL,
+  @gameruletv), and add the art and description. Check the live channel page before assuming any of that is done.
+- Claude plan: the person upgrades to **Max on 31 Oct 2026**. Do the heavy work (full animation, renders) from then.
+- First upload target: **Friday 6 Nov 2026, 3pm ET** (20:00 UTC; US clocks change on 1 Nov).
 - Episode 1 (*What If You Could Mine Anything?*): script, science, Shorts and package written. Not animated.
 - Studio: **not installed.** Installing the third-party skill needs the person's explicit OK (an install attempt
   on 28 Oct was blocked for that reason). Don't install it without that OK.
@@ -57,3 +61,6 @@ TypeScript; the scripts only call `api.elevenlabs.io`, ffmpeg and Remotion.
 - **2026-10-28** Research session. Found IFOLOGY (@IFOLOGYFILMS, 44.2K), Iflord (@ifinitumstories, 5.74K),
   Alternate You (@AlternateYou22, new). Picked the game-rules lane, the GAMERULE name and the `/gamerule` + Admin
   hook. Wrote episode 1. Drew concept art. Waiting on: channel creation, studio OK, ElevenLabs key.
+- **2026-10-28** Channel created ("GameRule", @GameRuleEducation). Sent the setup steps: handle → @gamerule, name →
+  GAMERULE, art, description, settings, ElevenLabs. Plan: studio + cast + storyboard before 31 Oct, animation on
+  Max after, first upload Fri 6 Nov.
