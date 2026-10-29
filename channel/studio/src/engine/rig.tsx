@@ -29,9 +29,19 @@ export type Look = {
   shoe: string;
   face: string;
   hair: string;
-  extra?: 'hood' | 'curls' | 'bunches' | 'bob' | 'suit';
+  extra?: 'hood' | 'curls' | 'bunches' | 'bob' | 'suit' | 'hoodDown' | 'cap' | 'raincoat' | 'bun';
+  /** GAMERULE: the legs in their own colour (trousers), when they differ from the sleeves */
+  leg?: string;
+  /** GAMERULE: the hero's cube backpack (the inventory), with straps across the chest */
+  pack?: boolean;
+  /** GAMERULE: the pixel player marker floating above the head, the channel's logo; on once the gamerule is set */
+  marker?: boolean;
+  /** GAMERULE: round reading glasses */
+  specs?: boolean;
+  /** GAMERULE: the colour of the extra piece (Dex's cap) */
+  piece?: string;
 };
-export type CastName = 'pip' | 'pipHood' | 'pipInk' | 'mo' | 'sis' | 'mom' | 'suit';
+export type CastName = 'pip' | 'pipHood' | 'pipInk' | 'mo' | 'sis' | 'mom' | 'suit' | 'you' | 'youPlain' | 'dex' | 'juni' | 'momGR';
 export const LOOKS: Record<CastName, Look> = {
   // A: Pip as built
   pip: { skin: C.skin, skinShade: C.skinShade, hand: C.skin, jacket: C.jacket, jacketShade: C.jacketShade, accent: C.jacketShade, limb: C.limb, line: C.ink, shoe: C.shoe, face: C.ink, hair: C.ink },
@@ -46,6 +56,33 @@ export const LOOKS: Record<CastName, Look> = {
   sis: { skin: C.skin, skinShade: C.skinShade, hand: C.skin, jacket: '#3E8C86', jacketShade: '#2F6E69', accent: '#F28C6A', limb: '#3A3446', line: '#14121C', shoe: '#F28C6A', face: C.ink, hair: '#3A2620', extra: 'bunches' },
   mom: { skin: C.skin, skinShade: C.skinShade, hand: C.skin, jacket: '#8A5A6A', jacketShade: '#704858', accent: '#E9C46A', limb: '#3A3446', line: '#14121C', shoe: '#5A4A6A', face: C.ink, hair: '#5A3226', extra: 'bob' },
   suit: { skin: '#D9C6AE', skinShade: '#C2AE96', hand: '#D9C6AE', jacket: '#2B2F3A', jacketShade: '#20232C', accent: '#A8323E', limb: '#2B2F3A', line: '#0E0F14', shoe: '#14151A', face: C.ink, hair: '#17141A', extra: 'suit' },
+  // GAMERULE's cast (channel/BIBLE.md). You: no hair, lime hoodie with the hood down and white drawstrings, the
+  // cube backpack, and the player marker once the gamerule is on (youPlain is the same without it).
+  you: { skin: C.skin, skinShade: C.skinShade, hand: C.skin, jacket: '#8BE04E', jacketShade: '#5DA832', accent: '#F4F1EA', limb: '#8BE04E', leg: '#3B3458', line: '#141024', shoe: '#F4F1EA', face: C.ink, hair: C.ink, extra: 'hoodDown', pack: true, marker: true },
+  youPlain: { skin: C.skin, skinShade: C.skinShade, hand: C.skin, jacket: '#8BE04E', jacketShade: '#5DA832', accent: '#F4F1EA', limb: '#8BE04E', leg: '#3B3458', line: '#141024', shoe: '#F4F1EA', face: C.ink, hair: C.ink, extra: 'hoodDown', pack: true },
+  // Dex, the best friend with the bad ideas: a red cap worn backwards, a denim jacket, red trainers
+  dex: { skin: '#9C6B4E', skinShade: '#86593F', hand: '#9C6B4E', jacket: '#4F7BB8', jacketShade: '#3D6396', accent: '#2C4A73', limb: '#4F7BB8', leg: '#2F2B3A', line: '#141024', shoe: '#E8483F', face: C.ink, hair: '#1E1612', extra: 'cap', piece: '#E8483F' },
+  // Juni, the little sister (draw her at about 0.68 of You): purple raincoat, hood up with yellow piping, a star clip, yellow boots
+  juni: { skin: C.skin, skinShade: C.skinShade, hand: C.skin, jacket: '#8B5CF6', jacketShade: '#6E44D6', accent: '#FFD93B', limb: '#8B5CF6', leg: '#3A3446', line: '#141024', shoe: '#FFD93B', face: C.ink, hair: '#3A2620', extra: 'raincoat' },
+  // Mom: hair up in a bun, round reading glasses, a rust cardigan over a cream top
+  momGR: { skin: '#E3C3A3', skinShade: '#CDAA88', hand: '#E3C3A3', jacket: '#C2643A', jacketShade: '#A4522E', accent: '#F2E6D0', limb: '#C2643A', leg: '#4A4060', line: '#141024', shoe: '#5A4A6A', face: C.ink, hair: '#5A3226', extra: 'bun', specs: true },
+};
+
+/** The player marker: a pixel-art arrow, lime with a darker rim and one highlight pixel. Centred on (0, 0). */
+export const PlayerMarker: React.FC<{ px?: number; glow?: number }> = ({ px = 6, glow = 1 }) => {
+  const rows = [9, 7, 5, 3, 1];
+  return (
+    <g transform={`translate(0 ${-2.5 * px})`}>
+      {glow > 0 ? <ellipse cx={0} cy={2.5 * px} rx={5.4 * px} ry={3.2 * px} fill="#C8F59E" opacity={0.13 * glow} /> : null}
+      {rows.map((n, r) =>
+        Array.from({ length: n }, (_, i) => {
+          const edge = i === 0 || i === n - 1 || r === 0;
+          return <rect key={`${r}-${i}`} x={-(n * px) / 2 + i * px} y={r * px} width={px + 0.4} height={px + 0.4} fill={edge ? '#2F7D32' : '#8BE04E'} />;
+        }),
+      )}
+      <rect x={-3.5 * px} y={px} width={px} height={px} fill="#C8F59E" />
+    </g>
+  );
 };
 
 // ---------- the hero ----------
@@ -282,22 +319,33 @@ const Face: React.FC<{ expr: Expr; blink: number; look: number; glasses: number;
   );
 };
 
-export const Hero: React.FC<{ pose: Pose; shadow?: number; rimId?: string; look?: Look }> = ({ pose, shadow = 1, rimId = 'rimR', look = LOOKS.pipHood }) => {
+export const Hero: React.FC<{ pose: Pose; shadow?: number; rimId?: string; look?: Look; t?: number }> = ({ pose, shadow = 1, rimId = 'rimR', look = LOOKS.pipHood, t = 0 }) => {
   const j = joints(pose);
   const L = look;
   // limbs are light with a dark outline, so they read on the dark sets (navy limbs vanished on navy walls)
-  const limb = (o: { root: P; mid: P; end: P }, w: number) => {
+  const limb = (o: { root: P; mid: P; end: P }, w: number, color = L.limb) => {
     const d = `M ${o.root.x} ${o.root.y} L ${o.mid.x} ${o.mid.y} L ${o.end.x} ${o.end.y}`;
     return (
       <g>
         <path d={d} stroke={L.line} strokeWidth={w + 7} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        <path d={d} stroke={L.limb} strokeWidth={w} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={d} stroke={color} strokeWidth={w} fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </g>
     );
   };
-  const shoe = (o: { root: P; mid: P; end: P }) => (
-    <ellipse cx={o.end.x + pose.facing * 9} cy={o.end.y + 4} rx={22} ry={11} fill={L.shoe} stroke={L.line} strokeWidth={4} />
-  );
+  const leg = (o: { root: P; mid: P; end: P }) => limb(o, 12, L.leg ?? L.limb);
+  // GAMERULE: the cube backpack rides on the upper back, so it shows on the side away from where the body faces
+  const backpack = L.pack ? (
+    <g transform={`rotate(${pose.tilt}) translate(${-Math.sign(pose.yaw || 1) * 34 * Math.min(1, Math.abs(pose.yaw) * 1.6)} 0)`}>
+      <path d="M -30 -118 L 0 -130 L 30 -118 L 0 -106 Z" fill="#3A4A5E" stroke={L.line} strokeWidth={4} strokeLinejoin="round" />
+      <path d="M -30 -118 L 0 -106 L 0 -52 L -30 -64 Z" fill="#26313F" stroke={L.line} strokeWidth={4} strokeLinejoin="round" />
+      <path d="M 0 -106 L 30 -118 L 30 -64 L 0 -52 Z" fill="#1C2532" stroke={L.line} strokeWidth={4} strokeLinejoin="round" />
+      <path d="M 0 -103 L 0 -56 M -26 -116 L -2 -107" stroke="#8BE04E" strokeWidth={2.5} opacity={0.9} />
+    </g>
+  ) : null;
+  const legs = pose.yaw < 0 ? <>{leg(j.legR)}{shoe(j.legR)}{leg(j.legL)}{shoe(j.legL)}</> : <>{leg(j.legL)}{shoe(j.legL)}{leg(j.legR)}{shoe(j.legR)}</>;
+  function shoe(o: { root: P; mid: P; end: P }) {
+    return <ellipse cx={o.end.x + pose.facing * 9} cy={o.end.y + 4} rx={22} ry={11} fill={L.shoe} stroke={L.line} strokeWidth={4} />;
+  }
   // a mitten along the forearm: the palm, the thumb toward the body, two knuckle marks; or a pointing fist
   const hand = (o: { mid: P; end: P }, side: 1 | -1, kind: HandKind) => {
     const ang = (Math.atan2(o.end.x - o.mid.x, o.end.y - o.mid.y) * 180) / Math.PI;
@@ -332,16 +380,68 @@ export const Hero: React.FC<{ pose: Pose; shadow?: number; rimId?: string; look?
           <path d="M -7 -112 L 7 -112 L 9 -100 L 5 -64 L 0 -56 L -5 -64 L -9 -100 Z" fill={L.accent} />
           <path d="M -26 -116 L 0 -54 M 26 -116 L 0 -54" stroke={L.line} strokeWidth={4} />
         </g>
-      ) : (
+      ) : L.extra === 'hoodDown' ? null : (
         <path d="M -22 -118 Q 0 -100 22 -118" stroke={L.accent} strokeWidth={6} fill="none" strokeLinecap="round" />
       )}
+      {L.pack ? (
+        // the backpack's straps, over the shoulders and down the chest
+        <g>
+          <path d="M -28 -116 Q -30 -80 -24 -46" stroke={L.line} strokeWidth={13} fill="none" strokeLinecap="round" />
+          <path d="M -28 -116 Q -30 -80 -24 -46" stroke="#2E3A4A" strokeWidth={7} fill="none" strokeLinecap="round" />
+          <path d="M 28 -116 Q 30 -80 24 -46" stroke={L.line} strokeWidth={13} fill="none" strokeLinecap="round" />
+          <path d="M 28 -116 Q 30 -80 24 -46" stroke="#2E3A4A" strokeWidth={7} fill="none" strokeLinecap="round" />
+        </g>
+      ) : null}
+      {L.extra === 'hoodDown' ? (
+        // the hood lies down behind the neck (the head covers most of it); white drawstrings hang on the chest
+        <g>
+          <path d="M -44 -110 Q -54 -150 0 -154 Q 54 -150 44 -110 Q 0 -96 -44 -110 Z" fill={L.jacketShade} stroke={L.line} strokeWidth={4} strokeLinejoin="round" />
+          {(() => {
+            const sw = pose.sway * 0.6 - pose.tilt * 0.5;
+            return (
+              <g>
+                <path d={`M -10 -110 Q ${-11 + sw * 0.3} -92 ${-12 + sw} -72 M 10 -110 Q ${11 + sw * 0.3} -92 ${12 + sw} -72`} stroke={L.accent} strokeWidth={4.5} strokeLinecap="round" fill="none" />
+                <rect x={-15 + sw} y={-74} width={6} height={9} rx={2} fill={L.accent} />
+                <rect x={9 + sw} y={-74} width={6} height={9} rx={2} fill={L.accent} />
+              </g>
+            );
+          })()}
+        </g>
+      ) : null}
     </g>
   );
   const head = (
     <g transform={`rotate(${pose.tilt}) rotate(${pose.headTilt} 0 ${HEAD.y + 40})`}>
+      {L.extra === 'cap' && Math.abs(pose.yaw) > 0.12 ? (
+        // GAMERULE (Dex): the peak of a cap worn backwards sticks out behind the head, away from where he faces
+        // (face-on it is hidden behind the head)
+        <path
+          transform={`translate(${-Math.sign(pose.yaw || 1) * (18 + 30 * Math.min(1, Math.abs(pose.yaw)))} 0) scale(${Math.sign(pose.yaw || 1)} 1)`}
+          d={`M -40 ${HEAD.y - 34} Q -78 ${HEAD.y - 36} -84 ${HEAD.y - 24} Q -60 ${HEAD.y - 16} -30 ${HEAD.y - 22} Z`}
+          fill={L.piece}
+          stroke={L.line}
+          strokeWidth={4}
+          strokeLinejoin="round"
+        />
+      ) : null}
       <circle cx={HEAD.x} cy={HEAD.y} r={HEAD.r} fill={L.skin} stroke={L.line} strokeWidth={4} />
       <path d={`M ${HEAD.x + 14} ${HEAD.y + 58} A ${HEAD.r} ${HEAD.r} 0 0 0 ${HEAD.x + 60} ${HEAD.y + 14} A 70 70 0 0 1 ${HEAD.x + 14} ${HEAD.y + 58} Z`} fill={L.skinShade} />
-      {L.extra === 'bunches' || L.extra === 'bob' || L.extra === 'suit' ? null : (
+      {L.extra === 'cap' ? (
+        // the crown of the cap: a dome over the top of the head, a band, the strap opening at the front
+        <g transform={`translate(${-pose.yaw * 10} 0)`}>
+          <path d={`M -63 ${HEAD.y - 12} Q -66 ${HEAD.y - 72} 0 ${HEAD.y - 74} Q 66 ${HEAD.y - 72} 63 ${HEAD.y - 12} Q 0 ${HEAD.y - 26} -63 ${HEAD.y - 12} Z`} fill={L.piece} stroke={L.line} strokeWidth={4} strokeLinejoin="round" />
+          <path d={`M -60 ${HEAD.y - 18} Q 0 ${HEAD.y - 32} 60 ${HEAD.y - 18}`} stroke="#B8352E" strokeWidth={6} fill="none" />
+          <circle cx={0} cy={HEAD.y - 72} r={5} fill="#B8352E" />
+        </g>
+      ) : null}
+      {L.extra === 'bun' ? (
+        // GAMERULE (Mom): hair pulled back into a bun on top, a soft side sweep
+        <g transform={`translate(${-pose.yaw * 12} 0)`}>
+          <circle cx={6} cy={HEAD.y - 70} r={22} fill={L.hair} stroke={L.line} strokeWidth={4} />
+          <path d={`M -62 ${HEAD.y - 6} Q -66 ${HEAD.y - 66} 0 ${HEAD.y - 66} Q 66 ${HEAD.y - 66} 62 ${HEAD.y - 6} Q 56 ${HEAD.y - 40} 22 ${HEAD.y - 44} Q -10 ${HEAD.y - 50} -34 ${HEAD.y - 40} Q -56 ${HEAD.y - 34} -62 ${HEAD.y - 6} Z`} fill={L.hair} stroke={L.line} strokeWidth={4} strokeLinejoin="round" />
+        </g>
+      ) : null}
+      {L.extra === 'bunches' || L.extra === 'bob' || L.extra === 'suit' || L.extra === 'hoodDown' || L.extra === 'cap' || L.extra === 'raincoat' || L.extra === 'bun' ? null : (
         <path transform={`translate(${-pose.yaw * 16} 0)`} d={`M -6 ${HEAD.y - 60} q 10 -26 30 -18 q -16 2 -14 16 q -8 -10 -16 2 Z`} fill={L.hair} />
       )}
       {L.extra === 'bunches' ? (
@@ -372,6 +472,18 @@ export const Hero: React.FC<{ pose: Pose; shadow?: number; rimId?: string; look?
         <path transform={`translate(${-pose.yaw * 14} 0)`} d={`M -60 ${HEAD.y - 18} Q -64 ${HEAD.y - 70} 4 ${HEAD.y - 68} Q 64 ${HEAD.y - 64} 60 ${HEAD.y - 18} Q 52 ${HEAD.y - 44} 18 ${HEAD.y - 46} L 12 ${HEAD.y - 54} L 6 ${HEAD.y - 46} Q -44 ${HEAD.y - 46} -60 ${HEAD.y - 18} Z`} fill={L.hair} />
       ) : null}
       <Face expr={pose.expr} blink={pose.blink} look={pose.look} glasses={pose.glasses} yaw={pose.yaw} ink={L.face} />
+      {L.specs ? (
+        // GAMERULE (Mom): round reading glasses, following the face as it turns
+        <g transform={`translate(${pose.yaw * 30} 0) scale(${1 - 0.28 * Math.min(1, Math.abs(pose.yaw))} 1)`} fill="none" stroke={L.line} strokeWidth={4}>
+          <circle cx={-21 + pose.look * 7} cy={HEAD.y - 4} r={15} />
+          <circle cx={21 + pose.look * 7} cy={HEAD.y - 4} r={15} />
+          <path d={`M ${-6 + pose.look * 7} ${HEAD.y - 6} L ${6 + pose.look * 7} ${HEAD.y - 6}`} />
+        </g>
+      ) : null}
+      {L.extra === 'raincoat' ? (
+        // GAMERULE (Juni): a yellow star clip on the hood, high on the side facing us
+        <path transform={`translate(${-44 - pose.yaw * 8} ${HEAD.y - 58}) scale(0.9)`} d="M 0 -14 L 4 -4 L 15 -4 L 6 3 L 9 14 L 0 7 L -9 14 L -6 3 L -15 -4 L -4 -4 Z" fill="#FFD93B" stroke={L.line} strokeWidth={3} strokeLinejoin="round" />
+      ) : null}
       {L.extra === 'curls'
         ? [-150, -125, -100, -78, -55, -30].map((deg, k) => {
             const a = (deg * Math.PI) / 180;
@@ -385,8 +497,9 @@ export const Hero: React.FC<{ pose: Pose; shadow?: number; rimId?: string; look?
       {shadow > 0 ? <ellipse cx={pose.x} cy={pose.y + LEG_LEN * pose.scale + 10} rx={70 * pose.scale} ry={12 * pose.scale} fill="#000" opacity={0.25 * shadow} /> : null}
       <g transform={`translate(${pose.x} ${pose.y}) scale(${pose.scale}) rotate(${pose.spin} 0 -90)`} filter={`url(#${rimId})`}>
         <g transform={`translate(0 ${LEG_LEN}) scale(${1 + 0.6 * pose.squash} ${1 - pose.squash}) translate(0 ${-LEG_LEN})`}>
+          {backpack}
           {/* the far side is drawn first, so a turned body overlaps itself the right way */}
-          {pose.yaw < 0 ? <>{limb(j.legR, 12)}{shoe(j.legR)}{limb(j.legL, 12)}{shoe(j.legL)}</> : <>{limb(j.legL, 12)}{shoe(j.legL)}{limb(j.legR, 12)}{shoe(j.legR)}</>}
+          {legs}
           {pose.yaw < 0 ? <>{limb(j.armR, 11)}{hand(j.armR, -1, pose.handR)}</> : <>{limb(j.armL, 11)}{hand(j.armL, 1, pose.handL)}</>}
           {torso}
           {pose.yaw < 0 ? <>{limb(j.armL, 11)}{hand(j.armL, 1, pose.handL)}</> : <>{limb(j.armR, 11)}{hand(j.armR, -1, pose.handR)}</>}
@@ -405,6 +518,13 @@ export const Hero: React.FC<{ pose: Pose; shadow?: number; rimId?: string; look?
               })()}
             </g>
           ) : null}
+          {L.extra === 'raincoat' ? (
+            // GAMERULE (Juni): the raincoat's hood up round the face, piped in yellow; no drawstrings
+            <g transform={`rotate(${pose.tilt}) rotate(${pose.headTilt * 0.5} 0 ${HEAD.y + 40})`}>
+              <path d={`M -72 ${HEAD.y + 16} Q -82 ${HEAD.y - 76} 0 ${HEAD.y - 82} Q 82 ${HEAD.y - 76} 72 ${HEAD.y + 16} Q 52 -100 0 -106 Q -52 -100 -72 ${HEAD.y + 16} Z`} fill={L.jacket} stroke={L.line} strokeWidth={4} />
+              <path d={`M -66 ${HEAD.y + 12} Q -76 ${HEAD.y - 70} 0 ${HEAD.y - 76} Q 76 ${HEAD.y - 70} 66 ${HEAD.y + 12}`} stroke={L.accent} strokeWidth={5} fill="none" />
+            </g>
+          ) : null}
           {L.extra === 'curls' ? (
             <g transform={`rotate(${pose.tilt})`}>
               <path d="M -46 -110 Q 0 -86 46 -110" stroke="#E06A5A" strokeWidth={8} fill="none" strokeLinecap="round" />
@@ -415,6 +535,18 @@ export const Hero: React.FC<{ pose: Pose; shadow?: number; rimId?: string; look?
           {head}
         </g>
       </g>
+      {L.marker
+        ? (() => {
+            // GAMERULE: the marker floats upright over the head and bobs on the shot's clock
+            const h = toWorld(pose, j.head);
+            const bob = Math.sin(t / 9) * 4;
+            return (
+              <g transform={`translate(${h.x} ${h.y - (HEAD.r + 46 + bob) * pose.scale}) scale(${pose.scale})`}>
+                <PlayerMarker />
+              </g>
+            );
+          })()
+        : null}
     </g>
   );
 };

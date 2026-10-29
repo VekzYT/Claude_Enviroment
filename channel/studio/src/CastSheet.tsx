@@ -12,10 +12,10 @@ const Label: React.FC<{ x: number; y: number; text: string }> = ({ x, y, text })
   </text>
 );
 const P = (o: Partial<Pose>): Pose => ({ ...basePose, ...o });
-const NAMES: Record<CastName, string> = { pip: 'PIP A', pipHood: 'PIP B (HERO)', pipInk: 'PIP C', mo: 'MO, FRIEND', sis: 'SISTER', mom: 'MUM', suit: 'THE SUIT' };
+const NAMES: Partial<Record<CastName, string>> = { pip: 'PIP A', pipHood: 'PIP B (HERO)', pipInk: 'PIP C', mo: 'MO, FRIEND', sis: 'SISTER', mom: 'MUM', suit: 'THE SUIT' };
 
 export const CastSheet: React.FC = () => {
-  const cast = Object.keys(LOOKS) as CastName[];
+  const cast = Object.keys(NAMES) as CastName[];
   const row1 = 430;
   const row2 = 900;
   const poses: { name: string; p: Partial<Pose> }[] = [
@@ -40,7 +40,7 @@ export const CastSheet: React.FC = () => {
           return (
             <g key={c}>
               <Hero look={LOOKS[c]} pose={P({ x, y: row1 + (0.82 - small) * 340, scale: small, yaw: i % 2 ? -0.35 : 0.35, look: i % 2 ? -0.5 : 0.5, expr: 'happy' })} shadow={0.6} />
-              <Label x={x} y={row1 + 170} text={NAMES[c]} />
+              <Label x={x} y={row1 + 170} text={NAMES[c] ?? c} />
             </g>
           );
         })}
