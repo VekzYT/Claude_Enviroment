@@ -62,6 +62,12 @@ latest `episodes/*/results.md`, and the log below.
   blip...) and composes the chiptune bed to the timeline, saving them where `sfx.py` looks, so `sfx.py` and
   `mixcheck.py` work unchanged with no ElevenLabs key. Two clips (`gasp`, `class_murmur`) are from the studio's MIT
   library. Hits land in the pause after their word ("Hit it." then the punch), per `references/sound.md`.
+  Order matters: `plan.py` rewrites `timeline.json`, so run `plan.py`, then `sfx_synth.py`, then `sfx.py` (which
+  writes the stem volumes back), then `mixcheck.py`, then `master.py`.
+- Master: speech plus hits peaks about 20 dB over its loudness, so plain loudnorm missed -14 (it fell back to dynamic
+  mode: -14.9). `master.py` now glues the mix first (compressor, then limiter, makeup found by bisection), then a plain
+  gain. The Short: -13.9 LUFS, -1.55 dBTP. Check the finished file's words with
+  `transcribe.py <slug> --file <final.mp4>` (the Short: 98%, the only misses "tonnes" written "tons").
 - Voice: Kokoro `am_michael` (sample A), the person's pick on 29 Oct. From the repo root,
   `channel/voice/.venv/bin/python channel/voice/voice_kokoro.py <slug>` voices the episode's `script` into
   `studio/public/<slug>/voice.wav` and writes `studio/src/episodes/<slug>/words.json`; pauses come from `gaps` and
@@ -140,3 +146,7 @@ TypeScript; the scripts only call `api.elevenlabs.io`, ffmpeg and Remotion.
 - **2026-10-29** The person picked voice A (Kokoro `am_michael`). Built GAMERULE's layer on the rig and storyboarded
   episode 1 part 1 (14 shots, 22 s). The self-check failed the first board (wake-up shot standing and smug, the
   school door beside the mined wall, thin cracks, no high angle, no foregrounds); fixed all of it and sent the board.
+- **2026-10-29** The person asked for a video to post now. Made the Monday Short in full (`mine-01-short`, 50 s,
+  1080 × 1920): tall framing in the engine, 9 new shots, every sound and the music synthesised in code, mastered to
+  -13.9 LUFS. Handed over `out/mine-01-short/mine-01-short-final.mp4` (not committed; rebuild with `master.py`) and
+  `episodes/01-mine-anything/short-monday-upload.md`. Waiting on: it going up, then 48-hour numbers.

@@ -2,7 +2,9 @@
 a dropped word is caught before the render. Prints what Whisper heard and every word it missed.
 
 Run from the repo root:
-    channel/voice/.venv/bin/python channel/voice/transcribe.py <slug>
+    channel/voice/.venv/bin/python channel/voice/transcribe.py <slug> [--file path]
+--file checks another recording of the same script instead of the voice track: the finished video, to make sure the
+words survive the effects and the music.
 """
 import json
 import re
@@ -27,7 +29,8 @@ def main():
     ep = json.loads((STUDIO / 'src' / 'episodes' / slug / 'episode.json').read_text(encoding='utf-8'))
     expected = words(' '.join(b['text'] for b in ep['script']))
     model = WhisperModel('base.en', device='cpu', compute_type='int8')
-    segments, _ = model.transcribe(str(STUDIO / 'public' / slug / 'voice.wav'), beam_size=5)
+    src = sys.argv[sys.argv.index('--file') + 1] if '--file' in sys.argv else str(STUDIO / 'public' / slug / 'voice.wav')
+    segments, _ = model.transcribe(src, beam_size=5)
     text = ' '.join(s.text.strip() for s in segments)
     heard = words(text)
     sm = SequenceMatcher(a=expected, b=heard, autojunk=False)
