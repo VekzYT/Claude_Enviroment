@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm ci *)",
+      "Bash(npm install *)",
+      "Bash(npx remotion *)",
+      "Bash(npx tsc *)",
+      "Bash(node ../.claude/skills/what-if-animation/scripts/*)",
+      "Bash(python ../.claude/skills/what-if-animation/scripts/*)",
+      "Bash(python3 ../.claude/skills/what-if-animation/scripts/*)",
+      "Bash(uv venv *)",
+      "Bash(uv pip install *)",
+      "Bash(channel/voice/.venv/bin/python channel/voice/*)"
+    ]
+  }
+}
