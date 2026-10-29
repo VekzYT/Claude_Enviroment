@@ -80,8 +80,7 @@ Decision rules:
 
 ## Launch checklist (for you)
 
-1. **Create a Brand Account channel** (YouTube → profile → Settings → Add or manage channels → Create a channel).
-   Name **GAMERULE**, handle **@gamerule** (backups: @GameruleIRL, @gameruletv).
+1. ~~Create the channel.~~ Done 28 Oct: "GameRule", **@gameruletv**, profile picture, banner and description.
 2. **Verify your phone number** at youtube.com/verify. This unlocks custom thumbnails, which we need from video 1.
 3. **Profile picture and banner:** upload the files in `art/` (`avatar.png`, `banner.png`).
 4. **Description:** paste the About text from `BIBLE.md`.

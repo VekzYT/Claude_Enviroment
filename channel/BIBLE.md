@@ -14,7 +14,8 @@ generic-superpower lane is flooded with clones.
 
 ## Name and handle
 
-- **GAMERULE**, handle **@gamerule** (free on 28 Oct 2026). Backups: @GameruleIRL, @gameruletv.
+- **GAMERULE** (the channel shows "GameRule"), handle **@gameruletv**. Live since 28 Oct 2026, with the art and
+  description from this bible.
 - Never put "Minecraft" in the channel name, logo or handle (Mojang's brand). Titles and descriptions can mention it
   where it's true.
 

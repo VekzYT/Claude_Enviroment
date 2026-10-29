@@ -11,9 +11,10 @@ latest `episodes/*/results.md`, and the log below.
 
 ## Current state
 
-- Channel: **created 28 Oct 2026** as "GameRule" with the handle @GameRuleEducation (YouTube's suggestion). Asked
-  the person to rename it GAMERULE, switch the handle to @gamerule (still free that day; backups @GameruleIRL,
-  @gameruletv), and add the art and description. Check the live channel page before assuming any of that is done.
+- Channel: **live** as "GameRule", **@gameruletv** (https://www.youtube.com/@gameruletv). Checked 29 Oct: profile
+  picture, banner and description are up. No videos yet.
+- Permissions: the person wrote the allow rules below themselves and committed them to `channel/.claude/settings.json`;
+  on 29 Oct Claude moved the file, unchanged, to the repo root `.claude/settings.json`, where settings are read.
 - Claude plan: the person upgrades to **Max on 31 Oct 2026**. Do the heavy work (full animation, renders) from then.
 - First upload target: **Friday 6 Nov 2026, 3pm ET** (20:00 UTC; US clocks change on 1 Nov).
 - Episode 1 (*What If You Could Mine Anything?*): script, science, Shorts and package written. Not animated.
@@ -115,3 +116,7 @@ TypeScript; the scripts only call `api.elevenlabs.io`, ffmpeg and Remotion.
 - **2026-10-28** Channel created ("GameRule", @GameRuleEducation). Sent the setup steps: handle → @gamerule, name →
   GAMERULE, art, description, settings, ElevenLabs. Plan: studio + cast + storyboard before 31 Oct, animation on
   Max after, first upload Fri 6 Nov.
+- **2026-10-28** Person chose free voices. Studio installed and verified end to end; four voice samples sent.
+- **2026-10-29** Channel setup confirmed done (@gameruletv). Moved their settings file to the repo root. Asked them,
+  simply, for two things: a voice pick (A–D) and "open a PR", so the channel merges into their default branch
+  (`claude/fps-game-setup-vmje1l`, the game) and future sessions can see it.
