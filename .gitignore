@@ -16,3 +16,5 @@ channel/studio/out/
 # Local voice models (Chatterbox, Kokoro): the virtualenv and generated audio stay out of git.
 channel/voice/.venv/
 channel/voice/out/
+# Voice tracks are rebuilt from episode.json by channel/voice/voice_kokoro.py (Kokoro is deterministic).
+channel/studio/public/**/*.wav

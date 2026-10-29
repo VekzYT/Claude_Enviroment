@@ -1,0 +1,15 @@
+{
+  "id": "MineOpen",
+  "slug": "mine-01-open",
+  "topic": "What if you could mine anything? (part 1: the cold open and the command)",
+  "title": ["WHAT IF YOU COULD", "MINE ANYTHING?"],
+  "kokoro": {"voice": "am_michael", "speed": 1.0},
+  "gaps": {"sentence": 0.28, "question": 0.4, "pairs": {"it|Mine": 0.62, "bike|Mine": 0.55}},
+  "script": [
+    {"beat": "1 cold open, demo 1 (small and selfish)", "text": "Monday. Your alarm won't shut up. Hit it. Mine.", "pause_after": 0.55},
+    {"beat": "1 cold open, demo 2 (useful)", "text": "Missed the bus? Don't go around the school. Go through it. Mine. Mine.", "pause_after": 1.3},
+    {"beat": "1 cold open, demo 3 (a little uncanny)", "text": "Someone parked on your bike. Mine.", "pause_after": 1.2},
+    {"beat": "2 the command and the premise (title card)", "text": "What if you could mine anything?", "pause_after": 0.9}
+  ],
+  "science": []
+}
