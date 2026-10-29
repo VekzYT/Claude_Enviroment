@@ -18,3 +18,6 @@ channel/voice/.venv/
 channel/voice/out/
 # Voice tracks are rebuilt from episode.json by channel/voice/voice_kokoro.py (Kokoro is deterministic).
 channel/studio/public/**/*.wav
+
+# GAMERULE: clips made by channel/voice/sfx_synth.py are rebuilt from code in seconds; the shipped library stays tracked
+channel/studio/library/sfx/*.mp3

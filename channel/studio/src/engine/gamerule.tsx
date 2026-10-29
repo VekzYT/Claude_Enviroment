@@ -3,6 +3,7 @@ import { backOut, clamp, easeOut, rnd } from './anim';
 import { FONT } from './fonts';
 import { Glow } from './light';
 import type { Look } from './rig';
+import { HudLayer, SAFE, useFrame } from './frame';
 
 // GAMERULE's game layer (channel/BIBLE.md): the chat where gamerules get typed, the "mine" power (cracks, debris, the
 // block that drops), the hotbar, the title card in our colours, and the props the first episode needs. Everything is
@@ -24,11 +25,21 @@ export type ChatLine = { at: number; text: string; kind?: 'cmd' | 'sys' | 'admin
 /**
  * The chat, bottom left, as in the game: one dark strip per line, newest at the bottom. A `cmd` line types itself
  * (about 1.6 characters a frame) behind a blinking cursor; `sys` (yellow) and `admin` (red) lines arrive whole.
- * Lines fade after `hold` frames unless `hold` is 0.
+ * Lines fade after `hold` frames unless `hold` is 0. In a tall frame it sits above the hotbar, clear of Shorts' UI.
  */
-export const ChatBox: React.FC<{ f: number; lines: ChatLine[]; x?: number; y?: number; size?: number; hold?: number; cps?: number }> = ({
-  f, lines, x = 64, y = 972, size = 36, hold = 0, cps = 1.6,
+export const ChatBox: React.FC<{ f: number; lines: ChatLine[]; x?: number; y?: number; size?: number; tallSize?: number; hold?: number; cps?: number }> = (props) => (
+  <HudLayer>
+    <ChatLines {...props} />
+  </HudLayer>
+);
+
+const ChatLines: React.FC<{ f: number; lines: ChatLine[]; x?: number; y?: number; size?: number; tallSize?: number; hold?: number; cps?: number }> = ({
+  f, lines, x: x0 = 64, y: y0 = 972, size: s0 = 36, tallSize = 33, hold = 0, cps = 1.6,
 }) => {
+  const F = useFrame();
+  const x = F.tall ? 40 : x0;
+  const y = F.tall ? F.h - SAFE.bottom - 150 : y0;
+  const size = F.tall ? tallSize : s0;
   const lh = size * 1.5;
   const shown = lines.filter((l) => f >= l.at);
   return (
@@ -266,15 +277,25 @@ export const BlockBurst: React.FC<{ x: number; y: number; t: number; kind?: Bloc
   );
 };
 
-/** The hotbar: nine slots along the bottom, the selected one lit, a block and a count in each filled slot. */
-export const Hotbar: React.FC<{ f: number; slots: ({ kind: BlockKind; count?: number } | null)[]; sel?: number; at?: number; y?: number; slot?: number }> = ({
-  f, slots, sel = 0, at = 0, y = 1000, slot = 78,
+/** The hotbar: nine slots along the bottom, the selected one lit, a block and a count in each filled slot. In a tall
+ * frame it rides above Shorts' caption, a little bigger. */
+export const Hotbar: React.FC<{ f: number; slots: ({ kind: BlockKind; count?: number } | null)[]; sel?: number; at?: number; y?: number; slot?: number }> = (props) => (
+  <HudLayer>
+    <HotbarSlots {...props} />
+  </HudLayer>
+);
+
+const HotbarSlots: React.FC<{ f: number; slots: ({ kind: BlockKind; count?: number } | null)[]; sel?: number; at?: number; y?: number; slot?: number }> = ({
+  f, slots, sel = 0, at = 0, y: y0 = 1000, slot: s0 = 78,
 }) => {
+  const F = useFrame();
   const up = easeOut(clamp((f - at) / 8));
   if (up <= 0) return null;
+  const slot = F.tall ? Math.round(s0 * 1.4) : s0;
+  const y = F.tall ? F.h - SAFE.bottom : y0;
   const gap = 6;
   const w = 9 * slot + 8 * gap;
-  const x0 = 960 - w / 2;
+  const x0 = F.w / 2 - w / 2;
   return (
     <g transform={`translate(0 ${(1 - up) * 120})`} fontFamily={FONT.ui}>
       <rect x={x0 - 10} y={y - slot - 10} width={w + 20} height={slot + 20} rx={6} fill="#000" opacity={0.45} />
@@ -286,7 +307,7 @@ export const Hotbar: React.FC<{ f: number; slots: ({ kind: BlockKind; count?: nu
             <rect x={sx} y={y - slot} width={slot} height={slot} rx={4} fill="#2A2436" opacity={0.85} stroke={i === sel ? GR.lime : '#5A5468'} strokeWidth={i === sel ? 5 : 3} />
             {s ? <ItemBlock x={sx + slot / 2} y={y - slot / 2 - 4} t={40 + i * 13} size={slot * 0.42} kind={s.kind} spin={0} bob={0} glow={0} /> : null}
             {s && s.count && s.count > 1 ? (
-              <text x={sx + slot - 5} y={y - 5} textAnchor="end" fontSize={28} fontWeight={700} fill={GR.white} stroke={GR.ink} strokeWidth={3} paintOrder="stroke">
+              <text x={sx + slot - 5} y={y - 5} textAnchor="end" fontFamily={FONT.title} fontSize={slot * 0.4} fontWeight={800} fill={GR.white} stroke={GR.ink} strokeWidth={3} paintOrder="stroke">
                 {s.count}
               </text>
             ) : null}
@@ -297,19 +318,30 @@ export const Hotbar: React.FC<{ f: number; slots: ({ kind: BlockKind; count?: nu
   );
 };
 
-/** GAMERULE's title card: a small first line, a big lime second line, one word in yellow that pulses. */
-export const GrTitle: React.FC<{ t: number; lines: [string, string]; accent?: string; accentT?: number; y?: number; size?: number }> = ({ t, lines, accent, accentT = 30, y = 200, size = 124 }) => {
+/** GAMERULE's title card: a small first line, a big lime second line, one word in yellow that pulses. In a tall frame
+ * it sits in the upper third and shrinks to fit the width. */
+export const GrTitle: React.FC<{ t: number; lines: [string, string]; accent?: string; accentT?: number; y?: number; size?: number }> = (props) => (
+  <HudLayer>
+    <TitleLines {...props} />
+  </HudLayer>
+);
+
+const TitleLines: React.FC<{ t: number; lines: [string, string]; accent?: string; accentT?: number; y?: number; size?: number }> = ({ t, lines, accent, accentT = 30, y: y0 = 200, size: s0 = 124 }) => {
+  const F = useFrame();
+  const size = F.tall ? Math.min(s0, (F.w - 110) / (lines[1].length * 0.68)) : s0;
+  const y = F.tall ? 560 : y0;
+  const cx = F.w / 2;
   const pop = (d: number) => backOut(clamp((t - d) / 9));
   const pulse = t >= accentT && t < accentT + 12 ? 1 + 0.12 * Math.sin(((t - accentT) / 12) * Math.PI) : 1;
   const words = lines[1].split(' ');
   return (
     <g fontFamily={FONT.title}>
-      <g transform={`translate(960 ${y}) scale(${pop(2)})`}>
+      <g transform={`translate(${cx} ${y}) scale(${pop(2)})`}>
         <text textAnchor="middle" fontWeight={700} fontSize={size / 2} letterSpacing={4} fill={GR.white} stroke={GR.ink} strokeWidth={9} paintOrder="stroke">
           {lines[0]}
         </text>
       </g>
-      <g transform={`translate(960 ${y + size - 4}) scale(${pop(5)})`}>
+      <g transform={`translate(${cx} ${y + size - 4}) scale(${pop(5)})`}>
         <text textAnchor="middle" fontWeight={900} fontSize={size} fill={GR.lime} stroke={GR.ink} strokeWidth={14} paintOrder="stroke" style={{ filter: 'drop-shadow(0 0 22px rgba(139,224,78,0.45))' }}>
           {words.map((w, i) => {
             const on = w.replace(/[^\w]/g, '') === accent;
@@ -322,6 +354,17 @@ export const GrTitle: React.FC<{ t: number; lines: [string, string]; accent?: st
         </text>
       </g>
     </g>
+  );
+};
+
+/** A flat shade over the whole visible frame (under a title card), in either format. */
+export const HudShade: React.FC<{ o: number; color?: string }> = ({ o, color = '#0B0816' }) => {
+  const F = useFrame();
+  if (o <= 0) return null;
+  return (
+    <HudLayer>
+      <rect x={-40} y={-40} width={F.w + 80} height={F.h + 80} fill={color} opacity={o} />
+    </HudLayer>
   );
 };
 
@@ -380,9 +423,9 @@ export const BackView: React.FC<{ x: number; y: number; s?: number; look: Look; 
       </filter>
     </defs>
     <g transform={`translate(${x} ${y}) scale(${s}) rotate(${tilt})`} filter={`url(#${rim})`}>
-      <path d="M -160 300 L -146 44 Q -136 -4 -62 -14 Q 0 -22 62 -14 Q 136 -4 146 44 L 160 300 Z" fill={look.jacket} stroke={look.line} strokeWidth={4} strokeLinejoin="round" />
-      <path d="M -160 300 L -146 44 Q -140 18 -116 6 L -118 300 Z" fill={look.jacketShade} opacity={0.6} />
-      <path d="M 160 300 L 146 44 Q 140 18 116 6 L 118 300 Z" fill={look.jacketShade} opacity={0.6} />
+      <path d="M -168 760 L -146 44 Q -136 -4 -62 -14 Q 0 -22 62 -14 Q 136 -4 146 44 L 168 760 Z" fill={look.jacket} stroke={look.line} strokeWidth={4} strokeLinejoin="round" />
+      <path d="M -168 760 L -146 44 Q -140 18 -116 6 L -120 760 Z" fill={look.jacketShade} opacity={0.6} />
+      <path d="M 168 760 L 146 44 Q 140 18 116 6 L 120 760 Z" fill={look.jacketShade} opacity={0.6} />
       <path d="M -66 -4 Q -78 -56 0 -62 Q 78 -56 66 -4 Q 0 16 -66 -4 Z" fill={look.jacketShade} stroke={look.line} strokeWidth={4} strokeLinejoin="round" />
       <circle cx={0} cy={-96} r={62} fill={look.skin} stroke={look.line} strokeWidth={4} />
       <path d="M -44 -50 A 62 62 0 0 0 50 -56 A 72 72 0 0 1 -44 -50 Z" fill={look.skinShade} />

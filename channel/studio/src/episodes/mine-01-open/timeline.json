@@ -139,7 +139,7 @@
   {
    "id": "S3",
    "size": "insert",
-   "key": 10,
+   "key": 27,
    "len": 43,
    "first": 95,
    "line": "Hit it.",
@@ -175,7 +175,7 @@
   {
    "id": "S7",
    "size": "macro",
-   "key": 14,
+   "key": 37,
    "len": 52,
    "first": 284,
    "line": "Go through it.",
@@ -238,7 +238,7 @@
   {
    "id": "S14",
    "size": "wide, title",
-   "key": 64,
+   "key": 54,
    "len": 131,
    "first": 529,
    "line": "What if you could mine anything?",
@@ -250,13 +250,13 @@
    "kind": "flash",
    "color": "#FFFFFF",
    "o": 0.45,
-   "f": 102
+   "f": 119
   },
   {
    "kind": "shake",
    "len": 6,
    "amp": 8,
-   "f": 102
+   "f": 119
   },
   {
    "kind": "flash",
@@ -268,7 +268,7 @@
    "kind": "flash",
    "color": "#FFFFFF",
    "o": 0.3,
-   "f": 289
+   "f": 317
   },
   {
    "kind": "flash",

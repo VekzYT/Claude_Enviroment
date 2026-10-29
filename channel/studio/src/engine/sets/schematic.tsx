@@ -62,12 +62,12 @@ export const Arrow: React.FC<{ x0: number; y0: number; x1: number; y1: number; t
 };
 
 /** A label in the mono face that pops on from t = 0. */
-export const SchLabel: React.FC<{ x: number; y: number; t: number; text: string; size?: number; color?: string; anchor?: 'start' | 'middle' | 'end' }> = ({ x, y, t, text, size = 36, color = SCH.line, anchor = 'middle' }) => {
+export const SchLabel: React.FC<{ x: number; y: number; t: number; text: string; size?: number; color?: string; anchor?: 'start' | 'middle' | 'end'; font?: string; weight?: number }> = ({ x, y, t, text, size = 36, color = SCH.line, anchor = 'middle', font = FONT.ui, weight }) => {
   if (t < 0) return null;
   const s = backOut(clamp(t / 6));
   return (
     <g transform={`translate(${x} ${y}) scale(${s})`}>
-      <text textAnchor={anchor} fontFamily={FONT.ui} fontSize={size} fill={color} letterSpacing={2}>
+      <text textAnchor={anchor} fontFamily={font} fontWeight={weight} fontSize={size} fill={color} letterSpacing={2}>
         {text}
       </text>
     </g>
@@ -75,14 +75,14 @@ export const SchLabel: React.FC<{ x: number; y: number; t: number; text: string;
 };
 
 /** A number counting from 0 to `to` between t = 0 and dur, formatted with commas (or by `format`). */
-export const CountUp: React.FC<{ x: number; y: number; t: number; to: number; dur?: number; size?: number; color?: string; suffix?: string; format?: (v: number) => string }> = ({
-  x, y, t, to, dur = 30, size = 64, color = SCH.live, suffix = '', format,
+export const CountUp: React.FC<{ x: number; y: number; t: number; to: number; dur?: number; size?: number; color?: string; suffix?: string; format?: (v: number) => string; font?: string; weight?: number }> = ({
+  x, y, t, to, dur = 30, size = 64, color = SCH.live, suffix = '', format, font = FONT.ui, weight,
 }) => {
   if (t < 0) return null;
   const v = to * easeOut(clamp(t / dur));
   const txt = format ? format(v) : Math.round(v).toLocaleString('en-US');
   return (
-    <text x={x} y={y} textAnchor="middle" fontFamily={FONT.ui} fontSize={size} fill={color} style={{ filter: `drop-shadow(0 0 14px ${SCH.glow}66)` }}>
+    <text x={x} y={y} textAnchor="middle" fontFamily={font} fontWeight={weight} fontSize={size} fill={color} style={{ filter: `drop-shadow(0 0 14px ${SCH.glow}66)` }}>
       {txt + suffix}
     </text>
   );

@@ -1,0 +1,986 @@
+{
+ "id": "MineShort",
+ "slug": "mine-01-short",
+ "topic": "What if you could mine anything? The Monday Short: the cold open, the rule, one real fact, the Admin.",
+ "title": [
+  "WHAT IF YOU COULD",
+  "MINE ANYTHING?"
+ ],
+ "kokoro": {
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ "gaps": {
+  "sentence": 0.28,
+  "question": 0.4,
+  "pairs": {
+   "it|Mine": 0.62,
+   "bike|Mine": 0.55,
+   "block|It": 0.3,
+   "tonnes|A": 0.45,
+   "sixty-four|A": 0.35,
+   "tonnes|As": 0.3,
+   "whale|That's": 0.45,
+   "nothing|So": 0.45
+  }
+ },
+ "script": [
+  {
+   "beat": "cold open, demo 1 (small and selfish)",
+   "text": "Monday. Your alarm won't shut up. Hit it. Mine.",
+   "pause_after": 0.55
+  },
+  {
+   "beat": "cold open, demo 2 (useful)",
+   "text": "Missed the bus? Don't go around the school. Go through it. Mine. Mine.",
+   "pause_after": 1.3
+  },
+  {
+   "beat": "cold open, demo 3 (a little uncanny)",
+   "text": "Someone parked on your bike. Mine.",
+   "pause_after": 1.2
+  },
+  {
+   "beat": "the command (title card)",
+   "text": "What if you could mine anything?",
+   "pause_after": 1.0
+  },
+  {
+   "beat": "the rule",
+   "text": "Keep hitting anything, and it breaks into a block. It flies into your inventory.",
+   "pause_after": 0.5
+  },
+  {
+   "beat": "that's real (science.md facts 1 and 2)",
+   "text": "But a real block of stone weighs two point seven tonnes. A stack of sixty-four? A hundred and seventy-three tonnes. As heavy as a blue whale. That's real.",
+   "pause_after": 0.6
+  },
+  {
+   "beat": "the cost",
+   "text": "And you feel nothing. So something, somewhere, is holding it for you.",
+   "pause_after": 1.1
+  },
+  {
+   "beat": "the Admin notices (red chat)",
+   "text": "And it just noticed.",
+   "pause_after": 0
+  }
+ ],
+ "science": [
+  "science.md 1: 1 m3 of granite at 2,700 kg/m3 = 2.7 t (5,950 lb)",
+  "science.md 2: 64 x 2.7 t = 172.8 t = 173 t (381,000 lb); blue whales up to 190 t"
+ ],
+ "tail": 1.9,
+ "shots": [
+  {
+   "id": "S1",
+   "size": "close-up",
+   "set": "nightstand",
+   "key": 14,
+   "note": "the alarm clock ringing, the sunrise in the window behind"
+  },
+  {
+   "id": "S2",
+   "size": "high angle",
+   "set": "the bed from above",
+   "key": 30,
+   "note": "You in bed, half awake and annoyed, eyes on the noise"
+  },
+  {
+   "id": "S3",
+   "size": "insert",
+   "set": "nightstand",
+   "key": 27,
+   "note": "the block outline snaps on; the fist hits the clock; cracks"
+  },
+  {
+   "id": "S4",
+   "size": "macro",
+   "set": "nightstand",
+   "key": 16,
+   "note": "the clock pops into a bobbing clock block; hotbar slot 1"
+  },
+  {
+   "id": "S5",
+   "size": "medium",
+   "set": "your street",
+   "key": 24,
+   "note": "the bus pulls away from the stop; You runs after it, arm out, and stops short"
+  },
+  {
+   "id": "S6",
+   "size": "wide",
+   "set": "the school, long side",
+   "key": 14,
+   "note": "You follows the arrow the long way round, then turns to the wall"
+  },
+  {
+   "id": "S7",
+   "size": "macro",
+   "set": "school wall",
+   "key": 37,
+   "note": "the outlined brick block; the fist cracks it"
+  },
+  {
+   "id": "S8",
+   "size": "insert",
+   "set": "school wall",
+   "key": 8,
+   "note": "the lower block pops into the lit room; the outline moves up"
+  },
+  {
+   "id": "S9",
+   "size": "medium",
+   "set": "school wall",
+   "key": 24,
+   "note": "the doorway opens; You steps into its light"
+  },
+  {
+   "id": "S10",
+   "size": "wide",
+   "set": "classroom",
+   "key": 28,
+   "note": "You steps in through the hole; the teacher and the class stare"
+  },
+  {
+   "id": "S11",
+   "size": "over the shoulder",
+   "set": "parking lot",
+   "key": 14,
+   "note": "a car parked across your bike, hazards blinking"
+  },
+  {
+   "id": "S12",
+   "size": "close-up",
+   "set": "parking lot (the car)",
+   "key": 30,
+   "note": "outlined like a block; knock, knock, knock: cracks spread"
+  },
+  {
+   "id": "S13",
+   "size": "medium",
+   "set": "parking lot",
+   "key": 12,
+   "note": "the car is a block over your palm; the owner stares, keys in hand"
+  },
+  {
+   "id": "S14",
+   "size": "wide, title",
+   "set": "parking lot",
+   "key": 54,
+   "note": "the command types itself; WHAT IF YOU COULD MINE ANYTHING?"
+  },
+  {
+   "id": "S15",
+   "size": "medium",
+   "set": "parking lot",
+   "key": 36,
+   "note": "You punches the street lamp, again and again; it flickers and cracks"
+  },
+  {
+   "id": "S16",
+   "size": "close-up",
+   "set": "parking lot (the lamp)",
+   "key": 22,
+   "note": "two more hits; it pops into a lamp block; the light goes out"
+  },
+  {
+   "id": "S17",
+   "size": "insert (UI)",
+   "set": "the inventory",
+   "key": 20,
+   "note": "thirty-six slots; the lamp block drops into the hotbar row"
+  },
+  {
+   "id": "S18",
+   "size": "schematic",
+   "set": "blueprint",
+   "key": 80,
+   "note": "a 1 m cube draws on and fills with stone; 2.7 t"
+  },
+  {
+   "id": "S19",
+   "size": "schematic",
+   "set": "blueprint",
+   "key": 110,
+   "note": "sixty-four blocks stack up; the counter rolls to 173 t"
+  },
+  {
+   "id": "S20",
+   "size": "schematic",
+   "set": "blueprint",
+   "key": 84,
+   "note": "the stack beside a blue whale; THAT'S REAL."
+  },
+  {
+   "id": "S21",
+   "size": "medium",
+   "set": "parking lot",
+   "key": 20,
+   "note": "You bounces on his heels, perfectly fine"
+  },
+  {
+   "id": "S22",
+   "size": "close-up, from behind",
+   "set": "parking lot",
+   "key": 50,
+   "note": "the cube backpack glowing faintly"
+  },
+  {
+   "id": "S23",
+   "size": "wide",
+   "set": "parking lot, dark",
+   "key": 70,
+   "note": "red in the chat: [Admin] unusual block activity detected."
+  }
+ ],
+ "edit": [
+  {
+   "shot": "S1",
+   "at": "Monday"
+  },
+  {
+   "shot": "S2",
+   "at": "Your"
+  },
+  {
+   "shot": "S3",
+   "at": "Hit"
+  },
+  {
+   "shot": "S4",
+   "at": "Mine"
+  },
+  {
+   "shot": "S5",
+   "at": "Missed"
+  },
+  {
+   "shot": "S6",
+   "at": "Don't"
+  },
+  {
+   "shot": "S7",
+   "at": "Go#2"
+  },
+  {
+   "shot": "S8",
+   "at": "Mine"
+  },
+  {
+   "shot": "S9",
+   "at": "Mine"
+  },
+  {
+   "shot": "S10",
+   "at": "+30"
+  },
+  {
+   "shot": "S11",
+   "at": "Someone"
+  },
+  {
+   "shot": "S12",
+   "at": "bike"
+  },
+  {
+   "shot": "S13",
+   "at": "Mine"
+  },
+  {
+   "shot": "S14",
+   "at": "+30"
+  },
+  {
+   "shot": "S15",
+   "at": "Keep"
+  },
+  {
+   "shot": "S16",
+   "at": "block"
+  },
+  {
+   "shot": "S17",
+   "at": "your"
+  },
+  {
+   "shot": "S18",
+   "at": "But"
+  },
+  {
+   "shot": "S19",
+   "at": "stack"
+  },
+  {
+   "shot": "S20",
+   "at": "As"
+  },
+  {
+   "shot": "S21",
+   "at": "And"
+  },
+  {
+   "shot": "S22",
+   "at": "So"
+  },
+  {
+   "shot": "S23",
+   "at": "s:45.75"
+  }
+ ],
+ "fx": [
+  {
+   "at": "S3+24",
+   "kind": "flash",
+   "color": "#FFFFFF",
+   "o": 0.45
+  },
+  {
+   "at": "S3+24",
+   "kind": "shake",
+   "len": 6,
+   "amp": 8
+  },
+  {
+   "at": "S4+2",
+   "kind": "flash",
+   "color": "#FFF3DC",
+   "o": 0.6
+  },
+  {
+   "at": "S7+33",
+   "kind": "flash",
+   "color": "#FFFFFF",
+   "o": 0.3
+  },
+  {
+   "at": "S8+2",
+   "kind": "flash",
+   "color": "#FFF3DC",
+   "o": 0.5
+  },
+  {
+   "at": "S8+18",
+   "kind": "flash",
+   "color": "#FFFFFF",
+   "o": 0.25
+  },
+  {
+   "at": "S9+2",
+   "kind": "flash",
+   "color": "#FFF3DC",
+   "o": 0.5
+  },
+  {
+   "at": "S13",
+   "kind": "flash",
+   "color": "#FFF3DC",
+   "o": 0.7
+  },
+  {
+   "at": "S13",
+   "kind": "shake",
+   "len": 8,
+   "amp": 10
+  },
+  {
+   "at": "S15+9",
+   "kind": "shake",
+   "len": 4,
+   "amp": 4
+  },
+  {
+   "at": "S15+35",
+   "kind": "shake",
+   "len": 4,
+   "amp": 5
+  },
+  {
+   "at": "S16+25",
+   "kind": "flash",
+   "color": "#FFF3DC",
+   "o": 0.55
+  },
+  {
+   "at": "S16+25",
+   "kind": "shake",
+   "len": 6,
+   "amp": 8
+  },
+  {
+   "at": "S17+9",
+   "kind": "flash",
+   "color": "#C8F59E",
+   "o": 0.18
+  },
+  {
+   "at": "S20+71",
+   "kind": "shake",
+   "len": 5,
+   "amp": 6
+  },
+  {
+   "at": "S23+8",
+   "kind": "flash",
+   "color": "#FF4D4D",
+   "o": 0.22
+  }
+ ],
+ "sound": {
+  "clips": {
+   "mine_hit": [
+    "synth: punch thump, the mine power's hit",
+    0.35
+   ],
+   "mine_crack": [
+    "synth: crunchy crackle, the mine power's crack",
+    0.4
+   ],
+   "mine_pop": [
+    "synth: cork pop and sparkle, the block breaking",
+    0.45
+   ],
+   "pickup": [
+    "synth: two-note chiptune blip, the block into the inventory",
+    0.25
+   ],
+   "alarm": [
+    "synth: twin-bell alarm clock ringing",
+    3.6
+   ],
+   "room_tone": [
+    "synth: quiet bedroom room tone",
+    6.0
+   ],
+   "street_amb": [
+    "synth: outdoor dawn and dusk ambience, distant traffic",
+    14.0
+   ],
+   "birds": [
+    "synth: dawn birds chirping",
+    8.0
+   ],
+   "bus_go": [
+    "synth: school bus engine pulling away, air brake hiss",
+    2.6
+   ],
+   "run_steps": [
+    "synth: sneakers running on pavement",
+    1.2
+   ],
+   "stop_skid": [
+    "synth: sneakers scuffing to a stop",
+    0.45
+   ],
+   "whoosh": [
+    "synth: air whoosh",
+    0.5
+   ],
+   "gasp": [
+    "two young people gasping in surprise at the same moment, cartoon, short",
+    0.8
+   ],
+   "class_murmur": [
+    "a quiet classroom murmur, kids whispering, chairs shuffling",
+    2.0
+   ],
+   "step_soft": [
+    "synth: a soft sneaker step",
+    0.25
+   ],
+   "hazard": [
+    "synth: car hazard light relay ticking",
+    3.0
+   ],
+   "knock": [
+    "synth: knuckles knocking on a car door",
+    0.3
+   ],
+   "car_pop": [
+    "synth: the car breaking into a block: pop, boom, clatter",
+    0.9
+   ],
+   "typing": [
+    "synth: quick keyboard typing",
+    0.7
+   ],
+   "chat_sys": [
+    "synth: soft two-tone chat notification",
+    0.35
+   ],
+   "title_hit": [
+    "synth: riser into a deep boom with a chime",
+    1.8
+   ],
+   "flicker": [
+    "synth: street lamp buzzing and flickering",
+    0.25
+   ],
+   "lamp_out": [
+    "synth: lamp fizzing out, glass tink",
+    0.7
+   ],
+   "inv_open": [
+    "synth: inventory opening swoosh",
+    0.3
+   ],
+   "slot_land": [
+    "synth: block landing in a slot",
+    0.2
+   ],
+   "draw_line": [
+    "synth: pen scribbling a blueprint line",
+    1.2
+   ],
+   "count_tick": [
+    "synth: counter ticking up, then a ding",
+    1.2
+   ],
+   "block_place": [
+    "synth: small stone block placed",
+    0.18
+   ],
+   "stone_thud": [
+    "synth: heavy stone block landing",
+    0.5
+   ],
+   "whale": [
+    "synth: a whale's low call",
+    2.2
+   ],
+   "stamp": [
+    "synth: rubber stamp thump",
+    0.5
+   ],
+   "bounce": [
+    "synth: soft sneaker landing",
+    0.2
+   ],
+   "glow_hum": [
+    "synth: soft magical hum and shimmer",
+    3.4
+   ],
+   "drone": [
+    "synth: low ominous drone",
+    4.6
+   ],
+   "admin_blip": [
+    "synth: harsh two-note error blip",
+    0.45
+   ],
+   "music": [
+    "synth: chiptune bed composed to the timeline: the cold open, then the rule and the science",
+    50.5
+   ]
+  },
+  "events": [
+   [
+    "S1",
+    "room_tone",
+    0.1,
+    "onset",
+    "S5"
+   ],
+   [
+    "S1",
+    "alarm",
+    0.2,
+    "onset",
+    "S3+24"
+   ],
+   [
+    "S3+24",
+    "mine_hit",
+    0.9
+   ],
+   [
+    "S3+25",
+    "mine_crack",
+    0.55
+   ],
+   [
+    "S4+2",
+    "mine_pop",
+    0.56
+   ],
+   [
+    "S4+8",
+    "pickup",
+    0.32
+   ],
+   [
+    "S5",
+    "street_amb",
+    0.07,
+    "onset",
+    "S10"
+   ],
+   [
+    "S5",
+    "birds",
+    0.07,
+    "onset",
+    "S10"
+   ],
+   [
+    "S5",
+    "bus_go",
+    0.22,
+    "onset",
+    "S6"
+   ],
+   [
+    "S5",
+    "run_steps",
+    0.25
+   ],
+   [
+    "S5+30",
+    "stop_skid",
+    0.22
+   ],
+   [
+    "S7+33",
+    "mine_hit",
+    0.9
+   ],
+   [
+    "S7+34",
+    "mine_crack",
+    0.6
+   ],
+   [
+    "S8+2",
+    "mine_pop",
+    0.56
+   ],
+   [
+    "S8+8",
+    "pickup",
+    0.28
+   ],
+   [
+    "S8+18",
+    "mine_hit",
+    0.8
+   ],
+   [
+    "S8+19",
+    "mine_crack",
+    0.5
+   ],
+   [
+    "S9+2",
+    "mine_pop",
+    0.56
+   ],
+   [
+    "S9+8",
+    "pickup",
+    0.28
+   ],
+   [
+    "S9+6",
+    "step_soft",
+    0.2
+   ],
+   [
+    "S9+12",
+    "step_soft",
+    0.2
+   ],
+   [
+    "S9+18",
+    "step_soft",
+    0.2
+   ],
+   [
+    "S10",
+    "room_tone",
+    0.1,
+    "onset",
+    "S11"
+   ],
+   [
+    "S10+3",
+    "gasp",
+    0.4
+   ],
+   [
+    "S10+8",
+    "class_murmur",
+    0.2,
+    "onset",
+    "S11"
+   ],
+   [
+    "S10+16",
+    "step_soft",
+    0.2
+   ],
+   [
+    "S10+25",
+    "step_soft",
+    0.2
+   ],
+   [
+    "S11",
+    "street_amb",
+    0.12,
+    "onset",
+    "S18"
+   ],
+   [
+    "S11",
+    "hazard",
+    0.18,
+    "onset",
+    "S13"
+   ],
+   [
+    "S12+5",
+    "knock",
+    0.55
+   ],
+   [
+    "S12+6",
+    "mine_crack",
+    0.4
+   ],
+   [
+    "S12+16",
+    "knock",
+    0.55
+   ],
+   [
+    "S12+17",
+    "mine_crack",
+    0.45
+   ],
+   [
+    "S12+27",
+    "knock",
+    0.55
+   ],
+   [
+    "S12+28",
+    "mine_crack",
+    0.5
+   ],
+   [
+    "S13",
+    "car_pop",
+    0.65
+   ],
+   [
+    "S13+6",
+    "pickup",
+    0.32
+   ],
+   [
+    "S14+1",
+    "typing",
+    0.3
+   ],
+   [
+    "S14+12",
+    "chat_sys",
+    0.35
+   ],
+   [
+    "S14+21",
+    "title_hit",
+    0.85,
+    "peak"
+   ],
+   [
+    "S15+9",
+    "mine_hit",
+    0.15
+   ],
+   [
+    "S15+10",
+    "flicker",
+    0.15
+   ],
+   [
+    "S15+22",
+    "mine_hit",
+    0.15
+   ],
+   [
+    "S15+23",
+    "mine_crack",
+    0.15
+   ],
+   [
+    "S15+35",
+    "mine_hit",
+    0.15
+   ],
+   [
+    "S15+36",
+    "flicker",
+    0.15
+   ],
+   [
+    "S15+48",
+    "mine_hit",
+    0.15
+   ],
+   [
+    "S15+49",
+    "mine_crack",
+    0.15
+   ],
+   [
+    "S16+6",
+    "mine_hit",
+    0.38
+   ],
+   [
+    "S16+7",
+    "mine_crack",
+    0.23
+   ],
+   [
+    "S16+16",
+    "mine_hit",
+    0.4
+   ],
+   [
+    "S16+17",
+    "flicker",
+    0.17
+   ],
+   [
+    "S16+25",
+    "mine_pop",
+    0.85
+   ],
+   [
+    "S16+25",
+    "lamp_out",
+    0.45
+   ],
+   [
+    "S16+46",
+    "whoosh",
+    0.4,
+    "peak"
+   ],
+   [
+    "S17",
+    "inv_open",
+    0.12
+   ],
+   [
+    "S17+9",
+    "slot_land",
+    0.22
+   ],
+   [
+    "S17+10",
+    "pickup",
+    0.22
+   ],
+   [
+    "S18",
+    "draw_line",
+    0.1
+   ],
+   [
+    "S18+28",
+    "stone_thud",
+    0.25
+   ],
+   [
+    "S18+41",
+    "count_tick",
+    0.2
+   ],
+   [
+    "S19+65",
+    "count_tick",
+    0.2
+   ],
+   [
+    "S20+4",
+    "whoosh",
+    0.3,
+    "peak"
+   ],
+   [
+    "S20+71",
+    "stamp",
+    0.75
+   ],
+   [
+    "S21",
+    "street_amb",
+    0.12,
+    "onset",
+    "S22"
+   ],
+   [
+    "S22",
+    "glow_hum",
+    0.06,
+    "onset",
+    "S23"
+   ],
+   [
+    "S23",
+    "street_amb",
+    0.12
+   ],
+   [
+    "S23",
+    "drone",
+    0.16
+   ],
+   [
+    "S23+8",
+    "admin_blip",
+    0.5
+   ]
+  ],
+  "repeats": [
+   {
+    "at": "S19+16",
+    "clip": "block_place",
+    "n": 18,
+    "every": 2,
+    "gain": [
+     0.25,
+     0.4
+    ],
+    "pitch": [
+     0.85,
+     1.25
+    ]
+   },
+   {
+    "at": "S21",
+    "clip": "bounce",
+    "n": 5,
+    "every": 13,
+    "gain": [
+     0.35,
+     0.45
+    ],
+    "pitch": [
+     0.95,
+     1.05
+    ]
+   }
+  ],
+  "music": {
+   "clip": "music"
+  },
+  "levels": {
+   "sfx_lu": -2.5,
+   "music_lu": -11.0
+  }
+ }
+}

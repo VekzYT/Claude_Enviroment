@@ -90,8 +90,8 @@ export const PlayerMarker: React.FC<{ px?: number; glow?: number }> = ({ px = 6,
 };
 
 // ---------- the hero ----------
-/** Mitten hands: open (a palm and a thumb) or pointing (a fist with the index finger out). */
-export type HandKind = 'open' | 'point';
+/** Mitten hands: open (a palm and a thumb), pointing (a fist with the index finger out), or a fist (GAMERULE: mining). */
+export type HandKind = 'open' | 'point' | 'fist';
 export type Expr = 'neutral' | 'happy' | 'smug' | 'shock' | 'worried' | 'oops' | 'cool' | 'dizzy' | 'groggy';
 export type Limb = { a: number; b: number }; // a: upper segment angle, b: bend of the lower segment (degrees)
 export type Pose = {
@@ -358,10 +358,11 @@ export const Hero: React.FC<{ pose: Pose; shadow?: number; rimId?: string; look?
     const ang = (Math.atan2(o.end.x - o.mid.x, o.end.y - o.mid.y) * 180) / Math.PI;
     return (
       <g transform={`translate(${o.end.x} ${o.end.y}) rotate(${-ang})`}>
-        {kind === 'point' ? (
+        {kind === 'point' || kind === 'fist' ? (
           <g>
-            <rect x={-4} y={10} width={8} height={24} rx={4} fill={L.hand} stroke={L.line} strokeWidth={3.5} />
-            <path d="M -11 -2 Q -14 14 -6 18 L 7 18 Q 14 14 11 -2 Z" fill={L.hand} stroke={L.line} strokeWidth={4} strokeLinejoin="round" />
+            {kind === 'point' ? <rect x={-4} y={10} width={8} height={24} rx={4} fill={L.hand} stroke={L.line} strokeWidth={3.5} /> : null}
+            <path d={kind === 'fist' ? 'M -13 -2 Q -16 18 -6 22 L 7 22 Q 16 18 13 -2 Z' : 'M -11 -2 Q -14 14 -6 18 L 7 18 Q 14 14 11 -2 Z'} fill={L.hand} stroke={L.line} strokeWidth={4} strokeLinejoin="round" />
+            {kind === 'fist' ? <path d="M -6 10 L 6 10 M -6 16 L 6 16" stroke={L.line} strokeWidth={2} opacity={0.45} strokeLinecap="round" /> : null}
             <ellipse cx={side * 10} cy={6} rx={4.5} ry={7} fill={L.hand} stroke={L.line} strokeWidth={3.5} />
           </g>
         ) : (

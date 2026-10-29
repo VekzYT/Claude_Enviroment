@@ -1,0 +1,507 @@
+{
+ "slug": "mine-01-short",
+ "title": "WHAT IF YOU COULD MINE ANYTHING?",
+ "fps": 30,
+ "total": 1503,
+ "segments": [
+  {
+   "shot": "S1",
+   "a": 0,
+   "b": 35,
+   "t0": 0,
+   "t1": 35,
+   "line": "Monday."
+  },
+  {
+   "shot": "S2",
+   "a": 35,
+   "b": 95,
+   "t0": 0,
+   "t1": 60,
+   "line": "Your alarm won't shut up."
+  },
+  {
+   "shot": "S3",
+   "a": 95,
+   "b": 138,
+   "t0": 0,
+   "t1": 43,
+   "line": "Hit it."
+  },
+  {
+   "shot": "S4",
+   "a": 138,
+   "b": 178,
+   "t0": 0,
+   "t1": 40,
+   "line": "Mine."
+  },
+  {
+   "shot": "S5",
+   "a": 178,
+   "b": 226,
+   "t0": 0,
+   "t1": 48,
+   "line": "Missed the bus?"
+  },
+  {
+   "shot": "S6",
+   "a": 226,
+   "b": 284,
+   "t0": 0,
+   "t1": 58,
+   "line": "Don't go around the school."
+  },
+  {
+   "shot": "S7",
+   "a": 284,
+   "b": 336,
+   "t0": 0,
+   "t1": 52,
+   "line": "Go through it."
+  },
+  {
+   "shot": "S8",
+   "a": 336,
+   "b": 368,
+   "t0": 0,
+   "t1": 32,
+   "line": "Mine."
+  },
+  {
+   "shot": "S9",
+   "a": 368,
+   "b": 398,
+   "t0": 0,
+   "t1": 30,
+   "line": "Mine."
+  },
+  {
+   "shot": "S10",
+   "a": 398,
+   "b": 431,
+   "t0": 0,
+   "t1": 33,
+   "line": ""
+  },
+  {
+   "shot": "S11",
+   "a": 431,
+   "b": 460,
+   "t0": 0,
+   "t1": 29,
+   "line": "Someone parked on"
+  },
+  {
+   "shot": "S12",
+   "a": 460,
+   "b": 499,
+   "t0": 0,
+   "t1": 39,
+   "line": "your bike."
+  },
+  {
+   "shot": "S13",
+   "a": 499,
+   "b": 529,
+   "t0": 0,
+   "t1": 30,
+   "line": "Mine."
+  },
+  {
+   "shot": "S14",
+   "a": 529,
+   "b": 649,
+   "t0": 0,
+   "t1": 120,
+   "line": "What if you could mine anything?"
+  },
+  {
+   "shot": "S15",
+   "a": 649,
+   "b": 715,
+   "t0": 0,
+   "t1": 66,
+   "line": "Keep hitting anything, and it breaks into"
+  },
+  {
+   "shot": "S16",
+   "a": 715,
+   "b": 778,
+   "t0": 0,
+   "t1": 63,
+   "line": "a block. It flies into"
+  },
+  {
+   "shot": "S17",
+   "a": 778,
+   "b": 834,
+   "t0": 0,
+   "t1": 56,
+   "line": "your inventory."
+  },
+  {
+   "shot": "S18",
+   "a": 834,
+   "b": 956,
+   "t0": 0,
+   "t1": 122,
+   "line": "But a real block of stone weighs two point seven tonnes."
+  },
+  {
+   "shot": "S19",
+   "a": 956,
+   "b": 1097,
+   "t0": 0,
+   "t1": 141,
+   "line": "A stack of sixty-four? A hundred and seventy-three tonnes."
+  },
+  {
+   "shot": "S20",
+   "a": 1097,
+   "b": 1217,
+   "t0": 0,
+   "t1": 120,
+   "line": "As heavy as a blue whale. That's real."
+  },
+  {
+   "shot": "S21",
+   "a": 1217,
+   "b": 1277,
+   "t0": 0,
+   "t1": 60,
+   "line": "And you feel nothing."
+  },
+  {
+   "shot": "S22",
+   "a": 1277,
+   "b": 1372,
+   "t0": 0,
+   "t1": 95,
+   "line": "So something, somewhere, is holding it for you."
+  },
+  {
+   "shot": "S23",
+   "a": 1372,
+   "b": 1503,
+   "t0": 0,
+   "t1": 131,
+   "line": "And it just noticed."
+  }
+ ],
+ "shots": [
+  {
+   "id": "S1",
+   "size": "close-up",
+   "key": 14,
+   "len": 35,
+   "first": 0,
+   "line": "Monday.",
+   "note": "the alarm clock ringing, the sunrise in the window behind"
+  },
+  {
+   "id": "S2",
+   "size": "high angle",
+   "key": 30,
+   "len": 60,
+   "first": 35,
+   "line": "Your alarm won't shut up.",
+   "note": "You in bed, half awake and annoyed, eyes on the noise"
+  },
+  {
+   "id": "S3",
+   "size": "insert",
+   "key": 27,
+   "len": 43,
+   "first": 95,
+   "line": "Hit it.",
+   "note": "the block outline snaps on; the fist hits the clock; cracks"
+  },
+  {
+   "id": "S4",
+   "size": "macro",
+   "key": 16,
+   "len": 40,
+   "first": 138,
+   "line": "Mine.",
+   "note": "the clock pops into a bobbing clock block; hotbar slot 1"
+  },
+  {
+   "id": "S5",
+   "size": "medium",
+   "key": 24,
+   "len": 48,
+   "first": 178,
+   "line": "Missed the bus?",
+   "note": "the bus pulls away from the stop; You runs after it, arm out, and stops short"
+  },
+  {
+   "id": "S6",
+   "size": "wide",
+   "key": 14,
+   "len": 58,
+   "first": 226,
+   "line": "Don't go around the school.",
+   "note": "You follows the arrow the long way round, then turns to the wall"
+  },
+  {
+   "id": "S7",
+   "size": "macro",
+   "key": 37,
+   "len": 52,
+   "first": 284,
+   "line": "Go through it.",
+   "note": "the outlined brick block; the fist cracks it"
+  },
+  {
+   "id": "S8",
+   "size": "insert",
+   "key": 8,
+   "len": 32,
+   "first": 336,
+   "line": "Mine.",
+   "note": "the lower block pops into the lit room; the outline moves up"
+  },
+  {
+   "id": "S9",
+   "size": "medium",
+   "key": 24,
+   "len": 30,
+   "first": 368,
+   "line": "Mine.",
+   "note": "the doorway opens; You steps into its light"
+  },
+  {
+   "id": "S10",
+   "size": "wide",
+   "key": 28,
+   "len": 33,
+   "first": 398,
+   "line": "",
+   "note": "You steps in through the hole; the teacher and the class stare"
+  },
+  {
+   "id": "S11",
+   "size": "over the shoulder",
+   "key": 14,
+   "len": 29,
+   "first": 431,
+   "line": "Someone parked on",
+   "note": "a car parked across your bike, hazards blinking"
+  },
+  {
+   "id": "S12",
+   "size": "close-up",
+   "key": 30,
+   "len": 39,
+   "first": 460,
+   "line": "your bike.",
+   "note": "outlined like a block; knock, knock, knock: cracks spread"
+  },
+  {
+   "id": "S13",
+   "size": "medium",
+   "key": 12,
+   "len": 30,
+   "first": 499,
+   "line": "Mine.",
+   "note": "the car is a block over your palm; the owner stares, keys in hand"
+  },
+  {
+   "id": "S14",
+   "size": "wide, title",
+   "key": 54,
+   "len": 120,
+   "first": 529,
+   "line": "What if you could mine anything?",
+   "note": "the command types itself; WHAT IF YOU COULD MINE ANYTHING?"
+  },
+  {
+   "id": "S15",
+   "size": "medium",
+   "key": 36,
+   "len": 66,
+   "first": 649,
+   "line": "Keep hitting anything, and it breaks into",
+   "note": "You punches the street lamp, again and again; it flickers and cracks"
+  },
+  {
+   "id": "S16",
+   "size": "close-up",
+   "key": 22,
+   "len": 63,
+   "first": 715,
+   "line": "a block. It flies into",
+   "note": "two more hits; it pops into a lamp block; the light goes out"
+  },
+  {
+   "id": "S17",
+   "size": "insert (UI)",
+   "key": 20,
+   "len": 56,
+   "first": 778,
+   "line": "your inventory.",
+   "note": "thirty-six slots; the lamp block drops into the hotbar row"
+  },
+  {
+   "id": "S18",
+   "size": "schematic",
+   "key": 80,
+   "len": 122,
+   "first": 834,
+   "line": "But a real block of stone weighs two point seven tonnes.",
+   "note": "a 1 m cube draws on and fills with stone; 2.7 t"
+  },
+  {
+   "id": "S19",
+   "size": "schematic",
+   "key": 110,
+   "len": 141,
+   "first": 956,
+   "line": "A stack of sixty-four? A hundred and seventy-three tonnes.",
+   "note": "sixty-four blocks stack up; the counter rolls to 173 t"
+  },
+  {
+   "id": "S20",
+   "size": "schematic",
+   "key": 84,
+   "len": 120,
+   "first": 1097,
+   "line": "As heavy as a blue whale. That's real.",
+   "note": "the stack beside a blue whale; THAT'S REAL."
+  },
+  {
+   "id": "S21",
+   "size": "medium",
+   "key": 20,
+   "len": 60,
+   "first": 1217,
+   "line": "And you feel nothing.",
+   "note": "You bounces on his heels, perfectly fine"
+  },
+  {
+   "id": "S22",
+   "size": "close-up, from behind",
+   "key": 50,
+   "len": 95,
+   "first": 1277,
+   "line": "So something, somewhere, is holding it for you.",
+   "note": "the cube backpack glowing faintly"
+  },
+  {
+   "id": "S23",
+   "size": "wide",
+   "key": 70,
+   "len": 131,
+   "first": 1372,
+   "line": "And it just noticed.",
+   "note": "red in the chat: [Admin] unusual block activity detected."
+  }
+ ],
+ "fx": [
+  {
+   "kind": "flash",
+   "color": "#FFFFFF",
+   "o": 0.45,
+   "f": 119
+  },
+  {
+   "kind": "shake",
+   "len": 6,
+   "amp": 8,
+   "f": 119
+  },
+  {
+   "kind": "flash",
+   "color": "#FFF3DC",
+   "o": 0.6,
+   "f": 140
+  },
+  {
+   "kind": "flash",
+   "color": "#FFFFFF",
+   "o": 0.3,
+   "f": 317
+  },
+  {
+   "kind": "flash",
+   "color": "#FFF3DC",
+   "o": 0.5,
+   "f": 338
+  },
+  {
+   "kind": "flash",
+   "color": "#FFFFFF",
+   "o": 0.25,
+   "f": 354
+  },
+  {
+   "kind": "flash",
+   "color": "#FFF3DC",
+   "o": 0.5,
+   "f": 370
+  },
+  {
+   "kind": "flash",
+   "color": "#FFF3DC",
+   "o": 0.7,
+   "f": 499
+  },
+  {
+   "kind": "shake",
+   "len": 8,
+   "amp": 10,
+   "f": 499
+  },
+  {
+   "kind": "shake",
+   "len": 4,
+   "amp": 4,
+   "f": 658
+  },
+  {
+   "kind": "shake",
+   "len": 4,
+   "amp": 5,
+   "f": 684
+  },
+  {
+   "kind": "flash",
+   "color": "#FFF3DC",
+   "o": 0.55,
+   "f": 740
+  },
+  {
+   "kind": "shake",
+   "len": 6,
+   "amp": 8,
+   "f": 740
+  },
+  {
+   "kind": "flash",
+   "color": "#C8F59E",
+   "o": 0.18,
+   "f": 787
+  },
+  {
+   "kind": "shake",
+   "len": 5,
+   "amp": 6,
+   "f": 1168
+  },
+  {
+   "kind": "flash",
+   "color": "#FF4D4D",
+   "o": 0.22,
+   "f": 1380
+  }
+ ],
+ "audio": {
+  "voiceVol": 0.5863,
+  "sfxVol": 0.8,
+  "musicVol": 0.1875,
+  "voice": "mine-01-short/voice.wav",
+  "sfx": "mine-01-short/sfx.wav",
+  "music": "mine-01-short/music.wav"
+ }
+}

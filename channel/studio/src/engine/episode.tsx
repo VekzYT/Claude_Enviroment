@@ -1,8 +1,9 @@
 import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
-import { clamp, lerp } from './anim';
+import { clamp, kf, lerp } from './anim';
 import { KitDefs } from './kit';
 import { SetDefs } from './light';
+import { FrameCtx, FrameInfo, WIDE, tallFrame } from './frame';
 
 // The episode engine. An episode is a set of shots plus a timeline (written by scripts/plan.py from the voice's word
 // timings). Each shot is a pure function of its own clock t, so the edit can cut back to a shot, hold it, or play it
@@ -28,6 +29,18 @@ export type Timeline = {
   shots: ShotInfo[];
   fx: Fx[];
   audio: { voice?: string; sfx?: string; music?: string; voiceVol?: number; sfxVol?: number; musicVol?: number };
+};
+
+/**
+ * GAMERULE: a shot's framing in a tall (Shorts) render: the window's centre in screen space (cx, cy) and how far it
+ * zooms out (k), each a number or keys over the shot's own clock, like kf.
+ */
+export type TallCam = { cx: number | [number, number][]; cy?: number | [number, number][]; k?: number | [number, number][] };
+const camVal = (v: number | [number, number][] | undefined, t: number, d: number) => (v === undefined ? d : typeof v === 'number' ? v : kf(t, v));
+const frameFor = (tall: Record<string, TallCam> | undefined, id: string, t: number): FrameInfo => {
+  if (!tall) return WIDE;
+  const c = tall[id];
+  return tallFrame(camVal(c?.cx, t, 960), camVal(c?.cy, t, 540), camVal(c?.k, t, 1));
 };
 
 /** What every shot receives: its own clock t, how long its clock runs (len), and the global frame f. */
@@ -82,8 +95,8 @@ const fxAt = (tl: Timeline, f: number) => {
 };
 
 /** Vignette and a fine grain that changes on twos, to take the vector edge off (the genre's finish). */
-const Grade: React.FC<{ f: number; grain: boolean; vignette: boolean }> = ({ f, grain, vignette }) => (
-  <svg width={1920} height={1080} viewBox="0 0 1920 1080" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+const Grade: React.FC<{ f: number; grain: boolean; vignette: boolean; tall?: boolean }> = ({ f, grain, vignette, tall = false }) => (
+  <svg width={tall ? 1080 : 1920} height={tall ? 1920 : 1080} viewBox={tall ? '0 0 1080 1920' : '0 0 1920 1080'} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
     <defs>
       <radialGradient id="epVig" cx="50%" cy="50%" r="75%">
         <stop offset="55%" stopColor="#000" stopOpacity={0} />
@@ -94,23 +107,26 @@ const Grade: React.FC<{ f: number; grain: boolean; vignette: boolean }> = ({ f, 
         <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.06 0" />
       </filter>
     </defs>
-    {vignette ? <rect width="1920" height="1080" fill="url(#epVig)" /> : null}
-    {grain ? <rect width="1920" height="1080" filter="url(#epGrain)" /> : null}
+    {vignette ? <rect width={tall ? 1080 : 1920} height={tall ? 1920 : 1080} fill="url(#epVig)" /> : null}
+    {grain ? <rect width={tall ? 1080 : 1920} height={tall ? 1920 : 1080} filter="url(#epGrain)" /> : null}
   </svg>
 );
 
-/** One shot drawn in the shared defs (filters, gradients), in a 1920 x 1080 world. */
-export const ShotFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <svg width={1920} height={1080} viewBox="0 0 1920 1080">
-    <KitDefs />
-    <SetDefs />
-    {children}
+/** One shot drawn in the shared defs (filters, gradients), in a 1920 x 1080 world; a tall frame shows a 9:16 window of it. */
+export const ShotFrame: React.FC<{ children: React.ReactNode; frame?: FrameInfo }> = ({ children, frame = WIDE }) => (
+  <svg width={frame.tall ? 1080 : 1920} height={frame.tall ? 1920 : 1080} viewBox={frame.tall ? `${frame.x} ${frame.y} ${1080 * frame.k} ${1920 * frame.k}` : '0 0 1920 1080'}>
+    <FrameCtx.Provider value={frame}>
+      <KitDefs />
+      <SetDefs />
+      {children}
+    </FrameCtx.Provider>
   </svg>
 );
 
-export type EpisodeProps = { timeline: Timeline; shots: ShotMap; looks?: Record<string, LookDef>; grain?: boolean; vignette?: boolean; bg?: string };
+/** `tall` (GAMERULE) makes the episode a 1080 x 1920 Short, framing each shot as given (shots left out stay centred). */
+export type EpisodeProps = { timeline: Timeline; shots: ShotMap; looks?: Record<string, LookDef>; grain?: boolean; vignette?: boolean; bg?: string; tall?: Record<string, TallCam> };
 
-export const Episode: React.FC<EpisodeProps> = ({ timeline: tl, shots, looks = {}, grain = true, vignette = true, bg = '#0E0C1E' }) => {
+export const Episode: React.FC<EpisodeProps> = ({ timeline: tl, shots, looks = {}, grain = true, vignette = true, bg = '#0E0C1E', tall }) => {
   const f = useCurrentFrame();
   const seg = segAt(tl, f);
   const Shot = shots[seg.shot];
@@ -121,14 +137,15 @@ export const Episode: React.FC<EpisodeProps> = ({ timeline: tl, shots, looks = {
   const jitter = def?.jitter && lv > 0 ? Math.sin(f * 13.7) * def.jitter * lv : 0;
   const { flash, x, y } = fxAt(tl, f);
   const A = tl.audio;
+  const t = clockAt(seg, f);
   return (
     <AbsoluteFill style={{ backgroundColor: bg }}>
       <AbsoluteFill style={{ transform: `translate(${x + jitter}px, ${y}px) scale(${x || y ? 1.02 : 1})`, filter: def?.grade && lv > 0 ? def.grade(lv) : undefined }}>
-        <ShotFrame>{Shot ? <Shot t={clockAt(seg, f)} len={info?.len ?? seg.b - seg.a} f={f} /> : null}</ShotFrame>
+        <ShotFrame frame={frameFor(tall, seg.shot, t)}>{Shot ? <Shot t={t} len={info?.len ?? seg.b - seg.a} f={f} /> : null}</ShotFrame>
       </AbsoluteFill>
-      <Grade f={f} grain={grain} vignette={vignette} />
+      <Grade f={f} grain={grain} vignette={vignette} tall={!!tall} />
       {def?.Overlay && run ? (
-        <svg width={1920} height={1080} viewBox="0 0 1920 1080" style={{ position: 'absolute', inset: 0, opacity: lv }}>
+        <svg width={tall ? 1080 : 1920} height={tall ? 1920 : 1080} viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0, opacity: lv }}>
           <def.Overlay f={f} lv={lv} p={clamp((f - run.a) / (run.b - run.a))} n={run.n} />
         </svg>
       ) : null}
@@ -141,24 +158,26 @@ export const Episode: React.FC<EpisodeProps> = ({ timeline: tl, shots, looks = {
 };
 
 /** The storyboard: frame i is shot i at its key frame, no audio, no look. Render it with scripts/stills.mjs. */
-export const Board: React.FC<{ timeline: Timeline; shots: ShotMap; grain?: boolean; vignette?: boolean; bg?: string }> = ({ timeline: tl, shots, grain = true, vignette = true, bg = '#0E0C1E' }) => {
+export const Board: React.FC<{ timeline: Timeline; shots: ShotMap; grain?: boolean; vignette?: boolean; bg?: string; tall?: Record<string, TallCam> }> = ({ timeline: tl, shots, grain = true, vignette = true, bg = '#0E0C1E', tall }) => {
   const f = useCurrentFrame();
   const info = tl.shots[Math.min(f, tl.shots.length - 1)];
   const Shot = shots[info.id];
   return (
     <AbsoluteFill style={{ backgroundColor: bg }}>
-      <ShotFrame>{Shot ? <Shot t={info.key} len={info.len} f={info.first + info.key} /> : null}</ShotFrame>
-      <Grade f={info.key} grain={grain} vignette={vignette} />
+      <ShotFrame frame={frameFor(tall, info.id, info.key)}>{Shot ? <Shot t={info.key} len={info.len} f={info.first + info.key} /> : null}</ShotFrame>
+      <Grade f={info.key} grain={grain} vignette={vignette} tall={!!tall} />
     </AbsoluteFill>
   );
 };
 
-/** Bundle an episode for the registry: the main composition and its storyboard. */
+/** Bundle an episode for the registry: the main composition and its storyboard (1080 x 1920 when tall). */
 export const defineEpisode = (id: string, p: EpisodeProps) => ({
   id,
   total: p.timeline.total,
   shotCount: p.timeline.shots.length,
+  width: p.tall ? 1080 : 1920,
+  height: p.tall ? 1920 : 1080,
   Main: () => <Episode {...p} />,
-  Board: () => <Board timeline={p.timeline} shots={p.shots} grain={p.grain} vignette={p.vignette} bg={p.bg} />,
+  Board: () => <Board timeline={p.timeline} shots={p.shots} grain={p.grain} vignette={p.vignette} bg={p.bg} tall={p.tall} />,
 });
 export type EpisodeDef = ReturnType<typeof defineEpisode>;

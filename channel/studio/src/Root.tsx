@@ -18,8 +18,8 @@ export const Root: React.FC = () => {
     <>
       {EPISODES.map((e) => (
         <React.Fragment key={e.id}>
-          <Composition id={e.id} component={e.Main} durationInFrames={Math.max(1, e.total)} {...common} />
-          <Composition id={`${e.id}Board`} component={e.Board} durationInFrames={Math.max(1, e.shotCount)} {...common} />
+          <Composition id={e.id} component={e.Main} durationInFrames={Math.max(1, e.total)} {...common} width={e.width} height={e.height} />
+          <Composition id={`${e.id}Board`} component={e.Board} durationInFrames={Math.max(1, e.shotCount)} {...common} width={e.width} height={e.height} />
         </React.Fragment>
       ))}
       <Composition id="Cast" component={CastSheet} durationInFrames={1} {...common} />

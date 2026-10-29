@@ -43,15 +43,22 @@ try:
     font = ImageFont.truetype('arial.ttf', 22)
 except OSError:
     font = ImageFont.load_default(22)
-W, H, cols = 480, 270, 6
+# GAMERULE: portrait tiles for a tall (Shorts) render, and every frame of a sheet pulled in one decoding pass
+size = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', video], capture_output=True, text=True).stdout.strip().split(',')
+tall = int(size[1]) > int(size[0])
+W, H, cols = (216, 384, 10) if tall else (480, 270, 6)
 for name, frames in jobs:
     rows = (len(frames) + cols - 1) // cols
     sheet = Image.new('RGB', (cols * W, rows * H))
+    for old_tile in out.glob('_f*.png'):
+        old_tile.unlink()
+    pick = '+'.join(f'eq(n\\,{f})' for f in frames)
+    subprocess.run(['ffmpeg', '-v', 'error', '-i', video, '-vf', f'select={pick},scale={W}:{H}', '-vsync', '0', str(out / '_f%04d.png')], check=True)
     for i, f in enumerate(frames):
-        raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', video, '-vf', f'select=eq(n\\,{f}),scale={W}:{H}', '-vframes', '1', '-f', 'image2pipe', '-vcodec', 'png', '-'], capture_output=True, check=True).stdout
-        tmp = out / '_f.png'
-        tmp.write_bytes(raw)
-        im = Image.open(tmp).convert('RGB')
+        tile = out / f'_f{i + 1:04d}.png'
+        if not tile.exists():
+            continue
+        im = Image.open(tile).convert('RGB')
         dr = ImageDraw.Draw(im)
         dr.rectangle([0, 0, 64, 28], fill=(0, 0, 0))
         dr.text((5, 2), str(f), fill=(255, 255, 0), font=font)
@@ -59,4 +66,5 @@ for name, frames in jobs:
     p = out / f'{name}.jpg'
     sheet.save(p, quality=85)
     print(p)
-(out / '_f.png').unlink(missing_ok=True)
+for old_tile in out.glob('_f*.png'):
+    old_tile.unlink()

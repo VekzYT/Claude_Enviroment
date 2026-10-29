@@ -12,7 +12,7 @@ latest `episodes/*/results.md`, and the log below.
 ## Current state
 
 - Channel: **live** as "GameRule", **@gameruletv** (https://www.youtube.com/@gameruletv). Checked 29 Oct: profile
-  picture, banner and description are up. No videos yet.
+  picture, banner and description are up. First post: the Monday Short (below), handed over 29 Oct to post.
 - Permissions: the person wrote the allow rules below themselves and committed them to `channel/.claude/settings.json`;
   on 29 Oct Claude moved the file, unchanged, to the repo root `.claude/settings.json`, where settings are read.
 - Claude plan: the person upgrades to **Max on 31 Oct 2026**. Do the heavy work (full animation, renders) from then.
@@ -47,11 +47,26 @@ latest `episodes/*/results.md`, and the log below.
     }
   }
   ```
+- **First post, 29 Oct:** on the person's request ("make a video now as our first post") the Monday Short from
+  `short.md` was made in full: `studio/src/episodes/mine-01-short` (1080 × 1920, ~50 s, 23 shots): the cold open's
+  14 shots reframed tall, then the rule (a street lamp mined into the inventory), the 2.7 t / 173 t / blue whale fact,
+  the backpack, and the Admin in red. Upload text: `episodes/01-mine-anything/short-monday-upload.md`. It promises
+  the full episode on **Friday 6 Nov** (description and pinned comment only, so the date can change).
+- Tall (Shorts) format: `defineEpisode(id, { ..., tall: { S1: { cx, cy?, k? } } })` frames each shot's wide drawing
+  in a 9:16 window (cx, cy in screen space, k zooms out; keys over the shot clock for pans) and renders 1080 × 1920.
+  The HUD (hotbar, chat, title) reads `useFrame()` and lays itself out above Shorts' own caption and buttons
+  (`SAFE` in `engine/frame.tsx`). Sets run their backdrops far past the frame so a tall window never sees an edge.
+  Digits go in the title face (Poppins): the pixel face's 2 and 5 read as a backwards S.
+- Sound: free and ours. `channel/voice/sfx_synth.py <slug>` (repo root, after `plan.py`) makes every clip whose
+  prompt starts with `synth:` (hits, cracks, pops, pickups, alarm, bus, knocks, hazards, title boom, drone, Admin
+  blip...) and composes the chiptune bed to the timeline, saving them where `sfx.py` looks, so `sfx.py` and
+  `mixcheck.py` work unchanged with no ElevenLabs key. Two clips (`gasp`, `class_murmur`) are from the studio's MIT
+  library. Hits land in the pause after their word ("Hit it." then the punch), per `references/sound.md`.
 - Voice: Kokoro `am_michael` (sample A), the person's pick on 29 Oct. From the repo root,
   `channel/voice/.venv/bin/python channel/voice/voice_kokoro.py <slug>` voices the episode's `script` into
   `studio/public/<slug>/voice.wav` and writes `studio/src/episodes/<slug>/words.json`; pauses come from `gaps` and
-  each beat's `pause_after`. Then `plan.py`, `stills.mjs`, `board.py` as the skill says. Free sound effects still to
-  source: YouTube Audio Library, Pixabay, or synthesised in code (the skill's `sfx.py` needs ElevenLabs).
+  each beat's `pause_after`. Then `plan.py`, `stills.mjs`, `board.py` as the skill says.
+  `channel/voice/transcribe.py <slug>` scores the take against the script with Whisper (the Short: 97%).
 - Storyboard lessons from part 1 (check these on every board): show the situation, not just the line (he wakes up in
   bed, not standing dressed); don't leave an easy way out in frame (a door beside the wall he mines kills the gag);
   the power needs its own look at phone size (the block outline, thick stepped cracks); keep neighbouring shots

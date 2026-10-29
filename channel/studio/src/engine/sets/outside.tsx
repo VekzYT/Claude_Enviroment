@@ -47,7 +47,7 @@ const Street: React.FC = () => (
     <rect x={-400} y={800} width={2720} height={44} fill="#5A5168" />
     <rect x={-400} y={800} width={2720} height={4} fill="#7A7090" opacity={0.6} />
     <rect x={-400} y={844} width={2720} height={10} fill="#231E2C" />
-    <rect x={-400} y={854} width={2720} height={800} fill="#2B2535" />
+    <rect x={-1400} y={854} width={4720} height={2600} fill="#2B2535" />
     {Array.from({ length: 12 }, (_, i) => (
       <rect key={`d${i}`} x={-300 + i * 240} y={985} width={120} height={10} fill="#FFD93B" opacity={0.45} />
     ))}
@@ -74,7 +74,7 @@ export const SchoolStreet: React.FC<{ t: number; id: string; hole?: number; veil
   return (
     <g>
       <BrickDefs id={id} y0={240} y1={800} />
-      <DuskSky id={`${id}-sky`} horizonY={640} />
+      <DuskSky id={`${id}-sky`} horizonY={640} x0={-1400} y0={-1800} w={4720} h={4400} />
       <Sun x={1560} y={560} r={130} t={t} />
       <Skyline y={600} seed={4} h={190} />
       <Haze y={520} h={180} o={0.3} />
@@ -169,7 +169,7 @@ const House: React.FC<{ x: number; w: number; base: number; h: number; roof: num
  */
 export const HomeStreet: React.FC<{ t: number; id: string; busX?: number; veil?: number }> = ({ t, id, busX, veil = 0.36 }) => (
   <g>
-    <DuskSky id={`${id}-sky`} horizonY={620} />
+    <DuskSky id={`${id}-sky`} horizonY={620} x0={-1400} y0={-1800} w={4720} h={4400} />
     <Sun x={1500} y={600} r={120} t={t} />
     <Skyline y={560} seed={11} h={150} />
     <Haze y={540} h={180} o={0.3} />
@@ -216,13 +216,15 @@ export const LOT = { ground: 720, rackX0: 760, rackX1: 1180, bikeX: 980, carY: 9
 
 /**
  * Behind the school at dusk: the brick side wall with high lit windows, a bike rack along it (your teal bike at
- * `LOT.bikeX`), asphalt with slanted bay lines, a lamp post. Feet stand at about y 760 near the wall, lower toward
- * camera. The car is drawn by the shot, so it can be mined.
+ * `LOT.bikeX`), asphalt with slanted bay lines, a lamp post (`lamp` false once it's been mined: its light goes with
+ * it; `flicker` 0..1 stutters it). Feet stand at about y 760 near the wall, lower toward camera. The car is drawn by
+ * the shot, so it can be mined.
  */
-export const ParkingLot: React.FC<{ t: number; id: string; bike?: boolean; veil?: number }> = ({ t, id, bike = true, veil = 0.4 }) => (
+export const LAMP = { x: 1560, y: 790, h: 560 };
+export const ParkingLot: React.FC<{ t: number; id: string; bike?: boolean; veil?: number; lamp?: boolean; flicker?: number }> = ({ t, id, bike = true, veil = 0.4, lamp = true, flicker = 0 }) => (
   <g>
     <BrickDefs id={id} y0={280} y1={720} />
-    <DuskSky id={`${id}-sky`} horizonY={560} />
+    <DuskSky id={`${id}-sky`} horizonY={560} x0={-1400} y0={-1800} w={4720} h={4400} />
     <Sun x={380} y={540} r={120} t={t} />
     <Skyline y={540} seed={8} h={170} />
     <Haze y={470} h={160} o={0.3} />
@@ -241,13 +243,13 @@ export const ParkingLot: React.FC<{ t: number; id: string; bike?: boolean; veil?
     {bike ? <Bike x={LOT.bikeX} y={748} s={0.95} /> : null}
     {/* curb and asphalt with slanted bays */}
     <rect x={-400} y={LOT.ground} width={2720} height={28} fill="#4A4258" />
-    <rect x={-400} y={LOT.ground + 28} width={2720} height={900} fill="#2E2838" />
+    <rect x={-1400} y={LOT.ground + 28} width={4720} height={2600} fill="#2E2838" />
     {Array.from({ length: 9 }, (_, i) => {
       const x = -120 + i * 300;
       return <path key={i} d={`M ${x} ${LOT.ground + 40} L ${x - 140} 1100`} stroke="#E8E2D4" strokeWidth={9} opacity={0.4} />;
     })}
-    <StreetLamp x={1560} y={790} h={560} t={t} side={-1} />
-    <LightVeil id={`${id}-veil`} lights={[[380, 540, 460], [1490, 790, 420], [1775, 620, 260], [275, 400, 200], [1315, 400, 200]]} o={veil} />
+    {lamp ? <StreetLamp x={LAMP.x} y={LAMP.y} h={LAMP.h} t={t} side={-1} o={1 - flicker} /> : null}
+    <LightVeil id={`${id}-veil`} lights={[[380, 540, 460], ...(lamp ? [[1490, 790, 420 * (1 - 0.5 * flicker)] as [number, number, number]] : []), [1775, 620, 260], [275, 400, 200], [1315, 400, 200]]} o={veil} />
     <Glow x={380} y={540} r={380} o={0.38} />
     <Dust t={t} seed={9} x0={1300} y0={260} w={500} h={480} n={26} o={0.45} />
   </g>
@@ -282,7 +284,7 @@ export const Nightstand: React.FC<{ t: number; id: string }> = ({ t, id }) => (
         <stop offset="100%" stopColor="#FFC98A" stopOpacity={0} />
       </radialGradient>
     </defs>
-    <rect x={-400} y={-400} width={2720} height={1880} fill={`url(#${id}-wall)`} />
+    <rect x={-1600} y={-1600} width={5120} height={4400} fill={`url(#${id}-wall)`} />
     {/* the window: sunrise over the roofs across the street */}
     <rect x={300} y={110} width={400} height={450} fill={`url(#${id}-dawn)`} />
     <circle cx={590} cy={520} r={54} fill="#FFE7B3" />
@@ -305,8 +307,8 @@ export const Nightstand: React.FC<{ t: number; id: string }> = ({ t, id }) => (
     <rect x={-400} y={720} width={2720} height={40} fill={`url(#${id}-top)`} />
     <rect x={-400} y={720} width={2720} height={6} fill="#A57A5E" opacity={0.6} />
     <ellipse cx={600} cy={724} rx={520} ry={40} fill={`url(#${id}-sheen)`} />
-    <rect x={-400} y={760} width={2720} height={500} fill="#3A2826" />
-    <rect x={-400} y={760} width={2720} height={500} fill="#000" opacity={0.25} />
+    <rect x={-1600} y={760} width={5120} height={2400} fill="#3A2826" />
+    <rect x={-1600} y={760} width={5120} height={2400} fill="#000" opacity={0.25} />
     {/* on the nightstand: a glass of water in the light, the lamp (off) */}
     <path d="M 690 644 L 740 644 L 734 720 L 696 720 Z" fill="#9FC0E8" opacity={0.35} stroke="#1E1A2A" strokeWidth={4} />
     <path d="M 694 672 L 736 672" stroke="#CFE2FF" strokeWidth={3} opacity={0.6} />
@@ -334,9 +336,9 @@ export const BedTop: React.FC<{ t: number; id: string; ring?: number }> = ({ t, 
       </pattern>
     </defs>
     {/* the floor: boards running away from the bed */}
-    <rect x={-400} y={-400} width={2720} height={1880} fill="#3A2A2A" />
-    {Array.from({ length: 24 }, (_, i) => (
-      <rect key={i} x={-400 + i * 120} y={-400} width={4} height={1880} fill="#22181A" opacity={0.7} />
+    <rect x={-1600} y={-1600} width={5120} height={4400} fill="#3A2A2A" />
+    {Array.from({ length: 44 }, (_, i) => (
+      <rect key={i} x={-1600 + i * 120} y={-1600} width={4} height={4400} fill="#22181A" opacity={0.7} />
     ))}
     <rect x={1320} y={700} width={800} height={600} fill="#4A3A5E" />
     <rect x={1344} y={724} width={752} height={552} fill="none" stroke="#6A5A7E" strokeWidth={8} />

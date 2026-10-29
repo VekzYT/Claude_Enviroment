@@ -12,7 +12,6 @@ from PIL import Image, ImageDraw, ImageFont
 from wi import STUDIO, ep_dir, out_dir
 
 slug = sys.argv[1]
-cols = int(sys.argv[sys.argv.index('--cols') + 1]) if '--cols' in sys.argv else 3
 tl = json.loads((ep_dir(slug) / 'timeline.json').read_text(encoding='utf-8'))
 ep = json.loads((ep_dir(slug) / 'episode.json').read_text(encoding='utf-8'))
 src = out_dir(slug) / 'board'
@@ -31,7 +30,11 @@ def font(size, bold=True):
 
 
 head, body, note = font(34), font(28), font(23, False)
-W, H, CAP, PAD = 960, 540, 160, 24
+# GAMERULE: portrait stills (a tall Short) get portrait tiles, six to a row
+first = next((src / f'{s["id"]}.png' for s in tl['shots'] if (src / f'{s["id"]}.png').exists()), None)
+tall = first is not None and Image.open(first).height > Image.open(first).width
+W, H, CAP, PAD = (540, 960, 160, 24) if tall else (960, 540, 160, 24)
+cols = int(sys.argv[sys.argv.index('--cols') + 1]) if '--cols' in sys.argv else (6 if tall else 3)
 n = len(tl['shots'])
 rows = (n + cols - 1) // cols
 sheet = Image.new('RGB', (cols * W + (cols + 1) * PAD, rows * (H + CAP + PAD) + PAD + 90), (20, 17, 26))

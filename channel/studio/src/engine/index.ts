@@ -9,6 +9,7 @@ export * from './furnish';
 export * from './ui';
 export * from './fonts';
 export * from './episode';
+export * from './frame';
 export * from './sets/study';
 export * from './sets/stairwell';
 export * from './sets/classroom';

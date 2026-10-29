@@ -61,7 +61,7 @@
    "id": "S3",
    "size": "insert",
    "set": "nightstand",
-   "key": 10,
+   "key": 27,
    "note": "the block outline snaps on; the fist hits the clock; cracks"
   },
   {
@@ -89,7 +89,7 @@
    "id": "S7",
    "size": "macro",
    "set": "school wall",
-   "key": 14,
+   "key": 37,
    "note": "the outlined brick block; the fist cracks it"
   },
   {
@@ -138,7 +138,7 @@
    "id": "S14",
    "size": "wide, title",
    "set": "parking lot",
-   "key": 64,
+   "key": 54,
    "note": "the command types itself; WHAT IF YOU COULD MINE ANYTHING?"
   }
  ],
@@ -202,13 +202,13 @@
  ],
  "fx": [
   {
-   "at": "S3+7",
+   "at": "S3+24",
    "kind": "flash",
    "color": "#FFFFFF",
    "o": 0.45
   },
   {
-   "at": "S3+7",
+   "at": "S3+24",
    "kind": "shake",
    "len": 6,
    "amp": 8
@@ -220,7 +220,7 @@
    "o": 0.6
   },
   {
-   "at": "S7+5",
+   "at": "S7+33",
    "kind": "flash",
    "color": "#FFFFFF",
    "o": 0.3

@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Hero, Actor, basePose, Pose, Look, poseAt, faceAt, kf, clamp, easeOut, easeIn, camT, LOOKS, LEG_LEN, joints, toWorld, walkPose, stand, ShotProps,
   Nightstand, BedTop, BedCover, HomeStreet, SchoolStreet, SCHOOL_HOLE, ParkingLot, LOT, Classroom, CLS, Glow, Sparkle, Foreground,
-  AlarmClock, Car, ItemBlock, BlockBurst, MineCracks, SelectBox, Impact, InsertArm, BackView, ChatBox, GrTitle, Hotbar, BlockKind, FONT,
+  AlarmClock, Car, ItemBlock, BlockBurst, MineCracks, SelectBox, Impact, InsertArm, BackView, ChatBox, GrTitle, Hotbar, HudShade, BlockKind, FONT,
 } from '../../engine';
 
 // "What if you could mine anything?" Part 1: the cold open (three demos: the alarm clock, the school wall, the car)
@@ -62,10 +62,10 @@ export const S2: React.FC<ShotProps> = ({ t, len }) => {
 
 // ---------- S3: insert, the nightstand: the outline snaps on, the fist comes in from the bed and hits; cracks ----------
 export const S3: React.FC<ShotProps> = ({ t, len }) => {
-  const hit = 7;
+  const hit = 24; // in the pause after "Hit it."
   const after = t - hit;
   const squash = after >= 0 && after < 6 ? 1 - after / 6 : 0;
-  const hand = { x: kf(t, [[0, 1760], [hit, 1074], [hit + 3, 1104], [len, 1150]]), y: kf(t, [[0, 520], [hit, 600], [len, 590]]) };
+  const hand = { x: kf(t, [[0, 1900], [hit - 12, 1820], [hit, 1074], [hit + 3, 1104], [len, 1150]]), y: kf(t, [[0, 500], [hit - 12, 510], [hit, 600], [len, 590]]) };
   return (
     <g transform={camT(1000, 600, kf(t, [[0, 1.55], [len, 1.62]]))}>
       <Nightstand t={t + 50} id="s3" />
@@ -129,17 +129,17 @@ export const S6: React.FC<ShotProps> = ({ t, len }) => {
   const base = { x: 470, y: STREET_FEET - LEG_LEN * 0.62, scale: 0.62 };
   const pose = poseAt(t, [
     { f: 0, p: { ...base, yaw: 0.6, look: 1, armR: { a: 14, b: -8 }, armL: { a: 12, b: -8 } } },
-    { f: 5, p: { armR: { a: 84, b: -4 } }, ease: easeOut },
-    { f: 20, p: { armR: { a: 82, b: -6 }, yaw: 0.55 } },
-    { f: 28, p: { armR: { a: 14, b: -8 }, yaw: -0.2, look: -0.4 }, ease: easeOut },
+    { f: 4, p: { armR: { a: 84, b: -4 } }, ease: easeOut },
+    { f: 30, p: { armR: { a: 82, b: -6 }, yaw: 0.55 } },
+    { f: 38, p: { armR: { a: 14, b: -8 }, yaw: -0.2, look: -0.4 }, ease: easeOut },
   ]);
-  const face = faceAt(t, [[0, 'neutral'], [8, 'groggy'], [27, 'smug']]);
+  const face = faceAt(t, [[0, 'neutral'], [6, 'groggy'], [38, 'smug']]);
   return (
     <>
       <g transform={camT(kf(t, [[0, 980], [len, 964]]), 560, kf(t, [[0, 1.0], [len, 1.03]]))}>
         <SchoolStreet t={t + 60} id="s6" />
-        <Hero look={YOU} pose={{ ...pose, ...face, handR: t >= 5 && t < 26 ? 'point' : 'open' }} rimId="rimR" shadow={0.7} t={t} />
-        <SelectBox {...CELL_LO} o={clamp((t - 34) / 4)} />
+        <Hero look={YOU} pose={{ ...pose, ...face, handR: t >= 4 && t < 36 ? 'point' : 'open' }} rimId="rimR" shadow={0.7} t={t} />
+        <SelectBox {...CELL_LO} o={clamp((t - 44) / 4)} />
       </g>
       {bar(1, 99)}
     </>
@@ -148,8 +148,8 @@ export const S6: React.FC<ShotProps> = ({ t, len }) => {
 
 // ---------- S7: macro, the outlined brick block: the fist comes in from the left and cracks it ----------
 export const S7: React.FC<ShotProps> = ({ t, len }) => {
-  const hit = 5;
-  const hand = { x: kf(t, [[0, 450], [hit, 640], [hit + 2, 650], [len, 608]]), y: kf(t, [[0, 780], [hit, 744], [len, 752]]) };
+  const hit = 33; // in the pause after "Go through it."
+  const hand = { x: kf(t, [[0, 380], [hit - 13, 420], [hit, 640], [hit + 2, 650], [len, 630]]), y: kf(t, [[0, 800], [hit - 13, 790], [hit, 744], [len, 752]]) };
   return (
     <g transform={camT(kf(t, [[0, 666], [len, 662]]), 726, kf(t, [[0, 3.9], [len, 4.05]]))}>
       <SchoolStreet t={t + 90} id="s7" />
@@ -230,6 +230,9 @@ export const S10: React.FC<ShotProps> = ({ t, len }) => {
   const chalk = toWorld(teacher, joints(teacher).armR.end);
   return (
     <g transform={camT(940, 520, kf(t, [[0, 0.98], [len, 1.02]]))}>
+      {/* past the room's edges (a tall frame sees them): more ceiling above, more floor below */}
+      <rect x={-2000} y={-2400} width={6000} height={2870} fill="#2A2430" />
+      <rect x={-2000} y={470} width={6000} height={2600} fill="#2C2532" />
       <Classroom
         t={t + 40}
         id="s10"
@@ -260,7 +263,7 @@ export const S10: React.FC<ShotProps> = ({ t, len }) => {
       ))}
       {/* a classmate's head and desk close to camera */}
       <Foreground blur={10}>
-        <rect x={-120} y={960} width={760} height={220} fill="#1A1420" />
+        <rect x={-120} y={960} width={760} height={900} fill="#1A1420" />
         <circle cx={250} cy={930} r={120} fill="#141018" />
         <path d="M 110 1080 Q 120 990 250 980 Q 380 990 390 1080 Z" fill="#141018" />
       </Foreground>
@@ -329,7 +332,7 @@ export const S13: React.FC<ShotProps> = ({ t, len }) => {
 export const S14: React.FC<ShotProps> = ({ t, len }) => {
   const pose = P({ x: 420, y: LOT_FEET - LEG_LEN * 0.85, scale: 0.85, yaw: 0.35, look: 0.3, armR: { a: 62, b: -64 }, armL: { a: 12, b: -8 }, expr: 'smug' });
   const palm = toWorld(pose, joints(pose).armR.end);
-  const titleAt = 30;
+  const titleAt = 20;
   return (
     <>
       <g transform={camT(kf(t, [[0, 820], [len, 800]]), kf(t, [[0, 760], [len, 750]]), kf(t, [[0, 0.95], [len, 1.0]]))}>
@@ -338,9 +341,9 @@ export const S14: React.FC<ShotProps> = ({ t, len }) => {
         <Hero look={YOU} pose={pose} rimId="rimR" shadow={0.7} t={t + 30} />
         <ItemBlock x={palm.x + 4} y={palm.y - 64} t={t + 30} size={34} kind="car" />
       </g>
-      <rect width={1920} height={1080} fill="#0B0816" opacity={0.3 * clamp((t - titleAt + 6) / 8)} />
+      <HudShade o={0.3 * clamp((t - titleAt + 6) / 8)} />
       <GrTitle t={t - titleAt} lines={['WHAT IF YOU COULD', 'MINE ANYTHING?']} accent="ANYTHING" accentT={30} y={200} size={124} />
-      <ChatBox f={t} lines={[{ at: 0, text: '/gamerule mineAnything true' }, { at: 20, text: 'Gamerule mineAnything is now set to: true', kind: 'sys' }]} />
+      <ChatBox f={t} lines={[{ at: 0, text: '/gamerule mineAnything true' }, { at: 12, text: 'Gamerule mineAnything is now set to: true', kind: 'sys' }]} />
     </>
   );
 };
