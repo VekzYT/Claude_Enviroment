@@ -15,3 +15,5 @@ export * from './sets/classroom';
 export * from './sets/rooftop';
 export * from './sets/kitchen';
 export * from './sets/schematic';
+export * from './gamerule';
+export * from './sets/outside';

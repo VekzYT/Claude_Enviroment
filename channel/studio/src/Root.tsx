@@ -5,6 +5,8 @@ import { STUDIO } from './studio.config';
 import { EPISODES } from './episodes';
 import { CastSheet } from './CastSheet';
 import { GameruleCast } from './GameruleCast';
+import { GameruleKit } from './GameruleKit';
+import { GameruleSets } from './GameruleSets';
 
 // Every episode gets two compositions: <Id> (the film) and <Id>Board (one frame per shot, at its key frame, for the
 // storyboard). Cast renders the cast sheet.
@@ -22,6 +24,8 @@ export const Root: React.FC = () => {
       ))}
       <Composition id="Cast" component={CastSheet} durationInFrames={1} {...common} />
       <Composition id="GameruleCast" component={GameruleCast} durationInFrames={1} {...common} />
+      <Composition id="GameruleKit" component={GameruleKit} durationInFrames={1} {...common} />
+      <Composition id="GameruleSets" component={GameruleSets} durationInFrames={5} {...common} />
     </>
   );
 };

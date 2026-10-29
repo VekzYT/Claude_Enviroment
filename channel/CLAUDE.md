@@ -17,18 +17,17 @@ latest `episodes/*/results.md`, and the log below.
   on 29 Oct Claude moved the file, unchanged, to the repo root `.claude/settings.json`, where settings are read.
 - Claude plan: the person upgrades to **Max on 31 Oct 2026**. Do the heavy work (full animation, renders) from then.
 - First upload target: **Friday 6 Nov 2026, 3pm ET** (20:00 UTC; US clocks change on 1 Nov).
-- Episode 1 (*What If You Could Mine Anything?*): script, science, Shorts and package written. Not animated.
-- Studio: the person approved it on 28 Oct, and its files are now in the repo (`channel/studio/`,
-  `channel/.claude/skills/what-if-animation/`, unmodified upstream commit 3725a22). **Not installed yet:** Auto mode's
-  safety check blocks installing or running third-party code, and Claude may not write `.claude/settings.json` itself
-  (self-modification). The person was asked to create the file below at the repo root on GitHub (branch
-  `claude/friendly-carson-lah8d7`), or to switch the session to "Accept edits" and approve each command. Once
-  `.claude/settings.json` exists (`git pull`), carry on: `npm ci` in `channel/studio`; the voice venv at
-  `channel/voice/.venv` (`uv venv --python 3.11`, then `uv pip install`); voice scripts in `channel/voice/`, run from
-  the repo root as `channel/voice/.venv/bin/python channel/voice/<script>.py`. A settings file created mid-session may
-  only load in a new session. Don't route around the block.
+- Episode 1 (*What If You Could Mine Anything?*): script, science, Shorts and package written. **Part 1** (the cold
+  open and the command, slug `mine-01-open`, 14 shots, 22 s) storyboarded and self-checked on 29 Oct; the board was
+  sent to the person for notes. Not animated yet: the full animation pass, sound and master come after 31 Oct.
+- Studio: installed and working (the person's allow rules in `.claude/settings.json`, copied below). GAMERULE's layer
+  is built on the skill's engine: the cast on the rig (`you`, `youPlain`, `dex`, `juni`, `momGR`, `driver`,
+  `teacher`; `groggy` joins the faces), the game layer in `studio/src/engine/gamerule.tsx` (chat, hotbar, block
+  outline, pixel cracks, item blocks with 8x8 faces, impact, back view for over-the-shoulder shots, props) and the
+  sets in `studio/src/engine/sets/outside.tsx` (school street, home street, parking lot, nightstand, the bed from
+  above). Preview compositions: `GameruleCast`, `GameruleKit`, `GameruleSets` (one set per frame).
 
-  The settings file to hand them (`.claude/settings.json`):
+  The settings file (`.claude/settings.json`, repo root):
 
   ```json
   {
@@ -48,11 +47,15 @@ latest `episodes/*/results.md`, and the log below.
     }
   }
   ```
-- Voice: the person chose free voices over ElevenLabs. On 28 Oct four samples of the episode 1 cold open were
-  sent (A Kokoro `am_michael`, B Kokoro `af_heart`, C Chatterbox Turbo built-in, D Chatterbox Turbo cloning A),
-  all checked with Whisper (96% word match each). **Waiting for their pick.** Then adapt the skill's voice step to
-  the chosen engine: `voice.wav` plus `words.json` word timings from Whisper (`channel/voice/check.py` shows how).
-  Free sound effects: YouTube Audio Library, Pixabay, or synthesised in code (the skill's `sfx.py` needs ElevenLabs).
+- Voice: Kokoro `am_michael` (sample A), the person's pick on 29 Oct. From the repo root,
+  `channel/voice/.venv/bin/python channel/voice/voice_kokoro.py <slug>` voices the episode's `script` into
+  `studio/public/<slug>/voice.wav` and writes `studio/src/episodes/<slug>/words.json`; pauses come from `gaps` and
+  each beat's `pause_after`. Then `plan.py`, `stills.mjs`, `board.py` as the skill says. Free sound effects still to
+  source: YouTube Audio Library, Pixabay, or synthesised in code (the skill's `sfx.py` needs ElevenLabs).
+- Storyboard lessons from part 1 (check these on every board): show the situation, not just the line (he wakes up in
+  bed, not standing dressed); don't leave an easy way out in frame (a door beside the wall he mines kills the gag);
+  the power needs its own look at phone size (the block outline, thick stepped cracks); keep neighbouring shots
+  different in size or angle; something blurred and dark in the foreground every few shots.
 
 ## Setting up a fresh container
 
@@ -86,10 +89,9 @@ TypeScript; the scripts only call `api.elevenlabs.io`, ffmpeg and Remotion.
 2. `npm ci` in `channel/studio`. `node_modules/` and `out/` are gitignored.
 3. Rendering: Chromium is pre-installed at `/opt/pw-browsers/` (`chromium_headless_shell-1243`); point Remotion at it
    if it tries to download its own.
-4. Make it ours before episode 1: a `you` look on the rig matching `art/cast.png` (lime hoodie, cube backpack,
-   player marker), Dex, Juni, Mom; the HUD (chat box, hotbar, coordinates, achievement toast) in the pixel face;
-   new sets (bedroom, backyard, parking lot/garage, the shaft). Check the cast sheet against the skill's default
-   cast (Pip, Mo) and the genre's heroes.
+4. Make it ours (done 29 Oct for part 1): the cast, the chat and hotbar in the pixel face, the mining look, and the
+   bedroom, street, school and parking lot sets. Still to build for later parts: the coordinates readout, the
+   achievement toast, the backyard and the shaft.
 5. The skill makes 15–25 s episodes. Long episodes are built in parts on the same cast and sets, then joined.
 
 ## Every episode
@@ -120,3 +122,6 @@ TypeScript; the scripts only call `api.elevenlabs.io`, ffmpeg and Remotion.
 - **2026-10-29** Channel setup confirmed done (@gameruletv). Moved their settings file to the repo root. Asked them,
   simply, for two things: a voice pick (A–D) and "open a PR", so the channel merges into their default branch
   (`claude/fps-game-setup-vmje1l`, the game) and future sessions can see it.
+- **2026-10-29** The person picked voice A (Kokoro `am_michael`). Built GAMERULE's layer on the rig and storyboarded
+  episode 1 part 1 (14 shots, 22 s). The self-check failed the first board (wake-up shot standing and smug, the
+  school door beside the mined wall, thin cracks, no high angle, no foregrounds); fixed all of it and sent the board.

@@ -29,7 +29,7 @@ export type Look = {
   shoe: string;
   face: string;
   hair: string;
-  extra?: 'hood' | 'curls' | 'bunches' | 'bob' | 'suit' | 'hoodDown' | 'cap' | 'raincoat' | 'bun';
+  extra?: 'hood' | 'curls' | 'bunches' | 'bob' | 'suit' | 'hoodDown' | 'cap' | 'raincoat' | 'bun' | 'stache';
   /** GAMERULE: the legs in their own colour (trousers), when they differ from the sleeves */
   leg?: string;
   /** GAMERULE: the hero's cube backpack (the inventory), with straps across the chest */
@@ -41,7 +41,7 @@ export type Look = {
   /** GAMERULE: the colour of the extra piece (Dex's cap) */
   piece?: string;
 };
-export type CastName = 'pip' | 'pipHood' | 'pipInk' | 'mo' | 'sis' | 'mom' | 'suit' | 'you' | 'youPlain' | 'dex' | 'juni' | 'momGR';
+export type CastName = 'pip' | 'pipHood' | 'pipInk' | 'mo' | 'sis' | 'mom' | 'suit' | 'you' | 'youPlain' | 'dex' | 'juni' | 'momGR' | 'driver' | 'teacher';
 export const LOOKS: Record<CastName, Look> = {
   // A: Pip as built
   pip: { skin: C.skin, skinShade: C.skinShade, hand: C.skin, jacket: C.jacket, jacketShade: C.jacketShade, accent: C.jacketShade, limb: C.limb, line: C.ink, shoe: C.shoe, face: C.ink, hair: C.ink },
@@ -66,6 +66,10 @@ export const LOOKS: Record<CastName, Look> = {
   juni: { skin: C.skin, skinShade: C.skinShade, hand: C.skin, jacket: '#8B5CF6', jacketShade: '#6E44D6', accent: '#FFD93B', limb: '#8B5CF6', leg: '#3A3446', line: '#141024', shoe: '#FFD93B', face: C.ink, hair: '#3A2620', extra: 'raincoat' },
   // Mom: hair up in a bun, round reading glasses, a rust cardigan over a cream top
   momGR: { skin: '#E3C3A3', skinShade: '#CDAA88', hand: '#E3C3A3', jacket: '#C2643A', jacketShade: '#A4522E', accent: '#F2E6D0', limb: '#C2643A', leg: '#4A4060', line: '#141024', shoe: '#5A4A6A', face: C.ink, hair: '#5A3226', extra: 'bun', specs: true },
+  // a bit part: the car's owner in episode 1. Bald, a thick moustache, a grey work jacket
+  driver: { skin: '#D9B08C', skinShade: '#C29A78', hand: '#D9B08C', jacket: '#5A6B7A', jacketShade: '#475665', accent: '#3A4652', limb: '#5A6B7A', leg: '#2F2B3A', line: '#141024', shoe: '#3A3446', face: C.ink, hair: '#3A2A22', extra: 'stache' },
+  // a bit part: the teacher in episode 1. A brown jacket over a shirt and a teal tie, combed-back hair, reading glasses
+  teacher: { skin: '#B98A66', skinShade: '#A27552', hand: '#B98A66', jacket: '#7A5A44', jacketShade: '#614634', accent: '#2F8C86', limb: '#7A5A44', leg: '#3A3446', line: '#141024', shoe: '#2A2232', face: C.ink, hair: '#2A1E1A', extra: 'suit', specs: true },
 };
 
 /** The player marker: a pixel-art arrow, lime with a darker rim and one highlight pixel. Centred on (0, 0). */
@@ -88,7 +92,7 @@ export const PlayerMarker: React.FC<{ px?: number; glow?: number }> = ({ px = 6,
 // ---------- the hero ----------
 /** Mitten hands: open (a palm and a thumb) or pointing (a fist with the index finger out). */
 export type HandKind = 'open' | 'point';
-export type Expr = 'neutral' | 'happy' | 'smug' | 'shock' | 'worried' | 'oops' | 'cool' | 'dizzy';
+export type Expr = 'neutral' | 'happy' | 'smug' | 'shock' | 'worried' | 'oops' | 'cool' | 'dizzy' | 'groggy';
 export type Limb = { a: number; b: number }; // a: upper segment angle, b: bend of the lower segment (degrees)
 export type Pose = {
   x: number;
@@ -260,7 +264,8 @@ const Face: React.FC<{ expr: Expr; blink: number; look: number; glasses: number;
   const farHidden = ay > 0.72;
   const farSide = yaw > 0 ? -1 : 1; // facing screen-right hides the screen-left eye
   const eyeY = HEAD.y - 4;
-  const lid = expr === 'smug' || expr === 'cool' ? 0.45 : 0;
+  const lid = expr === 'groggy' ? 0.62 : expr === 'smug' || expr === 'cool' ? 0.45 : 0;
+  const lidY = expr === 'groggy' ? 1 : -3; // groggy lids hang lower
   const open = Math.max(0.08, 1 - Math.max(blink, lid));
   const eye = (cx: number) => {
     if (farHidden && Math.sign(cx) === farSide) return null;
@@ -274,7 +279,7 @@ const Face: React.FC<{ expr: Expr; blink: number; look: number; glasses: number;
       <g>
         <ellipse cx={cx + ex} cy={eyeY + (lid ? 3 : 0)} rx={rx} ry={ry} fill={ink} />
         {big && open > 0.5 ? <circle cx={cx + ex + 3.5} cy={eyeY - 4} r={3.4} fill="#fff" /> : null}
-        {lid ? <path d={`M ${cx - 12} ${eyeY - 4} L ${cx + 12} ${eyeY - 2}`} stroke={ink} strokeWidth={4} strokeLinecap="round" /> : null}
+        {lid ? <path d={`M ${cx - 12} ${eyeY + lidY - 1} L ${cx + 12} ${eyeY + lidY + 1}`} stroke={ink} strokeWidth={4} strokeLinecap="round" /> : null}
       </g>
     );
   };
@@ -287,6 +292,7 @@ const Face: React.FC<{ expr: Expr; blink: number; look: number; glasses: number;
     oops: `M -32 ${eyeY - 20} L -12 ${eyeY - 16} M 12 ${eyeY - 16} L 32 ${eyeY - 20}`,
     cool: '',
     dizzy: '',
+    groggy: `M -34 ${eyeY - 22} L -12 ${eyeY - 15} M 12 ${eyeY - 15} L 34 ${eyeY - 22}`,
   };
   const mY = HEAD.y + 28;
   const mouth: Record<Expr, React.ReactNode> = {
@@ -298,6 +304,7 @@ const Face: React.FC<{ expr: Expr; blink: number; look: number; glasses: number;
     oops: <g><rect x={-18} y={mY - 6} width={36} height={16} rx={6} fill={ink} /><path d={`M -14 ${mY + 2} L 14 ${mY + 2}`} stroke="#fff" strokeWidth={3} /></g>,
     cool: <path d={`M -12 ${mY + 2} Q 4 ${mY + 8} 16 ${mY - 6}`} stroke={ink} strokeWidth={5} fill="none" strokeLinecap="round" />,
     dizzy: <path d={`M -14 ${mY + 4} Q -7 ${mY - 4} 0 ${mY + 4} Q 7 ${mY + 12} 14 ${mY + 4}`} stroke={ink} strokeWidth={5} fill="none" strokeLinecap="round" />,
+    groggy: <path d={`M -13 ${mY + 5} Q 0 ${mY - 3} 13 ${mY + 5}`} stroke={ink} strokeWidth={5} fill="none" strokeLinecap="round" />,
   };
   return (
     <g transform={`translate(${yaw * 30} 0) scale(${1 - 0.28 * ay} 1)`}>
@@ -441,7 +448,7 @@ export const Hero: React.FC<{ pose: Pose; shadow?: number; rimId?: string; look?
           <path d={`M -62 ${HEAD.y - 6} Q -66 ${HEAD.y - 66} 0 ${HEAD.y - 66} Q 66 ${HEAD.y - 66} 62 ${HEAD.y - 6} Q 56 ${HEAD.y - 40} 22 ${HEAD.y - 44} Q -10 ${HEAD.y - 50} -34 ${HEAD.y - 40} Q -56 ${HEAD.y - 34} -62 ${HEAD.y - 6} Z`} fill={L.hair} stroke={L.line} strokeWidth={4} strokeLinejoin="round" />
         </g>
       ) : null}
-      {L.extra === 'bunches' || L.extra === 'bob' || L.extra === 'suit' || L.extra === 'hoodDown' || L.extra === 'cap' || L.extra === 'raincoat' || L.extra === 'bun' ? null : (
+      {L.extra === 'bunches' || L.extra === 'bob' || L.extra === 'suit' || L.extra === 'hoodDown' || L.extra === 'cap' || L.extra === 'raincoat' || L.extra === 'bun' || L.extra === 'stache' ? null : (
         <path transform={`translate(${-pose.yaw * 16} 0)`} d={`M -6 ${HEAD.y - 60} q 10 -26 30 -18 q -16 2 -14 16 q -8 -10 -16 2 Z`} fill={L.hair} />
       )}
       {L.extra === 'bunches' ? (
@@ -479,6 +486,10 @@ export const Hero: React.FC<{ pose: Pose; shadow?: number; rimId?: string; look?
           <circle cx={21 + pose.look * 7} cy={HEAD.y - 4} r={15} />
           <path d={`M ${-6 + pose.look * 7} ${HEAD.y - 6} L ${6 + pose.look * 7} ${HEAD.y - 6}`} />
         </g>
+      ) : null}
+      {L.extra === 'stache' ? (
+        // a bushy moustache over the mouth, turning with the face
+        <path transform={`translate(${pose.yaw * 30} 0) scale(${1 - 0.28 * Math.min(1, Math.abs(pose.yaw))} 1)`} d={`M -26 ${HEAD.y + 22} Q -14 ${HEAD.y + 6} 0 ${HEAD.y + 14} Q 14 ${HEAD.y + 6} 26 ${HEAD.y + 22} Q 12 ${HEAD.y + 18} 0 ${HEAD.y + 22} Q -12 ${HEAD.y + 18} -26 ${HEAD.y + 22} Z`} fill={L.hair} stroke={L.line} strokeWidth={3} strokeLinejoin="round" />
       ) : null}
       {L.extra === 'raincoat' ? (
         // GAMERULE (Juni): a yellow star clip on the hood, high on the side facing us

@@ -16,7 +16,8 @@ export const KIDS: KidLook[] = [
   { hair: 'short', hairC: '#C9925A', top: '#4A6A5A' },
 ];
 
-/** A classmate seen from behind, sitting; `turn` brings the face round, `laugh` opens the mouth. */
+/** A classmate seen from behind, sitting; `turn` brings the face round, `laugh` opens the mouth. The set's `turn`
+ * (GAMERULE) turns the room round to stare, front row first, as it rises from 0 to 1. */
 export const Kid: React.FC<{ x: number; y: number; s: number; look: KidLook; turn?: number; laugh?: number; t?: number }> = ({ x, y, s, look, turn = 0, laugh = 0, t = 0 }) => {
   const bob = laugh ? Math.abs(Math.sin(t / 2.4 + x)) * 8 * laugh : 0;
   return (
@@ -59,8 +60,9 @@ const KidDesk: React.FC<{ u: number; w: number }> = ({ u, w }) => {
   );
 };
 
-/** `board` replaces the default sum (7 x 8 = ?) with your own chalk; the writing area is x 426-1054, y 196-524. */
-export const Classroom: React.FC<{ t: number; solved?: boolean; wrong?: boolean; laugh?: number; id?: string; board?: React.ReactNode }> = ({ t, solved = false, wrong = false, laugh = 0, id = 'cls', board }) => {
+/** `board` replaces the default sum (7 x 8 = ?) with your own chalk; the writing area is x 426-1054, y 196-524.
+ * `behindDesk` (GAMERULE) is drawn just before the teacher's desk, so a teacher standing there is hidden by it. */
+export const Classroom: React.FC<{ t: number; solved?: boolean; wrong?: boolean; laugh?: number; turn?: number; id?: string; board?: React.ReactNode; behindDesk?: React.ReactNode }> = ({ t, solved = false, wrong = false, laugh = 0, turn = 0, id = 'cls', board, behindDesk }) => {
   const r = CLS;
   const { P, Q } = r;
   const tiles: React.ReactNode[] = [];
@@ -171,6 +173,7 @@ export const Classroom: React.FC<{ t: number; solved?: boolean; wrong?: boolean;
       <circle cx={clock.x} cy={clock.y} r={58} fill="#EFE2CC" />
       <circle cx={clock.x} cy={clock.y} r={58} fill="none" stroke="#1E1824" strokeWidth={8} />
       <path d={`M ${clock.x} ${clock.y} L ${clock.x} ${clock.y - 38} M ${clock.x} ${clock.y} L ${clock.x + 26} ${clock.y + 10}`} stroke="#1E1824" strokeWidth={6} strokeLinecap="round" />
+      {behindDesk}
       {/* the teacher's desk, with books, an apple and a globe */}
       <Box r={r} u={[0.06, 0.3]} v={[0.76, 1]} w={[0.14, 0.26]} front="#5B4038" top="#7A5747" side="#3A2826" rim />
       {(() => {
@@ -229,7 +232,7 @@ export const Classroom: React.FC<{ t: number; solved?: boolean; wrong?: boolean;
                 const c = ['#B0463A', '#3E6A8A', '#6A8A4A', '#8A5A9A'][(ri * 2 + ui) % 4];
                 return <path d={`M ${bp.x - 22 * k} ${bp.y} L ${bp.x - 24 * k} ${bp.y - 50 * k} Q ${bp.x} ${bp.y - 66 * k} ${bp.x + 24 * k} ${bp.y - 50 * k} L ${bp.x + 22 * k} ${bp.y} Z`} fill={c} />;
               })()}
-              <Kid x={seat.x} y={seat.y - 70 * k} s={0.55 * k} look={KIDS[(ri * 2 + ui) % KIDS.length]} turn={laugh > 0 && (ri + ui) % 2 === 0 ? 1 : 0} laugh={laugh} t={t} />
+              <Kid x={seat.x} y={seat.y - 70 * k} s={0.55 * k} look={KIDS[(ri * 2 + ui) % KIDS.length]} turn={(laugh > 0 && (ri + ui) % 2 === 0) || turn > (ri + ui) * 0.12 ? 1 : 0} laugh={laugh} t={t} />
             </g>
           );
         }),
