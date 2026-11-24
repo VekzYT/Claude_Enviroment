@@ -4,9 +4,10 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = join(fileURLToPath(new URL('..', import.meta.url)), 'www');
+// CUBOPOLIS_OUT serves another build folder (see tools/build.mjs); the default is www/.
+const root = process.env.CUBOPOLIS_OUT ? join(process.cwd(), process.env.CUBOPOLIS_OUT) : join(fileURLToPath(new URL('..', import.meta.url)), 'www');
 const port = Number(process.argv[2] || 5173);
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 
 export function serve(p = port) {
   const server = createServer(async (req, res) => {

@@ -156,6 +156,8 @@ let tool: ToolId = 'inspect';
 let overlay: OverlayKind = 'none';
 let inspected: TilePos | null = null;
 let pageHidden = document.visibilityState === 'hidden';
+/** A phone held upright shows the "turn your phone" card instead of the game; the city waits. */
+const upright = typeof window.matchMedia === 'function' ? window.matchMedia('(orientation: portrait) and (max-width: 600px)') : null;
 let unsaved = false;
 let lastSaveAt = 0;
 let lastChangeAt = 0;
@@ -392,10 +394,10 @@ let inputBlocked = false;
 let booted = false;
 let loopErrors = 0;
 
-// debug readout
+// debug readout (frames per real second, not per clamped game step)
 let debugEl: HTMLDivElement | null = null;
 let fpsFrames = 0;
-let fpsTime = 0;
+let fpsFrom = 0;
 
 function tick(dt: number): void {
   const modal = ui.isModalOpen();
@@ -406,7 +408,7 @@ function tick(dt: number): void {
   }
 
   // ---- the city
-  const running = playing && state.speed > 0 && !modal;
+  const running = playing && state.speed > 0 && !modal && !(upright && upright.matches);
   if (running) {
     const per = DAY_SECONDS[state.speed];
     simAcc += dt;
@@ -473,16 +475,17 @@ function tick(dt: number): void {
     }
   }
 
-  if (debugEl) updateDebug(dt);
+  if (debugEl) updateDebug();
 }
 
-function updateDebug(dt: number): void {
+function updateDebug(): void {
   fpsFrames++;
-  fpsTime += dt;
-  if (fpsTime < 0.5 || !debugEl) return;
-  const fps = fpsFrames / fpsTime;
+  const now = performance.now();
+  if (!fpsFrom) fpsFrom = now;
+  if (now - fpsFrom < 500 || !debugEl) return;
+  const fps = (fpsFrames * 1000) / (now - fpsFrom);
   fpsFrames = 0;
-  fpsTime = 0;
+  fpsFrom = now;
   const s = world.stats();
   debugEl.textContent = `${fps.toFixed(0)} fps · ${s.drawCalls} draws · ${(s.triangles / 1000).toFixed(0)}k tris · day ${state.day}`;
 }
@@ -584,6 +587,17 @@ function boot(): void {
   });
   window.addEventListener('pagehide', () => {
     void saveCity('pagehide');
+  });
+
+  // The Home Screen web app fetched a new version in the background (see tools/pages.mjs).
+  // On the title screen, switch to it straight away; in a city, save and say it is ready.
+  window.addEventListener('cubopolis-update', () => {
+    if (!playing) {
+      location.reload();
+      return;
+    }
+    void saveCity('update');
+    emit({ type: 'toast', text: 'A new version of Cubopolis is ready. Close the game and open it again to get it.', tone: 'good' });
   });
 
   if (DEBUG) {

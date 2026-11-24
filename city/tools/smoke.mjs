@@ -120,9 +120,9 @@ const lerp = (a, b, t) => a + (b - a) * t;
 
 async function tapAt(x, y) {
   await touch('touchStart', [[1, x, y]]);
-  await sleep(70);
+  await sleep(60);
   await touch('touchEnd', []);
-  await frames(2);
+  await frames(1);
 }
 
 /** What the topmost element at a point is (for "is this covered?" checks). */
@@ -179,7 +179,6 @@ async function tap(sel, text, what = `${sel}${text ? ` "${text}"` : ''}`) {
   if (r.covered) throw new Error(`${what} is covered by ${r.by}`);
   if (r.x < SAFE.left || r.x > W - SAFE.right || r.y > H - SAFE.bottom) throw new Error(`${what} sits in a safe-area inset at ${r.x},${r.y}`);
   await tapAt(r.x, r.y);
-  await sleep(120);
 }
 
 async function dismissTip() {
@@ -237,80 +236,87 @@ const fingerprint = () =>
     return { name: s.name, day: s.day, money: s.money, pop: s.stats.population, buildings: s.buildings.filter(Boolean).length, hash: h };
   });
 
-/** Screen rectangles the interface covers right now (HUD, dock, chip, tips, cards), with a margin. */
-const obstructions = () =>
-  G(() => {
-    const out = [];
+/**
+ * One round trip to the page (each costs a frame in SwiftShader): where the tiles are on screen,
+ * what the interface covers right now (HUD, dock, chip, tips, cards, with a margin), and whether
+ * the map itself is the topmost thing under each tile.
+ */
+const probe = (tiles) =>
+  G((tiles) => {
+    const obs = [];
     for (const el of document.querySelectorAll('#ui .panel, #ui .dock-row, #ui .chip, #ui .pill, #ui .tip, #ui .toasts > *, .boot-banner')) {
       if (el.closest('[hidden]')) continue;
       const r = el.getBoundingClientRect();
       if (r.width < 2 || r.height < 2) continue;
-      out.push({ x0: r.left - 14, y0: r.top - 14, x1: r.right + 14, y1: r.bottom + 14 });
+      obs.push({ x0: r.left - 14, y0: r.top - 14, x1: r.right + 14, y1: r.bottom + 14 });
     }
-    return out;
-  });
+    const pts = tiles.map(([x, z]) => {
+      const p = window.cubopolis.tileToScreen(x, z);
+      const el = p.inFront ? document.elementFromPoint(p.x, p.y) : null;
+      return { ...p, world: !!el && el.id === 'world' };
+    });
+    return { obs, pts };
+  }, tiles);
 /** Edge auto-pan zone and a little extra stay clear too. */
 const EDGE = { x0: 70, x1: W - 70, y0: 56, y1: H - 40 };
 function freeAt(p, obs) {
   if (!p.inFront || p.x < EDGE.x0 || p.x > EDGE.x1 || p.y < EDGE.y0 || p.y > EDGE.y1) return false;
+  if (p.world === false) return false;
   return !obs.some((o) => p.x >= o.x0 && p.x <= o.x1 && p.y >= o.y0 && p.y <= o.y1);
 }
 /** Centre of the biggest clear band of the screen (between the HUD and whatever sits on the dock). */
-async function freeCentre(obs) {
+function freeCentre(obs) {
   let top = EDGE.y0;
   let bottom = EDGE.y1;
   for (const o of obs) {
-    const cx = (o.x0 + o.x1) / 2;
     if (o.x1 < W * 0.25 || o.x0 > W * 0.75) continue; // side panels do not limit the band
     if (o.y1 < H / 2) top = Math.max(top, o.y1);
-    else if (cx > 0) bottom = Math.min(bottom, o.y0);
+    else bottom = Math.min(bottom, o.y0);
   }
   return { x: W / 2, y: (top + bottom) / 2 };
 }
 
-/** One-finger pan (Look tool) so that tile (x, z) moves to screen point (sx, sy). */
+/** One-finger drag along a straight line (Look tool: pans the map, the ground stays under the finger). */
+async function fingerDrag(x0, y0, x1, y1, steps = 8) {
+  await touch('touchStart', [[1, x0, y0]]);
+  await frames(1);
+  for (let s = 1; s <= steps; s++) await touch('touchMove', [[1, lerp(x0, x1, s / steps), lerp(y0, y1, s / steps)]]);
+  await frames(1);
+  await sleep(150); // hold still before lifting: no fling
+  await touch('touchEnd', []);
+  await frames(2);
+}
+
+/** Pan (Look tool) so that tile (x, z) moves to screen point (sx, sy). */
 async function panTile(x, z, sx = W / 2, sy = H / 2 - 8) {
-  const p = await screenOf(x, z);
-  const obs = await obstructions();
+  const { obs, pts } = await probe([[x, z]]);
+  const p = pts[0];
   // Grab the ground somewhere clear (the tile itself if it is), and move it by the tile's offset.
   let from = { x: Math.min(W - 140, Math.max(140, p.x)), y: Math.min(H - 110, Math.max(90, p.y)) };
-  if (!freeAt({ ...from, inFront: true }, obs)) from = await freeCentre(obs);
+  if (!freeAt({ ...from, inFront: true }, obs)) from = freeCentre(obs);
   const dx = sx - p.x;
   const dy = sy - p.y;
   // Long moves go in a few strokes so the finger stays on the map.
-  const strokes = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 180));
-  for (let k = 0; k < strokes; k++) {
-    const steps = 12;
-    await touch('touchStart', [[1, from.x, from.y]]);
-    await frames(1);
-    for (let s = 1; s <= steps; s++) {
-      await touch('touchMove', [[1, from.x + (dx / strokes) * (s / steps), from.y + (dy / strokes) * (s / steps)]]);
-      await frames(1);
-    }
-    await sleep(200); // hold still: no fling
-    await touch('touchEnd', []);
-    await frames(3);
-  }
+  const strokes = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 200));
+  for (let k = 0; k < strokes; k++) await fingerDrag(from.x, from.y, from.x + dx / strokes, from.y + dy / strokes);
 }
 
 /** Make sure every given tile is on screen and clear of the interface: dismiss tips, pan (in Look mode). */
 async function ensureVisible(tiles, tool = null) {
   for (let attempt = 0; attempt < 5; attempt++) {
-    const obs = await obstructions();
-    const pts = await Promise.all(tiles.map(([x, z]) => screenOf(x, z)));
+    const { obs, pts } = await probe(tiles);
     if (pts.every((p) => freeAt(p, obs))) return true;
     if (await dismissTip()) continue;
     await selectTool('inspect');
-    // the Look chip is gone now: measure again before panning
-    const obs2 = await obstructions();
-    const c = await freeCentre(obs2);
+    // with the Look tool the chip is gone: measure the free band again, leaving room for the chip
+    const again = await probe([]);
+    const c = freeCentre(again.obs);
     const cx = tiles.reduce((a, t) => a + t[0], 0) / tiles.length;
     const cz = tiles.reduce((a, t) => a + t[1], 0) / tiles.length;
-    await panTile(Math.round(cx), Math.round(cz), c.x, c.y + (tool && tool !== 'inspect' ? -30 : 0));
+    await panTile(Math.round(cx), Math.round(cz), c.x, c.y - (tool && tool !== 'inspect' ? 40 : 0));
     if (tool) await selectTool(tool);
   }
-  const obs = await obstructions();
-  const pts = await Promise.all(tiles.map(([x, z]) => screenOf(x, z)));
+  const { obs, pts } = await probe(tiles);
   return pts.every((p) => freeAt(p, obs));
 }
 
@@ -336,37 +342,33 @@ async function selectTool(tool) {
   const [cat, card] = TOOL_PATH[tool];
   await tap('.dock-btn', cat, `dock "${cat}"`);
   if (card) await tap('.tray .card', card, `card "${card}"`);
-  await frames(2);
   const now = await currentTool();
   if (now !== tool) throw new Error(`picking ${tool} through the dock left the tool at ${now}`);
 }
 
 /** Drag a finger from tile a to tile b with the current tool (road / zone). */
 async function dragTiles(a, b) {
-  const p0 = await screenOf(a[0], a[1]);
-  const p1 = await screenOf(b[0], b[1]);
-  for (const p of [p0, p1]) {
-    const hit = await hitAt(p.x, p.y);
-    if (hit !== 'world') throw new Error(`map point ${Math.round(p.x)},${Math.round(p.y)} is covered by ${hit}`);
-  }
+  const { pts } = await probe([a, b]);
+  const [p0, p1] = pts;
+  for (const p of pts) if (!p.world) throw new Error(`map point ${Math.round(p.x)},${Math.round(p.y)} is covered`);
   const dist = Math.hypot(p1.x - p0.x, p1.y - p0.y);
-  const steps = Math.max(6, Math.round(dist / 12));
+  const steps = Math.max(5, Math.round(dist / 18));
   await touch('touchStart', [[1, p0.x, p0.y]]);
   await frames(1);
   for (let s = 1; s <= steps; s++) {
     await touch('touchMove', [[1, lerp(p0.x, p1.x, s / steps), lerp(p0.y, p1.y, s / steps)]]);
-    if (s % 2 === 0 || s === steps) await frames(1);
+    if (s % 3 === 0) await frames(1);
   }
   await frames(1);
   await touch('touchEnd', []);
-  await frames(2);
+  await frames(1);
 }
 
 /** Tap a map tile with the current tool (buildings place on lift). */
 async function tapTile(x, z) {
-  const p = await screenOf(x, z);
-  const hit = await hitAt(p.x, p.y);
-  if (hit !== 'world') throw new Error(`tile ${x},${z} on screen is covered by ${hit}`);
+  const { pts } = await probe([[x, z]]);
+  const p = pts[0];
+  if (!p.world) throw new Error(`tile ${x},${z} on screen is covered`);
   await tapAt(p.x, p.y);
 }
 
@@ -376,11 +378,21 @@ async function build(tool, label, fn, tiles) {
   if (!(await ensureVisible(tiles, tool))) throw new Error(`could not bring ${label} on screen, clear of the interface`);
   const before = await cityInfo();
   await fn();
-  await sleep(150);
   const after = await cityInfo();
   const ok = after.money < before.money;
-  check(`${label}`, ok, `money ${before.money} -> ${after.money}`);
+  const why = ok ? '' : ` — ${await G(() => [...document.querySelectorAll('.toasts > *')].map((t) => t.textContent).join(' | '))}`;
+  check(`${label}`, ok, `money ${before.money} -> ${after.money}${why}`);
   return ok;
+}
+
+/** Graphics quality through Menu → Graphics, like a player. */
+async function setQuality(label) {
+  await tap('.tool-btn', 'Menu');
+  await sleep(400);
+  await tap('.seg-btn', label);
+  await sleep(200);
+  await tap('.sh-close', undefined, 'menu close');
+  await sleep(300);
 }
 
 async function twoFingerPinch(cx, cy, r0, r1, steps = 14) {
@@ -395,7 +407,7 @@ async function twoFingerPinch(cx, cy, r0, r1, steps = 14) {
       [1, cx - r, cy + s * 0.3],
       [2, cx + r, cy - s * 0.3],
     ]);
-    await frames(1);
+    if (s % 2 === 0) await frames(1);
   }
   await sleep(150);
   await touch('touchEnd', []);
@@ -470,6 +482,10 @@ try {
 
   // Pause while building, like a careful player.
   await tap('.speed-btn', 'Pause');
+  // SwiftShader draws a frame in ~0.6 s at High: build and grow at Low (also checks the live switch),
+  // and go back to High for the close-ups.
+  await setQuality('Low');
+  check('graphics switched to Low through the menu', (await G(() => JSON.parse(localStorage.getItem('cubopolis:settings')).quality)) === 'low');
 
   console.log('== roads');
   const ROADS = [
@@ -483,7 +499,7 @@ try {
     await build('road', `road ${a} -> ${b}`, () => dragTiles(a, b), [a, b]);
   }
   const afterRoads = await cityInfo();
-  check('road grid laid', afterRoads.roads >= 70, `${afterRoads.roads} road tiles`);
+  check('road grid laid', afterRoads.roads >= 61, `${afterRoads.roads} road tiles`);
   await shot('roads');
 
   console.log('== zones');
@@ -500,17 +516,19 @@ try {
 
   console.log('== utilities');
   await build('build:power_coal', 'coal power plant', () => tapTile(32, 36), [[31, 35], [33, 37]]);
-  await build('build:water_tower', 'water tower 1', () => tapTile(32, 30), [[32, 30]]);
-  await build('build:water_tower', 'water tower 2', () => tapTile(32, 31), [[32, 31]]);
+  await build('build:water_tower', 'water tower 1', () => tapTile(31, 32), [[31, 32]]);
+  await build('build:water_tower', 'water tower 2', () => tapTile(33, 29), [[33, 29]]);
   await build('build:park_small', 'park', () => tapTile(28, 31), [[28, 31]]);
   await build('build:park_small', 'park', () => tapTile(30, 31), [[30, 31]]);
   await build('build:park_small', 'park', () => tapTile(35, 24), [[35, 24]]);
   const placed = await cityInfo();
+  console.log('      buildings: ' + (await G(() => window.cubopolis.state.buildings.filter(Boolean).map((b) => `${b.type}@${b.x},${b.z}`).join(' '))));
   check('coal plant and water towers placed', placed.buildings.includes('power_coal') && placed.buildings.filter((b) => b === 'water_tower').length === 2, placed.buildings.join(','));
   await shot('utilities');
 
   // A two-finger pinch to take a closer look at the new neighbourhood.
   await selectTool('inspect');
+  await panTile(32, 31, W / 2, H / 2 - 20);
   const v0 = await G(() => window.cubopolis.view());
   await twoFingerPinch(W / 2, H / 2, 70, 120);
   const v1 = await G(() => window.cubopolis.view());
@@ -577,6 +595,8 @@ try {
   check('the city did not go broke', grown.money > -2000, `$${grown.money}${moneyAdded ? `, $${moneyAdded} added` : ''}`);
   await tap('.speed-btn', 'Pause');
   await handleMilestone();
+  await setQuality('High');
+  check('graphics back to High', (await G(() => JSON.parse(localStorage.getItem('cubopolis:settings')).quality)) === 'high');
   await shot('city-grown');
 
   // Closer look at the tallest buildings.

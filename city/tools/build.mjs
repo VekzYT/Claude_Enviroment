@@ -9,10 +9,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const out = join(root, 'www');
+// CUBOPOLIS_OUT builds somewhere else (relative to the current folder), so several builds can run side by side.
+const out = process.env.CUBOPOLIS_OUT ? join(process.cwd(), process.env.CUBOPOLIS_OUT) : join(root, 'www');
 const watch = process.argv.includes('--watch');
 const ios = process.argv.includes('--ios');
-const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+const pkgVersion = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+// tools/pages.mjs passes a build number so a published build can be told apart on the phone.
+const version = process.env.CUBOPOLIS_BUILD ? `${pkgVersion} (build ${process.env.CUBOPOLIS_BUILD})` : pkgVersion;
 
 const options = {
   entryPoints: { game: join(root, 'src/main.ts') },

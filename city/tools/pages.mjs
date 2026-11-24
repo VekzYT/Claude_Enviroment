@@ -9,11 +9,19 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const www = join(root, 'www');
-const docs = join(root, '..', 'docs');
+// CUBOPOLIS_OUT (see tools/build.mjs) keeps this build apart from www/, e.g. while a test is using it.
+const www = process.env.CUBOPOLIS_OUT ? join(process.cwd(), process.env.CUBOPOLIS_OUT) : join(root, 'www');
+// PAGES_OUT lets a test publish somewhere else (default: the repository's docs/ folder).
+const docs = process.env.PAGES_OUT ? join(process.cwd(), process.env.PAGES_OUT) : join(root, '..', 'docs');
 const iconSrc = join(root, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png');
 
-execFileSync(process.execPath, [join(root, 'tools/build.mjs')], { stdio: 'inherit' });
+// The version shown on the title screen and in the menu carries a build number (the commit count),
+// so it is easy to tell which build a phone is running.
+let buildNo = '';
+try {
+  buildNo = String(Number(execFileSync('git', ['rev-list', '--count', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()) + 1);
+} catch {}
+execFileSync(process.execPath, [join(root, 'tools/build.mjs')], { stdio: 'inherit', env: { ...process.env, CUBOPOLIS_BUILD: buildNo } });
 
 rmSync(docs, { recursive: true, force: true });
 mkdirSync(docs, { recursive: true });
@@ -21,6 +29,40 @@ for (const f of readdirSync(www)) copyFileSync(join(www, f), join(docs, f));
 copyFileSync(join(root, 'pwa/manifest.webmanifest'), join(docs, 'manifest.webmanifest'));
 copyFileSync(join(root, 'pwa/robots.txt'), join(docs, 'robots.txt'));
 writeFileSync(join(docs, '.nojekyll'), '');
+
+// The web-app page: manifest, Home Screen icon and full-screen launch, no indexing, and the offline
+// service worker. (The plain www/ build and the iOS app do without these.)
+const headTags = [
+  '<meta name="robots" content="noindex, nofollow">',
+  '<link rel="manifest" href="manifest.webmanifest">',
+  '<link rel="apple-touch-icon" href="apple-touch-icon.png">',
+  '<meta name="apple-mobile-web-app-capable" content="yes">',
+  '<meta name="mobile-web-app-capable" content="yes">',
+  '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">',
+  '<meta name="apple-mobile-web-app-title" content="Cubopolis">',
+  '<meta name="theme-color" content="#9fd3f0">',
+  '<link rel="apple-touch-startup-image" href="launch-landscape.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">',
+].join('\n');
+// Registers the offline service worker, checks for a new version every time the app comes back to the
+// front (a Home Screen app can stay open for days), and tells the game when one has taken over.
+const swTag = `<script>
+if ('serviceWorker' in navigator) addEventListener('load', function () {
+  var had = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (had) dispatchEvent(new Event('cubopolis-update'));
+    had = true;
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') reg.update().catch(function () {});
+    });
+  }).catch(function () {});
+});
+</script>`;
+let page = readFileSync(join(docs, 'index.html'), 'utf8');
+if (!page.includes('</head>') || !page.includes('</body>')) throw new Error('www/index.html has no </head> or </body>');
+page = page.replace('</head>', `${headTags}\n</head>`).replace('</body>', `${swTag}\n</body>`);
+writeFileSync(join(docs, 'index.html'), page);
 
 // Home Screen icons, resized from the 1024px app icon (opaque, as iOS wants).
 if (!existsSync(iconSrc)) throw new Error('missing app icon at ' + iconSrc);

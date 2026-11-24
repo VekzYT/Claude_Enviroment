@@ -113,3 +113,52 @@
   white-space: nowrap;
   pointer-events: none;
 }
+
+/* Shown instead of the game while a phone is held upright (the game is landscape-only). */
+#rotate {
+  display: none;
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  #rotate {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 32px;
+    box-sizing: border-box;
+    text-align: center;
+    background: #9fd3f0;
+    color: #2d4a5c;
+    font-family: ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    pointer-events: auto;
+  }
+  #rotate svg {
+    width: 96px;
+    height: 96px;
+    animation: rotate-hint 2.4s ease-in-out infinite;
+  }
+  #rotate b {
+    font-size: 22px;
+    font-weight: 800;
+  }
+  #rotate span {
+    max-width: 300px;
+    font-size: 14px;
+    line-height: 1.4;
+    opacity: 0.85;
+  }
+}
+@keyframes rotate-hint {
+  0%,
+  20% {
+    transform: rotate(0deg);
+  }
+  60%,
+  100% {
+    transform: rotate(-90deg);
+  }
+}
