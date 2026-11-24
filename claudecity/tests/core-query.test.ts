@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ROADS, SWAMP_FLOOR, WATER_FLOOR } from '../src/core/config';
+import { BRIDGE_H, ROADS, SWAMP_FLOOR, WATER_FLOOR } from '../src/core/config';
 import { fixtureCity } from '../src/core/fixture';
 import { districtAt, groundY, lineOfSight, nearestLane, newRayHit, queryColliders, raycast, surfaceAt } from '../src/core/query';
 import { Surface } from '../src/core/types';
@@ -28,8 +28,12 @@ test('surfaces', () => {
   assert.equal(surfaceAt(map, -5, 10), Surface.Water);
   assert.equal(surfaceAt(map, map.spawn.x, map.spawn.z), Surface.Sidewalk);
   const bridge = map.edges.find((e) => e.bridge)!;
-  assert.equal(surfaceAt(map, (bridge.x0 + bridge.x1) / 2, bridge.z0), Surface.Bridge);
-  assert.equal(groundY(map, (bridge.x0 + bridge.x1) / 2, bridge.z0), 0);
+  const deckX = map.ramps.find((r) => r.kind === 'bridge' && r.h0 === r.h)!;
+  const dx = (deckX.x0 + deckX.x1) / 2;
+  assert.equal(surfaceAt(map, dx, bridge.z0), Surface.Bridge);
+  assert.equal(groundY(map, dx, bridge.z0), BRIDGE_H, 'a car on the deck stands on it');
+  assert.equal(groundY(map, dx, bridge.z0, -0.35), WATER_FLOOR, 'a boat under the deck is in deep water');
+  assert.ok(Math.abs(groundY(map, deckX.x0 - 11, bridge.z0) - BRIDGE_H / 2) < 0.01, 'half way up the approach');
   assert.equal(groundY(map, (bridge.x0 + bridge.x1) / 2, bridge.z0 + 60), WATER_FLOOR);
   assert.ok(districtAt(map, 200, 200).length > 0);
   // the wilderness
@@ -60,7 +64,7 @@ test('right-hand traffic', () => {
 });
 
 test('ramp height', () => {
-  const r = map.ramps[0];
+  const r = map.ramps.find((x) => x.kind === 'stunt')!;
   assert.equal(groundY(map, (r.x0 + r.x1) / 2, r.z0 + 0.001) < 0.01, true);
   assert.ok(Math.abs(groundY(map, (r.x0 + r.x1) / 2, r.z1 - 0.001) - r.h) < 0.01);
 });

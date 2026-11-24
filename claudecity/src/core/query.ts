@@ -2,7 +2,7 @@
 // hit anything. Also finalizeCity, which turns a CityDraft from src/world into the CityMap the game
 // uses (derived colliders and lookup grids). All of it is allocation-free after finalizeCity.
 
-import { DISTRICT_CELL, GRID_CELL, SURF_CELL, SWAMP_FLOOR, WATER_FLOOR } from './config';
+import { DISTRICT_CELL, GRID_CELL, STEP_UP, SURF_CELL, SWAMP_FLOOR, WATER_FLOOR } from './config';
 import { DISTRICT_IDS, PROPS } from './defs';
 import type { CityDraft, CityMap, Collider, DistrictId, Prop, RayHit, SpatialGrid } from './types';
 import { Surface } from './types';
@@ -203,13 +203,17 @@ export function districtAt(map: CityMap, x: number, z: number): DistrictId {
 }
 
 /**
- * Height of the solid ground at a point: 0 on land, bridges and boardwalks, up a ramp where there is
- * one, SWAMP_FLOOR in the shallows and WATER_FLOOR under deep water (so things that leave the land
- * fall in). The water surface itself is at WATER_Y everywhere.
+ * Height of the solid ground at a point: 0 on land and boardwalks, the ramp or bridge-deck height
+ * where there is one, SWAMP_FLOOR in the shallows and WATER_FLOOR under deep water (so things that
+ * leave the land fall in). The water surface itself is at WATER_Y everywhere.
+ *
+ * Pass `fromY` (the height of whoever is asking) to get the ground under THEM: a ramp or deck more
+ * than STEP_UP above fromY is overhead, not underfoot, and is ignored. That is how a boat passes
+ * under a bridge while a car drives over it. Leave it out to get the topmost surface.
  */
-export function groundY(map: CityMap, x: number, z: number): number {
+export function groundY(map: CityMap, x: number, z: number, fromY = Infinity): number {
   const s = surfaceAt(map, x, z);
-  let y = s === Surface.Water ? WATER_FLOOR : s === Surface.Swamp ? SWAMP_FLOOR : 0;
+  let y = s === Surface.Water || s === Surface.Bridge ? WATER_FLOOR : s === Surface.Swamp ? SWAMP_FLOOR : 0;
   const ramps = map.ramps;
   for (let i = 0; i < ramps.length; i++) {
     const r = ramps[i];
@@ -219,8 +223,8 @@ export function groundY(map: CityMap, x: number, z: number): number {
     else if (r.dir === 1) t = (x - r.x0) / (r.x1 - r.x0);
     else if (r.dir === 2) t = (r.z1 - z) / (r.z1 - r.z0);
     else t = (r.x1 - x) / (r.x1 - r.x0);
-    const h = r.h * t;
-    if (h > y) y = h;
+    const h = r.h0 + (r.h - r.h0) * t;
+    if (h > y && h <= fromY + STEP_UP) y = h;
   }
   return y;
 }

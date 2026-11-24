@@ -1,9 +1,9 @@
 // Helpers for creating the game state and its pools. Pools are allocated once; entities are reused
 // by flipping `active`.
 
-import { MAX_CRITTERS, MAX_DRONES, MAX_PEDS, MAX_PICKUPS, MAX_SHOTS, MAX_VEHICLES, SAVE_VERSION, START_CLOCK, START_TOKENS } from './config';
+import { MAX_CRITTERS, MAX_DRONES, MAX_PEDS, MAX_PICKUPS, MAX_SHOTS, MAX_SMOKES, MAX_VEHICLES, SAVE_VERSION, START_CLOCK, START_TOKENS } from './config';
 import { GADGETS, GADGET_IDS, PLAYER_LOOK, VEHICLES } from './defs';
-import type { CityMap, Critter, Drone, GameState, Ped, Pickup, Player, Progress, Shot, Vehicle } from './types';
+import type { CityMap, Critter, Drone, GameState, Ped, Pickup, Player, Progress, Shot, Smoke, Vehicle } from './types';
 import { Surface } from './types';
 
 export function blankVehicle(id: number): Vehicle {
@@ -65,6 +65,8 @@ export function createState(map: CityMap, seed: number): GameState {
   for (let i = 0; i < MAX_DRONES; i++) drones.push(blankDrone(i));
   const critters: Critter[] = [];
   for (let i = 0; i < MAX_CRITTERS; i++) critters.push(blankCritter(i));
+  const smokes: Smoke[] = [];
+  for (let i = 0; i < MAX_SMOKES; i++) smokes.push({ active: false, x: 0, y: 0, z: 0, life: 0 });
   const shots: Shot[] = [];
   for (let i = 0; i < MAX_SHOTS; i++) shots.push(blankShot());
   const pickups: Pickup[] = [];
@@ -79,6 +81,7 @@ export function createState(map: CityMap, seed: number): GameState {
     peds,
     drones,
     critters,
+    smokes,
     shots,
     pickups,
     propsDown: new Uint8Array(map.props.length),

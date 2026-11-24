@@ -5,7 +5,7 @@
 // their dev harnesses and tests so they do not depend on the real generator in src/world. Also
 // exports the lane and sidewalk builders, which src/world may reuse.
 
-import { DISTRICT_CELL, LANE_WIDTH, ROADS, SURF_CELL } from './config';
+import { BRIDGE_H, DISTRICT_CELL, LANE_WIDTH, ROADS, SURF_CELL } from './config';
 import { DISTRICT_IDS } from './defs';
 import { finalizeCity, paintPath, paintRect } from './query';
 import { makeRng } from './rng';
@@ -174,12 +174,23 @@ export function fixtureCity(seed = 1): CityMap {
   addEdge(nodeId(2, lines - 1), outpost.id, 1, 'rural', 'Bayou Road', false);
 
   // ---- surface: road corridors (sidewalk under roadway), junctions
+  const props: Prop[] = [];
+  const ramps: Ramp[] = [];
   for (const e of edges) {
     const w = e.half + e.walk;
     if (e.axis === 0) {
       if (!e.bridge) paintS(e.x0, e.z0 - w, e.x1, e.z0 + w, Surface.Sidewalk);
       paintS(e.x0, e.z0 - e.half, e.x1, e.z0 + e.half, Surface.Road);
-      if (e.bridge) paintS(waterX0, e.z0 - w, waterX1, e.z0 + w, Surface.Bridge);
+      if (e.bridge) {
+        // a raised bridge: an approach ramp each side and a level deck over the canal, with rails
+        paintS(waterX0, e.z0 - w, waterX1, e.z0 + w, Surface.Bridge);
+        ramps.push({ x0: waterX0 - 22, z0: e.z0 - w, x1: waterX0, z1: e.z0 + w, dir: 1, h0: 0, h: BRIDGE_H, kind: 'bridge' });
+        ramps.push({ x0: waterX0, z0: e.z0 - w, x1: waterX1, z1: e.z0 + w, dir: 1, h0: BRIDGE_H, h: BRIDGE_H, kind: 'bridge' });
+        ramps.push({ x0: waterX1, z0: e.z0 - w, x1: waterX1 + 22, z1: e.z0 + w, dir: 3, h0: 0, h: BRIDGE_H, kind: 'bridge' });
+        for (const side of [1, -1]) {
+          props.push({ kind: 'barrier', x: (waterX0 + waterX1) / 2, y: BRIDGE_H, z: e.z0 + side * (w - 0.3), yaw: Math.PI / 2, scale: 1, seed: 0, w: 0.5, h: 1.1, d: waterX1 - waterX0 });
+        }
+      }
     } else {
       if (e.walk > 0) paintS(e.x0 - w, e.z0, e.x0 + w, e.z1, Surface.Sidewalk);
       paintS(e.x0 - e.half, e.z0, e.x0 + e.half, e.z1, Surface.Road);
@@ -190,9 +201,7 @@ export function fixtureCity(seed = 1): CityMap {
   // ---- city blocks, buildings, props
   const blocksOut: Block[] = [];
   const buildings: Building[] = [];
-  const props: Prop[] = [];
   const pois: Poi[] = [];
-  const ramps: Ramp[] = [];
   const prop = (kind: Prop['kind'], x: number, z: number, yaw = 0, extra: Partial<Prop> = {}) =>
     props.push({ kind, x, y: 0, z, yaw, scale: 1, seed: Math.floor(rng() * 1e6), ...extra });
   const mid = Math.floor(blocks / 2);
@@ -323,7 +332,7 @@ export function fixtureCity(seed = 1): CityMap {
   const sx = pos(1) + 24;
   const sz = pos(2) + ROADS.street.half + 1.5; // on the south sidewalk of row 2
   const kerb = pos(2) + ROADS.street.half - 1.1; // the parking strip, eastbound side
-  ramps.push({ x0: pos(mid) - 4, z0: pos(2) + 30, x1: pos(mid) + 4, z1: pos(2) + 46, dir: 0, h: 3.5 });
+  ramps.push({ x0: pos(mid) - 4, z0: pos(2) + 30, x1: pos(mid) + 4, z1: pos(2) + 46, dir: 0, h0: 0, h: 3.5, kind: 'stunt' });
   prop('barrier', waterX0 - 2, pos(1) + 64, 0, { w: 0.8, h: 1, d: 60 });
   prop('container', pos(0) + 26, pos(0) + 26, 0, { w: 2.6, h: 2.6, d: 12 });
   prop('billboard', pos(2) + 30, pos(0) + 22, 0, { w: 14, h: 12, d: 0.6 });

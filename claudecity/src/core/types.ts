@@ -81,7 +81,7 @@ export enum Surface {
   Water = 5,
   Sand = 6,
   Lot = 7, // paved private yard around buildings (concrete)
-  Bridge = 8, // road deck over water: solid, drawn as a bridge
+  Bridge = 8, // deep water with a raised bridge deck over it (see Ramp): boats pass underneath
   Dirt = 9, // dirt trail or track
   Forest = 10, // forest floor: undergrowth, roots, slow going for cars
   Swamp = 11, // shallow water and mud: wade, drive a truck or take a boat through it
@@ -279,7 +279,11 @@ export interface Prop {
   d?: number;
 }
 
-/** A stunt ramp: a wedge you can drive up. Open at the sides and the top. */
+/**
+ * A raised driving surface: a stunt ramp (a wedge from 0 up to h), or one piece of a bridge (an
+ * approach from h0 up to h, or a level deck where h0 = h). Open at the sides: drive off and you fall.
+ * Boats and anything else low enough pass underneath a deck.
+ */
 export interface Ramp {
   x0: number;
   z0: number;
@@ -287,8 +291,10 @@ export interface Ramp {
   z1: number;
   /** Uphill direction: 0 +z, 1 +x, 2 -z, 3 -x. */
   dir: 0 | 1 | 2 | 3;
-  /** Height at the top edge. */
+  /** Height at the low edge (0 for a stunt ramp) and at the high edge. */
+  h0: number;
   h: number;
+  kind: 'stunt' | 'bridge';
 }
 
 export type PoiKind = 'safehouse' | 'garage' | 'chopshop' | 'job' | 'landmark' | 'stunt' | 'spark' | 'vehicle' | 'dock' | 'checkpoint' | 'outpost' | 'viewpoint' | 'race';
@@ -580,6 +586,16 @@ export interface Critter {
   tz: number;
 }
 
+/** A smoke screen left by the smoke gadget: nobody sees through it. */
+export interface Smoke {
+  active: boolean;
+  x: number;
+  y: number;
+  z: number;
+  /** Seconds left. */
+  life: number;
+}
+
 export type ShotKind = 'pulse' | 'stun';
 
 export interface Shot {
@@ -692,6 +708,7 @@ export interface GameState {
   peds: Ped[];
   drones: Drone[];
   critters: Critter[];
+  smokes: Smoke[];
   shots: Shot[];
   pickups: Pickup[];
   /** One byte per CityMap.props entry: 0 standing, 1 knocked over. */

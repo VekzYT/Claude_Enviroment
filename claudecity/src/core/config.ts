@@ -20,6 +20,10 @@ export const WATER_Y = -0.35;
 /** The bed of deep water (things that leave the land sink to it) and of the shallow swamp. */
 export const WATER_FLOOR = -5;
 export const SWAMP_FLOOR = -0.8;
+/** Height of a bridge deck above the land (boats pass under it). */
+export const BRIDGE_H = 3.2;
+/** A raised surface counts as ground only if it is no higher than this above where you are. */
+export const STEP_UP = 0.75;
 
 export interface RoadSpec {
   /** Lanes per direction. */
@@ -57,6 +61,7 @@ export const MAX_DRONES = 12;
 export const MAX_CRITTERS = 20;
 export const MAX_SHOTS = 24;
 export const MAX_PICKUPS = 96;
+export const MAX_SMOKES = 4;
 
 // ---------- the player on foot ----------
 export const GRAVITY = 24;

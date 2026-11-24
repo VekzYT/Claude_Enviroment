@@ -121,7 +121,7 @@ export const SURFACES: Record<Surface, SurfaceDef> = {
   [Surface.Water]: { paved: false, grip: 0.4, drag: 1, water: 2, walk: 0.4 },
   [Surface.Sand]: { paved: false, grip: 0.6, drag: 0.5, water: 0, walk: 0.85 },
   [Surface.Lot]: { paved: true, grip: 1, drag: 0, water: 0, walk: 1 },
-  [Surface.Bridge]: { paved: true, grip: 1, drag: 0, water: 0, walk: 1 },
+  [Surface.Bridge]: { paved: false, grip: 0.4, drag: 1, water: 2, walk: 0.4 },
   [Surface.Dirt]: { paved: false, grip: 0.8, drag: 0.1, water: 0, walk: 1 },
   [Surface.Forest]: { paved: false, grip: 0.65, drag: 0.45, water: 0, walk: 0.9 },
   [Surface.Swamp]: { paved: false, grip: 0.5, drag: 0.8, water: 1, walk: 0.55 },
