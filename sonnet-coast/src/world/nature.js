@@ -48,9 +48,9 @@ function palmGeo() {
 
 function pineGeo() {
   const b = new Batch();
-  b.add(new THREE.CylinderGeometry(0.32, 0.55, 7, 6), 0x3b2a22, 0, 3.5, 0);
+  b.add(new THREE.CylinderGeometry(0.32, 0.55, 7, 5, 1, true), 0x3b2a22, 0, 3.5, 0);
   const cols = [0x0f3d33, 0x13493a, 0x186045];
-  for (let i = 0; i < 4; i++) b.add(new THREE.ConeGeometry(4.4 - i * 0.85, 5.6, 7), cols[i % 3], 0, 6.5 + i * 3.1, 0, 0, i * 0.5, 0);
+  for (let i = 0; i < 3; i++) b.add(new THREE.ConeGeometry(4.5 - i * 1.15, 6.6, 6, 1, i > 0), cols[i % 3], 0, 6.9 + i * 3.9, 0, 0, i * 0.5, 0);
   return b.merged();
 }
 function pineGlowGeo() {
@@ -171,17 +171,22 @@ export function buildNature(scene, env, quality) {
   const sh = quality === 'high';
   const palms = new ChunkedInstances(palmGeo(), leafMat, { shadow: sh, chunk: 250, maxDist: 900 });
   const pines = new ChunkedInstances(pineGeo(), solidMat, { shadow: sh, maxDist: 1250 });
-  const gl = { maxDist: 520 };
-  const pineGlow = [new ChunkedInstances(pineGlowGeo(), glowMat(PAL.neonCyan), gl), new ChunkedInstances(pineGlowGeo(), glowMat(PAL.neonMagenta), gl), new ChunkedInstances(pineGlowGeo(), glowMat(PAL.neonLime), gl)];
+  const gl = { maxDist: 520, colors: true };
+  const glowCols = [PAL.neonCyan, PAL.neonMagenta, PAL.neonLime, 0x7dffb0, 0x35e0c8, 0xb46bff].map((h) => new THREE.Color(h));
+  const white = () => { const m = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }); for (const ch of ['r', 'g', 'b']) env.nightLerp(m.color, ch, 0.75, 2.6); return m; };
+  const pineGlowAll = new ChunkedInstances(pineGlowGeo(), white(), gl);
+  const pineGlow = [0, 1, 2].map((k) => ({ add: (m) => pineGlowAll.add(m, glowCols[k]) }));
   const broad = new ChunkedInstances(broadleafGeo(), solidMat, { shadow: sh, chunk: 250, maxDist: 800 });
   const cypress = new ChunkedInstances(cypressGeo(), leafMat, { shadow: sh, maxDist: 950 });
   const mangrove = new ChunkedInstances(mangroveGeo(), leafMat, { shadow: false, maxDist: 600 });
   const mg = mushroomGeo();
   const near = { chunk: 200, maxDist: 260 };
   const stems = new ChunkedInstances(mg.stems, solidMat, near);
-  const caps = [new ChunkedInstances(mg.caps, glowMat(PAL.neonCyan), gl), new ChunkedInstances(mg.caps, glowMat(PAL.neonMagenta), gl), new ChunkedInstances(mg.caps, glowMat(0x7dffb0), gl)];
-  const fernMatBase = (hex) => { const m = glowMat(hex); m.side = THREE.DoubleSide; return m; };
-  const ferns = [new ChunkedInstances(glowFernGeo(), fernMatBase(0x35e0c8), gl), new ChunkedInstances(glowFernGeo(), fernMatBase(0xb46bff), gl)];
+  const capsAll = new ChunkedInstances(mg.caps, white(), gl);
+  const caps = [0, 1, 3].map((k) => ({ add: (m) => capsAll.add(m, glowCols[k]) }));
+  const fernMat = white(); fernMat.side = THREE.DoubleSide;
+  const fernsAll = new ChunkedInstances(glowFernGeo(), fernMat, gl);
+  const ferns = [4, 5].map((k) => ({ add: (m) => fernsAll.add(m, glowCols[k]) }));
   const reeds = new ChunkedInstances(reedGeo(), leafMat, near);
   const rocks = new ChunkedInstances(rockGeo(), solidMat, { shadow: sh, maxDist: 500 });
   const umbrellas = new ChunkedInstances(umbrellaGeo(), leafMat, { chunk: 200, maxDist: 380 });
@@ -304,7 +309,7 @@ export function buildNature(scene, env, quality) {
     placePalm(CITY.promenade.x0 + 3.5, z + rng.float(-2, 2), GY, true);
   }
 
-  for (const ci of [palms, pines, ...pineGlow, broad, cypress, mangrove, stems, ...caps, ...ferns, reeds, rocks, umbrellas, lilies]) ci.build(group);
+  for (const ci of [palms, pines, pineGlowAll, broad, cypress, mangrove, stems, capsAll, fernsAll, reeds, rocks, umbrellas, lilies]) ci.build(group);
 
   // ---- Fireflies (GPU-wrapped point field following the camera) -------------
   const N = quality === 'low' ? 250 : 700;

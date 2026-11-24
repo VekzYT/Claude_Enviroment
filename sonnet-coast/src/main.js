@@ -20,7 +20,7 @@ async function boot() {
   const hadSave = hasSave();
   G.save = loadSave();
   if (G.save.settings) Object.assign(G.settings, G.save.settings);
-  if (params.get('q')) G.settings.quality = params.get('q');
+  if (params.get('q')) { G.settings.quality = params.get('q'); G.settings.qualityChosen = true; }
 
   const R = createRenderer(canvas);
   Input.init(canvas);
@@ -69,6 +69,7 @@ async function boot() {
     G.menus.pause();
   };
 
+  G.hooks = { applySettings };
   G.audio = new AudioSystem();
   G.radio = new Radio(G.audio);
   G.menus = new Menus(ui, { resume, startNew: () => start(true), startContinue: () => start(false), applySettings, quit: () => location.reload() });

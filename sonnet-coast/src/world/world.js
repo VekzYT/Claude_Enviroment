@@ -1,4 +1,5 @@
 // Builds the whole world and exposes per-frame updates.
+import { G } from '../state.js';
 import { Environment } from './env.js';
 import { installCityLighting } from './citylight.js';
 import { buildTerrain } from './terrainMesh.js';
@@ -10,6 +11,7 @@ import { buildNature } from './nature.js';
 import { buildProps } from './props.js';
 import { updateBreakables } from './breakables.js';
 import { cullChunks } from './geom.js';
+import { buildWildlife } from './wildlife.js';
 
 export async function buildWorld(scene, renderer, quality, progress) {
   const step = async (label, frac, fn) => {
@@ -27,12 +29,13 @@ export async function buildWorld(scene, renderer, quality, progress) {
   const landmarks = await step('Wiring up data centres', 0.62, () => buildLandmarks(scene, env));
   const nature = await step('Growing the Glowwood', 0.7, () => buildNature(scene, env, quality));
   const props = await step('Switching on the street lights', 0.88, () => buildProps(scene, env, quality));
+  const wildlife = buildWildlife(scene, env);
   env.apply(0);
   env.refreshEnvMap();
   let cullTimer = 0;
-  const drawScale = { low: 0.6, medium: 0.85, high: 1 };
+  const drawScale = { low: 0.55, medium: 0.85, high: 1 };
   return {
-    env, city, nature, water, props, roads, landmarks, terrain,
+    env, city, nature, water, props, roads, landmarks, terrain, wildlife,
     quality,
     update(dt, t, focus) {
       cullTimer -= dt;
@@ -46,6 +49,7 @@ export async function buildWorld(scene, renderer, quality, progress) {
       landmarks.update(dt, t);
       nature.update(dt, t, focus);
       props.update(dt, t);
+      if (G.player) wildlife.update(dt, t);
       updateBreakables(dt);
     },
   };

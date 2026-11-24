@@ -62,22 +62,9 @@ class PursuitDriver {
     }
     const onFoot = !pl.vehicle;
     const los = known && d < 110 && !segmentBlocked(v.pos.x, v.pos.z, pp.x, pp.z, v.pos.y + 1.2);
-    const targetRoad = roadAt(tx, tz, 30);
-    const direct = (los && d < 110) || d < 28 || !targetRoad || u.offroad && !roadAt(v.pos.x, v.pos.z, 30);
-    if (direct) {
-      this.path = null;
-      if (known && !onFoot) {
-        const lead = clamp(d / 34, 0, 1.1);
-        tx += pl.vehicle.vel.x * lead; tz += pl.vehicle.vel.z * lead;
-      }
-      let want = v.T.maxSpeed;
-      if (known && onFoot) {
-        want = d < 9 ? 0 : Math.min(want, 6 + d * 0.5);
-      } else if (known && PS.stars <= 1 && d < 16) want = Math.min(want, pl.worldSpeed + 3); // one star: tail, do not ram
-      if (want <= 0.1) stopVehicle(v);
-      else driveToward(v, tx, tz, want, dt, { avoid: true, allowReverse: true, noWater: true });
-    } else {
-      // route along the road graph
+    let direct = los || d < 28;
+    if (!direct) {
+      // Out of sight: route along the road graph, then go straight for the last stretch.
       this.pathT -= dt;
       if (!this.path || this.pathT <= 0) {
         this.pathT = 2.2 + Math.random();
@@ -85,17 +72,35 @@ class PursuitDriver {
         const to = nearestNode(tx, tz);
         const route = findPath(from, to, u.offroad);
         this.path = route ? route.map((s) => (s.forward ? s.e.b : s.e.a)) : [];
-        if (Math.hypot(from.x - v.pos.x, from.z - v.pos.z) > 16) this.path.unshift(from);
+        if (Math.hypot(from.x - v.pos.x, from.z - v.pos.z) > 16 && from !== to) this.path.unshift(from);
+        // skip the first node if it is behind us and the second is closer to where we are going
+        if (this.path.length > 1) {
+          const a = this.path[0], b = this.path[1];
+          const ax = a.x - v.pos.x, az = a.z - v.pos.z, bx = b.x - a.x, bz = b.z - a.z;
+          if (ax * bx + az * bz < 0 && Math.hypot(b.x - v.pos.x, b.z - v.pos.z) < Math.hypot(bx, bz)) this.path.shift();
+        }
       }
       while (this.path.length && Math.hypot(this.path[0].x - v.pos.x, this.path[0].z - v.pos.z) < 15) this.path.shift();
-      if (this.path.length) { tx = this.path[0].x; tz = this.path[0].z; }
-      driveToward(v, tx, tz, Math.min(v.T.maxSpeed, 34), dt, { avoid: true, allowReverse: true, noWater: true });
+      if (this.path.length) {
+        driveToward(v, this.path[0].x, this.path[0].z, Math.min(v.T.maxSpeed, 34), dt, { avoid: true, allowReverse: true, noWater: true });
+      } else direct = true;
+    } else this.path = null;
+    if (direct) {
+      if (known && !onFoot) {
+        const lead = clamp(d / 34, 0, 1.1);
+        tx += pl.vehicle.vel.x * lead; tz += pl.vehicle.vel.z * lead;
+      }
+      let want = v.T.maxSpeed;
+      if (known && onFoot) want = d < 9 ? 0 : Math.min(want, 6 + d * 0.5);
+      else if (known && PS.stars <= 1 && d < 16) want = Math.min(want, pl.worldSpeed + 3); // one star: tail, do not ram
+      if (want <= 0.1) stopVehicle(v);
+      else driveToward(v, tx, tz, want, dt, { avoid: true, allowReverse: true, noWater: true });
     }
     // passenger opens fire at three stars and up
     if (PS.stars >= 3 && known && los && d < 55 && !v.destroyed) {
       this.shootT -= dt;
       if (this.shootT <= 0) {
-        this.shootT = rand(1.0, 1.9);
+        this.shootT = rand(1.7, 3.0);
         const lead = d / 75;
         const pv = pl.vehicle ? pl.vehicle.vel : pl.vel;
         G.weapons.fireBolt(v.pos.x, v.pos.y + v.T.hgt * 0.8, v.pos.z, pp.x + pv.x * lead, pp.y + 1.0, pp.z + pv.z * lead, 7, 0.72);

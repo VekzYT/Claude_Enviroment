@@ -8,9 +8,10 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { G } from './state.js';
 
 export const QUALITY = {
-  low: { pixelRatio: 0.75, shadows: false, post: false, samples: 0, far: 1400, fogFar: 1150, cityLights: false, shadowMap: 1024 },
-  medium: { pixelRatio: 1, shadows: true, post: true, samples: 2, far: 2000, fogFar: 1700, cityLights: true, shadowMap: 1536 },
-  high: { pixelRatio: 1.5, shadows: true, post: true, samples: 4, far: 2700, fogFar: 2200, cityLights: true, shadowMap: 2048 },
+  // maxRatio caps the device pixel ratio; scale shrinks the internal resolution below native
+  low: { maxRatio: 1, scale: 0.8, shadows: false, post: false, samples: 0, far: 1400, fogFar: 1150, cityLights: false, shadowMap: 1024 },
+  medium: { maxRatio: 1.25, scale: 1, shadows: true, post: true, samples: 2, far: 2000, fogFar: 1700, cityLights: true, shadowMap: 1536 },
+  high: { maxRatio: 1.75, scale: 1, shadows: true, post: true, samples: 4, far: 2700, fogFar: 2200, cityLights: true, shadowMap: 2048 },
 };
 
 // Final grade: speed blur, chromatic fringe, split-tone, vignette. Runs in linear HDR.
@@ -78,8 +79,7 @@ export function createRenderer(canvas) {
   R.applyQuality = () => {
     const q = QUALITY[G.settings.quality] || QUALITY.medium;
     R.q = q;
-    const pr = Math.min(window.devicePixelRatio || 1, 2) * q.pixelRatio;
-    renderer.setPixelRatio(Math.max(0.5, Math.min(pr, 2)));
+    renderer.setPixelRatio(Math.max(0.5, Math.min(window.devicePixelRatio || 1, q.maxRatio) * q.scale));
     renderer.shadowMap.enabled = q.shadows;
     if (G.env) {
       G.env.sun.castShadow = q.shadows;

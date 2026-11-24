@@ -321,7 +321,7 @@ export class Weapons {
       if (pl.alive) {
         if (pl.vehicle) {
           const t = rayVehicle(pl.vehicle, b.pos.x, b.pos.y, b.pos.z, dx, dy, dz, step);
-          if (t < step) { pl.vehicle.damage(b.dmg * 0.7, 'police'); pl.hurt(b.dmg * 0.25, 'shot'); hit = true; G.fx.sparks(b.pos.x, b.pos.y, b.pos.z, 6, 0, 0, [0.4, 0.7, 1]); }
+          if (t < step) { pl.vehicle.damage(b.dmg * 0.4, 'police'); pl.hurt(b.dmg * 0.15, 'shot'); hit = true; G.fx.sparks(b.pos.x, b.pos.y, b.pos.z, 6, 0, 0, [0.4, 0.7, 1]); }
         } else {
           const px = pl.pos.x - b.pos.x, py = pl.pos.y + 1.0 - b.pos.y, pz = pl.pos.z - b.pos.z;
           const along = px * dx + py * dy + pz * dz;

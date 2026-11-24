@@ -42,6 +42,7 @@ export class Game {
     this.alarmT = 0;
     this.timeScale = 1;
     this.introT = 0;
+    this.perf = { t: 0, frames: 0, settle: 3 };
     this.wire();
     this.applySave();
     const car = new Vehicle('sport', POI.safehouse.x + 8, POI.safehouse.z - 9.5, Math.PI / 2, { paint: 0xff7a59 });
@@ -235,9 +236,27 @@ export class Game {
       if (this.respawnT < 0.8) G.menus.fadeTo(true);
       if (this.respawnT <= 0) this.respawn();
     }
+    this.autoQuality(rawDt);
     if (this.introT > 0) { this.introT -= rawDt; if (this.introT <= 0 && !G.missions.active) G.missions.begin(G.missions.jobById('intro')); }
     this.saveT -= rawDt;
     if (this.saveT <= 0) { this.saveT = 60; if (!G.missions.active && pl.alive) writeSave(); }
+  }
+
+  // If nobody chose a preset and the machine is struggling, step the quality down once or twice.
+  autoQuality(dt) {
+    const P = this.perf;
+    if (!P || G.settings.qualityChosen || G.settings.quality === 'low') return;
+    if (P.settle > 0) { P.settle -= dt; return; }
+    P.t += dt; P.frames++;
+    if (P.t < 4) return;
+    const fps = P.frames / P.t;
+    P.t = 0; P.frames = 0;
+    if (fps < 34) {
+      G.settings.quality = G.settings.quality === 'high' ? 'medium' : 'low';
+      G.hooks.applySettings(true);
+      G.hud.toast(`Graphics set to ${G.settings.quality} to keep the frame rate up (change it in Settings)`);
+      P.settle = 4;
+    } else this.perf = null;
   }
 
   // Slow orbit of the skyline behind the title screen.

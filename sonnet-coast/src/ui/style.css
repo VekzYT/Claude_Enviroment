@@ -165,3 +165,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 4px 0 
 .list { display: flex; flex-direction: column; gap: 6px; }
 .miss { display: flex; justify-content: space-between; gap: 14px; padding: 8px 12px; border-radius: 4px; background: rgba(240,232,216,.05); font-size: 13.5px; }
 .miss.done { opacity: .6; } .miss b { color: var(--lime); }
+
+/* smaller windows: shrink the HUD rather than let it crowd the view */
+@media (max-height: 820px), (max-width: 1280px) { #hud { zoom: 0.85; } }
+@media (max-height: 640px), (max-width: 1000px) { #hud { zoom: 0.68; } .panel { zoom: 0.85; } }

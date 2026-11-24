@@ -21,6 +21,7 @@ export const G = {
   env: null,
   settings: {
     quality: 'high', // low | medium | high
+    qualityChosen: false, // true once the player picks a preset; stops the automatic fallback
     sensitivity: 1,
     invertY: false,
     volume: 0.8,

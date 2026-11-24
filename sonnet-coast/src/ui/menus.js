@@ -115,7 +115,7 @@ export class Menus {
       <button class="btn" id="back" style="margin-top:18px">BACK</button></div>`);
     this.kind = 'sub'; this.back = back;
     d.querySelectorAll('#q button').forEach((b) => b.addEventListener('click', () => {
-      s.quality = b.dataset.q;
+      s.quality = b.dataset.q; s.qualityChosen = true;
       d.querySelectorAll('#q button').forEach((x) => x.classList.toggle('on', x === b));
       this.hooks.applySettings(true); this.ui('uiSelect');
     }));
