@@ -3,11 +3,11 @@
 import type { RoadClass } from './types';
 
 export const SAVE_VERSION = 1;
-export const SAVE_SLOT = 'claudecity';
+export const SAVE_SLOT = 'sonnetcoast';
 
-// ---------- the city ----------
-/** Side of the full city in metres. */
-export const CITY_SIZE = 2048;
+// ---------- the map ----------
+/** Side of the whole map (Sonnet Coast: the city and the wilderness around it) in metres. */
+export const MAP_SIZE = 4096;
 /** Cell size of CityMap.surface. */
 export const SURF_CELL = 2;
 /** Cell size of CityMap.district. */
@@ -15,9 +15,11 @@ export const DISTRICT_CELL = 16;
 /** Cell size of the collider / prop / lane grids. */
 export const GRID_CELL = 32;
 export const LANE_WIDTH = 4;
-/** Height of the water surface, and of the bed things fall to. Land and bridges are at y = 0. */
-export const WATER_Y = -1.2;
-export const WATER_FLOOR = -6;
+/** Land, roads, bridges and boardwalks are at y = 0. The water surface is just below, everywhere. */
+export const WATER_Y = -0.35;
+/** The bed of deep water (things that leave the land sink to it) and of the shallow swamp. */
+export const WATER_FLOOR = -5;
+export const SWAMP_FLOOR = -0.8;
 
 export interface RoadSpec {
   /** Lanes per direction. */
@@ -35,6 +37,8 @@ export const ROADS: Record<RoadClass, RoadSpec> = {
   street: { lanes: 1, half: 6, walk: 3, speed: 14, median: 0 },
   avenue: { lanes: 2, half: 10, walk: 4, speed: 20, median: 0 },
   expressway: { lanes: 3, half: 14, walk: 0, speed: 34, median: 1 },
+  /** Two-lane country road through the wilderness: no parking strip, no sidewalk. */
+  rural: { lanes: 1, half: 4.5, walk: 0, speed: 24, median: 0 },
 };
 
 // ---------- time ----------
@@ -50,6 +54,7 @@ export const START_CLOCK = 0.68;
 export const MAX_VEHICLES = 40;
 export const MAX_PEDS = 48;
 export const MAX_DRONES = 12;
+export const MAX_CRITTERS = 20;
 export const MAX_SHOTS = 24;
 export const MAX_PICKUPS = 96;
 
@@ -72,11 +77,18 @@ export const PULSE_COOLDOWN = 0.45;
 /** Seconds a vehicle / drone / bot stays disabled when hit. */
 export const PULSE_STUN = 4;
 
-// ---------- heat ----------
+/** Seconds it takes to pull a driver out, and to break into a locked parked vehicle. */
+export const JACK_TIME = 1.1;
+export const BREAK_IN_TIME = 1.6;
+
+// ---------- the Safety Flag level (heat) ----------
 export const MAX_HEAT = 5;
-/** Seconds out of sight before heat starts to drain, and per level drained after that. */
+/** Seconds out of sight before the level starts to drain, and per flag drained after that. */
 export const HEAT_HIDE_DELAY = 6;
 export const HEAT_COOL_PER_LEVEL = 9;
+/** How far and how wide a police unit sees (the cone drawn on the minimap). */
+export const POLICE_VIEW_RANGE = 75;
+export const POLICE_VIEW_HALF_ANGLE = 0.6;
 
 // ---------- money ----------
-export const START_CREDITS = 500;
+export const START_TOKENS = 500;

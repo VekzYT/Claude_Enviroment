@@ -24,7 +24,7 @@ export interface ControlsSource {
 export function blankControls(): Controls {
   return {
     scheme: 'kbm', moveX: 0, moveY: 0, lookX: 0, lookY: 0, gas: 0, brake: 0, handbrake: false, boost: false, jump: false,
-    enter: false, fire: false, interact: false, horn: false, camera: false, lookBack: false, map: false, pause: false, camYaw: 0,
+    enter: false, fire: false, gadgetNext: false, radio: false, interact: false, horn: false, camera: false, lookBack: false, wheel: false, map: false, pause: false, camYaw: 0,
   };
 }
 

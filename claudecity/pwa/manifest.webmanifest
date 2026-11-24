@@ -1,7 +1,7 @@
 {
-  "name": "Claude City",
-  "short_name": "Claude City",
-  "description": "An open-world driving game in a warm, futuristic city.",
+  "name": "Sonnet Coast",
+  "short_name": "Sonnet Coast",
+  "description": "An open-world action game on a futuristic coast.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

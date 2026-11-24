@@ -2,7 +2,7 @@
 // hit anything. Also finalizeCity, which turns a CityDraft from src/world into the CityMap the game
 // uses (derived colliders and lookup grids). All of it is allocation-free after finalizeCity.
 
-import { DISTRICT_CELL, GRID_CELL, SURF_CELL, WATER_FLOOR } from './config';
+import { DISTRICT_CELL, GRID_CELL, SURF_CELL, SWAMP_FLOOR, WATER_FLOOR } from './config';
 import { DISTRICT_IDS, PROPS } from './defs';
 import type { CityDraft, CityMap, Collider, DistrictId, Prop, RayHit, SpatialGrid } from './types';
 import { Surface } from './types';
@@ -143,6 +143,41 @@ export function paintRect(raster: Uint8Array, n: number, cell: number, x0: numbe
   for (let cz = cz0; cz < cz1; cz++) raster.fill(value, cz * n + cx0, cz * n + cx1);
 }
 
+/**
+ * Paint a path of the given width along a polyline (x0, z0, x1, z1, ...) into a raster. `keep`, when
+ * given, lists cell values that must not be overwritten (e.g. roads and water under a dirt trail).
+ */
+export function paintPath(raster: Uint8Array, n: number, cell: number, pts: number[], width: number, value: number, keep?: readonly number[]): void {
+  const r = width / 2;
+  for (let i = 0; i + 3 < pts.length; i += 2) {
+    const ax = pts[i];
+    const az = pts[i + 1];
+    const bx = pts[i + 2];
+    const bz = pts[i + 3];
+    const cx0 = Math.max(0, Math.floor((Math.min(ax, bx) - r) / cell));
+    const cz0 = Math.max(0, Math.floor((Math.min(az, bz) - r) / cell));
+    const cx1 = Math.min(n - 1, Math.floor((Math.max(ax, bx) + r) / cell));
+    const cz1 = Math.min(n - 1, Math.floor((Math.max(az, bz) + r) / cell));
+    const dx = bx - ax;
+    const dz = bz - az;
+    const len2 = dx * dx + dz * dz;
+    for (let cz = cz0; cz <= cz1; cz++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        const px = (cx + 0.5) * cell;
+        const pz = (cz + 0.5) * cell;
+        let t = len2 > 0 ? ((px - ax) * dx + (pz - az) * dz) / len2 : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const ex = ax + dx * t - px;
+        const ez = az + dz * t - pz;
+        if (ex * ex + ez * ez > r * r) continue;
+        const k = cz * n + cx;
+        if (keep && keep.includes(raster[k])) continue;
+        raster[k] = value;
+      }
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Point queries
 // ---------------------------------------------------------------------------------------------
@@ -168,11 +203,13 @@ export function districtAt(map: CityMap, x: number, z: number): DistrictId {
 }
 
 /**
- * Height of the solid ground at a point: 0 on land and bridges, up a ramp where there is one, and
- * WATER_FLOOR under water (so things that leave the land fall in).
+ * Height of the solid ground at a point: 0 on land, bridges and boardwalks, up a ramp where there is
+ * one, SWAMP_FLOOR in the shallows and WATER_FLOOR under deep water (so things that leave the land
+ * fall in). The water surface itself is at WATER_Y everywhere.
  */
 export function groundY(map: CityMap, x: number, z: number): number {
-  let y = surfaceAt(map, x, z) === Surface.Water ? WATER_FLOOR : 0;
+  const s = surfaceAt(map, x, z);
+  let y = s === Surface.Water ? WATER_FLOOR : s === Surface.Swamp ? SWAMP_FLOOR : 0;
   const ramps = map.ramps;
   for (let i = 0; i < ramps.length; i++) {
     const r = ramps[i];

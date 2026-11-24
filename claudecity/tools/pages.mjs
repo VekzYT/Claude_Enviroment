@@ -40,7 +40,7 @@ const headTags = [
   '<meta name="apple-mobile-web-app-capable" content="yes">',
   '<meta name="mobile-web-app-capable" content="yes">',
   '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">',
-  '<meta name="apple-mobile-web-app-title" content="Claude City">',
+  '<meta name="apple-mobile-web-app-title" content="Sonnet Coast">',
   '<meta name="theme-color" content="#141413">',
   '<link rel="apple-touch-startup-image" href="launch-landscape.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">',
 ].join('\n');

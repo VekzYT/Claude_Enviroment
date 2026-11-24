@@ -244,7 +244,7 @@ export function createPlatform(env: PlatformEnv): Platform {
           if (localOk) {
             // The browser copy is now the newest one; loadSave prefers it until the app has it.
             writeLocal(key + PENDING_SUFFIX, '1');
-            console.warn('Claude City: saving to the app failed, kept a browser copy:', err);
+            console.warn('Sonnet Coast: saving to the app failed, kept a browser copy:', err);
             return;
           }
           throw new Error(`Could not save the city: ${err instanceof Error ? err.message : String(err)}`);
@@ -273,7 +273,7 @@ export function createPlatform(env: PlatformEnv): Platform {
         const v = await post(h, { op: 'load', slot: s }, timeoutMs);
         if (typeof v === 'string' && v.length > 0) return v;
       } catch (err) {
-        console.warn('Claude City: loading from the app failed, using the browser copy:', err);
+        console.warn('Sonnet Coast: loading from the app failed, using the browser copy:', err);
       }
       return local;
     },
@@ -289,7 +289,7 @@ export function createPlatform(env: PlatformEnv): Platform {
         await post(h, { op: 'delete', slot: s }, timeoutMs);
       } catch (err) {
         // The next save to this slot overwrites the file anyway.
-        console.warn('Claude City: deleting the save in the app failed:', err);
+        console.warn('Sonnet Coast: deleting the save in the app failed:', err);
       }
     },
 

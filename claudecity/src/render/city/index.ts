@@ -1,5 +1,7 @@
-// OWNER: city-render. Draws the city that never moves: ground, roads, water, buildings, props,
-// landmarks. Lives inside the scene that src/render sets up and follows its lighting (RenderEnv).
+// OWNER: city-render. Draws the built world that never moves: roads, junctions, sidewalks, plazas and
+// lots, bridges and boardwalks, ramps, buildings, landmarks, and every prop that is not `nature`.
+// The soft ground, the water and the vegetation are src/render/terrain. Lives inside the scene that
+// src/render sets up and follows its lighting (RenderEnv).
 import * as THREE from 'three';
 import type { CityMap, GameState, Quality, RenderEnv } from '../../core/types';
 
@@ -8,23 +10,20 @@ export interface CityView {
   readonly object: THREE.Object3D;
   /**
    * Once per frame: cull and swap detail for the camera, follow the lighting (window glow, lamps,
-   * wet streets), animate water and signs, and show knocked-over props from game.propsDown.
+   * wet streets), animate signs, and show knocked-over props from game.propsDown.
    */
   update(dt: number, camera: THREE.PerspectiveCamera, env: RenderEnv, game: GameState | null): void;
   setQuality(quality: Quality): void;
-  /** A top-down picture of the whole city, `size` pixels square, north up (for the minimap and map). */
+  /** A top-down picture of the whole map (city and wilderness, roads, trails, water), `size` pixels
+   *  square, north up (for the minimap and the map screen). */
   minimap(size: number): HTMLCanvasElement;
   dispose(): void;
 }
 
-/** PLACEHOLDER: a flat ground and a grey box per building part. */
+/** PLACEHOLDER: a grey box per building part. */
 export function createCityView(map: CityMap, quality: Quality): CityView {
   void quality;
   const object = new THREE.Group();
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(map.size, map.size), new THREE.MeshLambertMaterial({ color: 0x4a4f55 }));
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.set(map.size / 2, 0, map.size / 2);
-  object.add(ground);
   let count = 0;
   for (const b of map.buildings) count += b.parts.length;
   const boxes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xd8d4c8 }), Math.max(1, count));

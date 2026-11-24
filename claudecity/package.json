@@ -2,7 +2,7 @@
   "name": "claudecity",
   "version": "0.1.0",
   "private": true,
-  "description": "Claude City - an open-world driving game for phone and PC",
+  "description": "Sonnet Coast - an open-world action game for phone and PC",
   "type": "module",
   "scripts": {
     "build": "node tools/build.mjs",

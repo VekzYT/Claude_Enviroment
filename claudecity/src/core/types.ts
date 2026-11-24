@@ -1,4 +1,5 @@
-// Shared types for Claude City. Every module reads these; only the architect edits this file.
+// Shared types for Sonnet Coast. Every module reads these; only the architect edits this file.
+// ("City" in type names means the whole map: the city and the wilderness around it.)
 // Units: metres, seconds, radians. Axes: x east, y up, z south. The world is [0, size] x [0, size].
 // Heading ("yaw") is a rotation about +y, the same value three.js takes as rotation.y:
 //   forward = (sin yaw, 0, cos yaw)      yaw 0 faces +z (south), yaw PI/2 faces +x (east)
@@ -54,17 +55,25 @@ export type SfxId =
   | 'step'
   | 'jump'
   | 'propBreak'
-  | 'dialog';
+  | 'dialog'
+  | 'jack'
+  | 'alarm'
+  | 'emp'
+  | 'smoke'
+  | 'repair'
+  | 'radio'
+  | 'flagUp'
+  | 'flagClear';
 
 // ---------------------------------------------------------------------------------------------
 // The city (static, generated once from a seed by src/world)
 // ---------------------------------------------------------------------------------------------
 
-export type DistrictId = 'core' | 'strip' | 'heights' | 'harbor' | 'park' | 'market';
+export type DistrictId = 'core' | 'strip' | 'heights' | 'harbor' | 'park' | 'market' | 'bayou' | 'forest' | 'coast';
 
 /** What the ground is at a point. Stored one byte per cell in CityMap.surface. */
 export enum Surface {
-  Ground = 0, // bare earth / rough grass outside blocks
+  Ground = 0, // wild grass and scrub
   Road = 1,
   Sidewalk = 2,
   Plaza = 3, // paved public square
@@ -73,9 +82,13 @@ export enum Surface {
   Sand = 6,
   Lot = 7, // paved private yard around buildings (concrete)
   Bridge = 8, // road deck over water: solid, drawn as a bridge
+  Dirt = 9, // dirt trail or track
+  Forest = 10, // forest floor: undergrowth, roots, slow going for cars
+  Swamp = 11, // shallow water and mud: wade, drive a truck or take a boat through it
+  Boardwalk = 12, // wooden deck or pier over water or swamp: solid
 }
 
-export type RoadClass = 'street' | 'avenue' | 'expressway';
+export type RoadClass = 'street' | 'avenue' | 'expressway' | 'rural';
 
 export interface RoadNode {
   id: number;
@@ -147,6 +160,16 @@ export interface WalkSeg {
   crossing: boolean;
 }
 
+/** A winding path through the wilderness (not part of the road graph). Painted into `surface`. */
+export interface Trail {
+  id: number;
+  name: string;
+  kind: 'dirt' | 'boardwalk';
+  width: number;
+  /** x0, z0, x1, z1, ... */
+  pts: number[];
+}
+
 export interface Box {
   x0: number;
   z0: number;
@@ -170,8 +193,8 @@ export interface Block {
 }
 
 /** Facade looks the city renderer knows how to draw. */
-export type BuildingStyle = 'glass' | 'ceramic' | 'brick' | 'concrete' | 'neon' | 'residential';
-export type LandmarkId = 'spire' | 'arena' | 'observatory' | 'lighthouse' | 'gate' | 'wheel';
+export type BuildingStyle = 'glass' | 'ceramic' | 'brick' | 'concrete' | 'neon' | 'residential' | 'datacenter' | 'shack';
+export type LandmarkId = 'spire' | 'arena' | 'observatory' | 'lighthouse' | 'gate' | 'wheel' | 'datacore';
 
 export interface Building {
   id: number;
@@ -224,7 +247,22 @@ export type PropKind =
   | 'ac_unit'
   | 'water_tank'
   | 'helipad'
-  | 'roof_garden';
+  | 'roof_garden'
+  // --- wilderness
+  | 'cypress'
+  | 'glow_tree'
+  | 'rock'
+  | 'log'
+  | 'glow_shroom'
+  | 'dock_post'
+  | 'buoy'
+  | 'crate'
+  | 'gate_arm'
+  | 'watchtower'
+  | 'campfire'
+  | 'trail_sign'
+  | 'cooler'
+  | 'dish';
 
 export interface Prop {
   kind: PropKind;
@@ -253,7 +291,7 @@ export interface Ramp {
   h: number;
 }
 
-export type PoiKind = 'safehouse' | 'garage' | 'job' | 'landmark' | 'stunt' | 'spark' | 'vehicle' | 'viewpoint' | 'race';
+export type PoiKind = 'safehouse' | 'garage' | 'chopshop' | 'job' | 'landmark' | 'stunt' | 'spark' | 'vehicle' | 'dock' | 'checkpoint' | 'outpost' | 'viewpoint' | 'race';
 
 /** A named place. Missions, the map and spawning read these. */
 export interface Poi {
@@ -298,6 +336,7 @@ export interface CityDraft {
   edges: RoadEdge[];
   lanes: Lane[];
   walks: WalkSeg[];
+  trails: Trail[];
   blocks: Block[];
   buildings: Building[];
   props: Prop[];
@@ -340,8 +379,8 @@ export interface RayHit {
 // The game (dynamic). Plain objects in fixed-size pools: never allocate per frame.
 // ---------------------------------------------------------------------------------------------
 
-export type VehicleKind = 'pod' | 'sedan' | 'coupe' | 'super' | 'van' | 'hauler' | 'bike' | 'patrol';
-export type VehicleRole = 'parked' | 'traffic' | 'player' | 'enforcer' | 'mission' | 'wreck';
+export type VehicleKind = 'compact' | 'sedan' | 'sports' | 'super' | 'van' | 'truck' | 'buggy' | 'hauler' | 'bike' | 'boat' | 'police' | 'ranger' | 'swat';
+export type VehicleRole = 'parked' | 'traffic' | 'player' | 'police' | 'mission' | 'wreck';
 
 /** Scratch owned by src/ai. Nobody else writes it. */
 export interface VehicleAI {
@@ -401,6 +440,17 @@ export interface Vehicle {
   stunT: number;
   /** Someone is driving it (the player or an AI driver). */
   occupied: boolean;
+  /** Look of the AI driver sitting in it, or -1 (the player, or nobody). */
+  driverLook: number;
+  /** Parked and locked: getting in takes a break-in and may set off the alarm. */
+  locked: boolean;
+  /** Seconds of alarm left. */
+  alarmT: number;
+  /** The surface under it (for spray, dust, wake and sound). */
+  surface: Surface;
+  /** Wheel rotation in radians (advances with distance), and the front wheels' steering angle. */
+  wheelSpin: number;
+  wheelSteer: number;
   /** Not moving and not simulated until something touches it. */
   asleep: boolean;
   lights: boolean;
@@ -410,8 +460,8 @@ export interface Vehicle {
   ai: VehicleAI;
 }
 
-export type PedState = 'idle' | 'walk' | 'run' | 'flee' | 'cower' | 'talk' | 'down' | 'getup';
-export type PedRole = 'civilian' | 'bot' | 'enforcer' | 'mission';
+export type PedState = 'idle' | 'walk' | 'run' | 'flee' | 'cower' | 'talk' | 'down' | 'getup' | 'chase' | 'aim';
+export type PedRole = 'civilian' | 'bot' | 'police' | 'mission';
 
 /** Scratch owned by src/ai. */
 export interface PedAI {
@@ -448,7 +498,9 @@ export interface Ped {
 }
 
 export type PlayerMode = 'foot' | 'vehicle';
-export type PlayerAnim = 'idle' | 'walk' | 'run' | 'jump' | 'fall' | 'enter' | 'exit' | 'down' | 'pulse' | 'swim';
+export type PlayerAnim = 'idle' | 'walk' | 'run' | 'jump' | 'fall' | 'enter' | 'exit' | 'down' | 'pulse' | 'swim' | 'wade';
+/** What the player carries. The pulse never runs out; the others have charges (Progress.gadgets). */
+export type GadgetId = 'pulse' | 'emp' | 'smoke' | 'repair';
 
 export interface Player {
   x: number;
@@ -464,8 +516,12 @@ export interface Player {
   vehicle: number;
   /** 0..100. */
   health: number;
+  /** 0..100: soaks up damage before health does. */
+  armor: number;
   /** 0..1, drained by sprinting. */
   stamina: number;
+  /** The gadget in hand (what `fire` uses). */
+  gadget: GadgetId;
   anim: PlayerAnim;
   /** Seconds in the current anim. */
   animT: number;
@@ -480,7 +536,7 @@ export interface Player {
   look: number;
 }
 
-export type DroneRole = 'courier' | 'enforcer';
+export type DroneRole = 'courier' | 'police';
 
 export interface Drone {
   id: number;
@@ -504,6 +560,26 @@ export interface Drone {
   timer: number;
 }
 
+export type CritterKind = 'gator' | 'heron' | 'deer';
+
+/** Wildlife. src/ai moves them; they are scenery with a little behaviour. */
+export interface Critter {
+  id: number;
+  active: boolean;
+  kind: CritterKind;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  speed: number;
+  state: number;
+  stateT: number;
+  /** Animation phase. */
+  anim: number;
+  tx: number;
+  tz: number;
+}
+
 export type ShotKind = 'pulse' | 'stun';
 
 export interface Shot {
@@ -521,7 +597,7 @@ export interface Shot {
   life: number;
 }
 
-export type PickupKind = 'spark' | 'credits' | 'health' | 'boost' | 'mask';
+export type PickupKind = 'spark' | 'tokens' | 'health' | 'armor' | 'boost' | 'cargo';
 
 export interface Pickup {
   active: boolean;
@@ -534,13 +610,16 @@ export interface Pickup {
   poi: string;
 }
 
-/** How hard security is looking for the player. 0 = nobody cares. */
+/**
+ * The Safety Flag level: how hard the police are looking for the player. 0 = nobody cares, 5 = everything
+ * they have. (Called `heat` in code.)
+ */
 export interface Heat {
-  /** 0..5. */
+  /** 0..5 flags. */
   level: number;
   /** 0..1 progress towards the next level (or towards cooling off while hidden). */
   charge: number;
-  /** An enforcer can see the player right now. */
+  /** A police unit can see the player right now. */
   seen: boolean;
   /** Seconds out of sight. */
   hiddenT: number;
@@ -549,7 +628,7 @@ export interface Heat {
   lastZ: number;
 }
 
-export type MarkerKind = 'job' | 'target' | 'dropoff' | 'checkpoint' | 'pickup' | 'enemy' | 'garage' | 'safehouse';
+export type MarkerKind = 'job' | 'target' | 'dropoff' | 'checkpoint' | 'pickup' | 'enemy' | 'garage' | 'chopshop' | 'safehouse' | 'race' | 'convoy';
 
 /** Something to show in the world and on the map. src/missions writes them; render and ui read them. */
 export interface Marker {
@@ -583,7 +662,8 @@ export interface MissionView {
 
 /** Everything that is saved. */
 export interface Progress {
-  credits: number;
+  /** Money. The city runs on Tokens. */
+  tokens: number;
   /** Ids of finished missions. */
   done: string[];
   /** Poi ids of collected sparks. */
@@ -592,6 +672,10 @@ export interface Progress {
   /** The vehicle waiting at the safehouse. */
   ride: VehicleKind;
   ridePaint: number;
+  /** Charges left per gadget (pulse is unlimited and not listed). */
+  gadgets: Record<string, number>;
+  /** The operative's outfit: jacket colour (index into OUTFITS) and style (0 streetwear, 1 tactical...). */
+  outfit: { colour: number; style: number };
   stats: Record<string, number>;
   flags: Record<string, number>;
 }
@@ -607,6 +691,7 @@ export interface GameState {
   vehicles: Vehicle[];
   peds: Ped[];
   drones: Drone[];
+  critters: Critter[];
   shots: Shot[];
   pickups: Pickup[];
   /** One byte per CityMap.props entry: 0 standing, 1 knocked over. */
@@ -641,8 +726,12 @@ export interface Controls {
   // --- pressed this frame (true for exactly one update)
   /** Get in the nearest vehicle / get out. */
   enter: boolean;
-  /** Fire the pulse. */
+  /** Use the gadget in hand. */
   fire: boolean;
+  /** Switch to the next gadget. */
+  gadgetNext: boolean;
+  /** Next radio station (while driving). */
+  radio: boolean;
   /** Talk to a contact, accept a job, use a garage. */
   interact: boolean;
   horn: boolean;
@@ -650,6 +739,8 @@ export interface Controls {
   camera: boolean;
   /** Look behind while held. */
   lookBack: boolean;
+  /** Held: the gadget wheel is open (the ui draws it and picks with the stick or pointer). */
+  wheel: boolean;
   map: boolean;
   pause: boolean;
   /** Camera heading, set by main from the camera rig before each sim step, so "forward" on the

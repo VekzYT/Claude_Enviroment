@@ -1,5 +1,5 @@
 // OWNER: models. The look of everything that is not a plain building: vehicles, people and robots,
-// street furniture, landmarks. All geometry is made in code and cached.
+// wildlife, street furniture, trees, landmarks. All geometry is made in code and cached.
 //
 // Geometry convention (every model): non-indexed BufferGeometry with
 //   position, normal         flat-shaded
@@ -8,37 +8,68 @@
 //   aPaint  (float 0..1)     how much the instance colour (vehicle paint, outfit tint) replaces `color`
 // Built facing +z, standing on y = 0, centred on x / z.
 import * as THREE from 'three';
-import { LANDMARKS, PROPS, VEHICLES } from '../../core/defs';
-import type { LandmarkId, PropKind, VehicleKind } from '../../core/types';
+import { CRITTERS, LANDMARKS, PROPS, VEHICLES } from '../../core/defs';
+import type { CritterKind, LandmarkId, PropKind, VehicleKind } from '../../core/types';
 
 export type Vec3 = [number, number, number];
 
+export interface WheelMount {
+  /** Wheel centre in model space. */
+  pos: Vec3;
+  radius: number;
+  /** Turns with the steering (front wheels). */
+  steers: boolean;
+}
+
 export interface VehicleModel {
+  /** The body, without wheels. Sized from core/defs VEHICLES: underside at y = ride (the boat's hull
+   *  sits in the water: its waterline is at y = 0). */
   geometry: THREE.BufferGeometry;
+  /** One wheel of radius 1 centred on the origin with its axle along x, or null for the hover-bike
+   *  and the boat. The renderer instances it at each mount, scaled by the mount's radius, spinning
+   *  with Vehicle.wheelSpin and turning with Vehicle.wheelSteer. */
+  wheel: THREE.BufferGeometry | null;
+  wheels: WheelMount[];
   /** Where the driver's hips sit, in model space (for drawing a rider and for the camera). */
   seat: Vec3;
-  /** True when the rider is out in the open (bikes): the renderer draws the character on the seat. */
+  /** True when the driver is out in the open (bike, buggy, boat): the renderer draws them seated. */
   openRider: boolean;
   /** Light and effect anchor points in model space. */
   headlights: Vec3[];
   taillights: Vec3[];
-  /** Under-body hover emitters (glow pads, dust). */
+  /** Where the roof light bar is (police vehicles), else null. */
+  lightBar: Vec3 | null;
+  /** Hover emitters under the bike; empty for everything else. */
   hoverPads: Vec3[];
-  /** Where boost flame comes out. */
+  /** Where nitro flame comes out (exhausts; the boat's jet). */
   thrusters: Vec3[];
 }
 
-/** The model for a vehicle kind, sized from core/defs VEHICLES (underside at y = hover). PLACEHOLDER: a box. */
+/** The model for a vehicle kind. PLACEHOLDER: a box with box wheels. */
 export function vehicleModel(kind: VehicleKind): VehicleModel {
   const d = VEHICLES[kind];
   const g = box(d.w, d.h, d.l, 0xffffff, 1);
-  g.translate(0, d.hover + d.h / 2, 0);
+  g.translate(0, d.ride + d.h / 2, 0);
+  const wheels: WheelMount[] = [];
+  if (d.wheels > 0) {
+    const rows = d.wheels / 2;
+    for (let r = 0; r < rows; r++) {
+      const z = rows === 1 ? 0 : d.l * 0.34 - (r * d.l * 0.68) / (rows - 1);
+      for (const side of [1, -1]) wheels.push({ pos: [side * (d.w / 2 - 0.12), d.wheelR, z], radius: d.wheelR, steers: r === 0 });
+    }
+  }
+  const lightY = d.ride + d.h * 0.4;
   return {
-    geometry: g, seat: [0, d.hover + d.h * 0.4, 0], openRider: kind === 'bike',
-    headlights: [[-d.w * 0.35, d.hover + d.h * 0.4, d.l / 2], [d.w * 0.35, d.hover + d.h * 0.4, d.l / 2]],
-    taillights: [[-d.w * 0.35, d.hover + d.h * 0.4, -d.l / 2], [d.w * 0.35, d.hover + d.h * 0.4, -d.l / 2]],
-    hoverPads: [[0, d.hover, d.l * 0.3], [0, d.hover, -d.l * 0.3]],
-    thrusters: [[0, d.hover + d.h * 0.3, -d.l / 2]],
+    geometry: g,
+    wheel: d.wheels > 0 ? box(0.24, 2, 2, 0x1c1c1c, 0) : null,
+    wheels,
+    seat: [0, d.ride + d.h * 0.4, 0],
+    openRider: kind === 'bike' || kind === 'buggy' || kind === 'boat',
+    headlights: [[-d.w * 0.35, lightY, d.l / 2], [d.w * 0.35, lightY, d.l / 2]],
+    taillights: [[-d.w * 0.35, lightY, -d.l / 2], [d.w * 0.35, lightY, -d.l / 2]],
+    lightBar: kind === 'police' || kind === 'ranger' || kind === 'swat' ? [0, d.ride + d.h, 0] : null,
+    hoverPads: kind === 'bike' ? [[0, d.ride, d.l * 0.3], [0, d.ride, -d.l * 0.3]] : [],
+    thrusters: [[0, d.ride + d.h * 0.3, -d.l / 2]],
   };
 }
 
@@ -52,7 +83,7 @@ export interface CharacterModel {
   height: number;
 }
 
-/** Body types 0..CHARACTER_TYPES-1 (core/defs): 0 the player, 1-3 residents, 4 service robot, 5 security. PLACEHOLDER: boxes. */
+/** Body types 0..CHARACTER_TYPES-1 (core/defs): 0 the operative (player), 1-3 residents, 4 service robot, 5 police. PLACEHOLDER: boxes. */
 export function characterModel(type: number): CharacterModel {
   void type;
   const limb = (w: number, h: number, d: number, c: number, paint: number) => {
@@ -130,6 +161,22 @@ export function propModel(kind: PropKind): PropModel {
   const g = d.sized ? box(1, 1, 1, 0x9aa3ad, 0) : box(Math.max(0.2, d.r * 2), d.h, Math.max(0.2, d.r * 2), 0x9aa3ad, 0);
   g.translate(0, d.sized ? 0.5 : d.h / 2, 0);
   return { geometry: g, unit: d.sized, light: kind === 'lamp' ? [0, d.h, 0] : null };
+}
+
+export interface CritterModel {
+  /** The body, facing +z, on y = 0. */
+  geometry: THREE.BufferGeometry;
+  /** Parts that swing (wings, a tail, a jaw): each rotates about `axis` through `pivot` by
+   *  sin(phase) * amount radians. The renderer drives phase from Critter.anim. */
+  flaps: Array<{ geometry: THREE.BufferGeometry; pivot: Vec3; axis: 'x' | 'y' | 'z'; amount: number }>;
+}
+
+/** Wildlife. PLACEHOLDER: a box. */
+export function critterModel(kind: CritterKind): CritterModel {
+  const d = CRITTERS[kind];
+  const g = box(d.l * 0.35, d.l * 0.3, d.l, 0x5a7a4a, 0);
+  g.translate(0, d.l * 0.15, 0);
+  return { geometry: g, flaps: [] };
 }
 
 /** A unique building at the size given in core/defs LANDMARKS. PLACEHOLDER: a box. */

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ROADS, WATER_FLOOR } from '../src/core/config';
+import { ROADS, SWAMP_FLOOR, WATER_FLOOR } from '../src/core/config';
 import { fixtureCity } from '../src/core/fixture';
 import { districtAt, groundY, lineOfSight, nearestLane, newRayHit, queryColliders, raycast, surfaceAt } from '../src/core/query';
 import { Surface } from '../src/core/types';
@@ -8,7 +8,9 @@ import { Surface } from '../src/core/types';
 const map = fixtureCity(1);
 
 test('fixture city is well formed', () => {
-  assert.equal(map.size, 5 * 128 + 128);
+  assert.equal(map.size, 1024);
+  assert.ok(map.trails.length >= 2);
+  for (const p of map.pois) assert.ok(p.x > 0 && p.z > 0 && p.x < map.size && p.z < map.size);
   assert.ok(map.buildings.length >= 60);
   assert.ok(map.lanes.length > 0 && map.walks.length > 0);
   for (const l of map.lanes) {
@@ -30,6 +32,20 @@ test('surfaces', () => {
   assert.equal(groundY(map, (bridge.x0 + bridge.x1) / 2, bridge.z0), 0);
   assert.equal(groundY(map, (bridge.x0 + bridge.x1) / 2, bridge.z0 + 60), WATER_FLOOR);
   assert.ok(districtAt(map, 200, 200).length > 0);
+  // the wilderness
+  assert.equal(districtAt(map, 100, 900), 'forest');
+  assert.equal(surfaceAt(map, 60, 820), Surface.Forest);
+  assert.equal(surfaceAt(map, 700, 850), Surface.Swamp);
+  assert.equal(groundY(map, 700, 850), SWAMP_FLOOR);
+  assert.equal(surfaceAt(map, 500, 900), Surface.Boardwalk);
+  assert.equal(groundY(map, 500, 900), 0);
+  assert.equal(surfaceAt(map, 800, 300), Surface.Sand);
+  assert.equal(surfaceAt(map, 950, 300), Surface.Water);
+  assert.equal(surfaceAt(map, 250, 870), Surface.Dirt);
+  const boat = map.pois.find((p) => p.tag === 'boat')!;
+  assert.equal(surfaceAt(map, boat.x, boat.z), Surface.Water);
+  const rural = map.edges.find((e) => e.cls === 'rural')!;
+  assert.equal(surfaceAt(map, rural.x0, (rural.z0 + rural.z1) / 2), Surface.Road);
 });
 
 test('right-hand traffic', () => {

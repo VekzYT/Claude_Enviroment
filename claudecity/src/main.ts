@@ -49,7 +49,7 @@ function frame(now: number): void {
   view.render();
   if (!booted) {
     booted = true;
-    console.log('CLAUDECITY_BOOT_OK');
+    console.log('SONNETCOAST_BOOT_OK');
   }
 }
 requestAnimationFrame(frame);

@@ -1,14 +1,15 @@
-// A small, plain test city that follows every rule of the CityMap contract: a 5 x 5 grid of blocks
-// with streets and avenues, every facade style, a park, a plaza, a strip of water with a bridge, a
-// stunt ramp, props and points of interest. Modules use it in their dev harnesses and tests so they
-// do not depend on the real generator in src/world. Also exports the lane and sidewalk builders,
-// which src/world may reuse.
+// A small, plain test map that follows every rule of the CityMap contract. North-west: a 5 x 5 grid
+// of city blocks with streets and avenues, every facade style, a park, a plaza and a canal with a
+// bridge. South: a strip of wilderness with a forest, a dirt trail, a swamp with a boardwalk and a
+// shack, and a country road. East: a beach and the sea, joined to the canal. Modules use it in
+// their dev harnesses and tests so they do not depend on the real generator in src/world. Also
+// exports the lane and sidewalk builders, which src/world may reuse.
 
 import { DISTRICT_CELL, LANE_WIDTH, ROADS, SURF_CELL } from './config';
 import { DISTRICT_IDS } from './defs';
-import { finalizeCity, paintRect } from './query';
+import { finalizeCity, paintPath, paintRect } from './query';
 import { makeRng } from './rng';
-import type { Block, Building, BuildingStyle, CityMap, DistrictId, Lane, Poi, Prop, Ramp, RoadClass, RoadEdge, RoadNode, WalkSeg } from './types';
+import type { Block, Building, BuildingStyle, CityMap, DistrictId, Lane, Poi, Prop, Ramp, RoadClass, RoadEdge, RoadNode, Trail, WalkSeg } from './types';
 import { Surface } from './types';
 
 /**
@@ -64,8 +65,8 @@ export function buildLanes(nodes: RoadNode[], edges: RoadEdge[]): Lane[] {
 }
 
 /**
- * Two sidewalk segments per edge (none for expressways), joined at each junction to every other
- * sidewalk end there. Simple, not pretty: src/world lays proper corners and crossings.
+ * Two sidewalk segments per edge (none where the road has no sidewalk), joined at each junction to
+ * every other sidewalk end there. Simple, not pretty: src/world lays proper corners and crossings.
  */
 export function buildWalks(nodes: RoadNode[], edges: RoadEdge[]): WalkSeg[] {
   const walks: WalkSeg[] = [];
@@ -94,26 +95,47 @@ export function buildWalks(nodes: RoadNode[], edges: RoadEdge[]): WalkSeg[] {
   return walks;
 }
 
-const STYLES: BuildingStyle[] = ['glass', 'ceramic', 'brick', 'concrete', 'neon', 'residential'];
+const STYLES: BuildingStyle[] = ['glass', 'ceramic', 'brick', 'concrete', 'neon', 'residential', 'datacenter'];
+const CITY_DISTRICTS: DistrictId[] = ['core', 'strip', 'heights', 'harbor', 'park', 'market'];
 
-/** The test city. `blocks` per side (default 5) gives a city of blocks * 128 + 128 metres. */
-export function fixtureCity(seed = 1, blocks = 5): CityMap {
+/** The test map: 1024 m square. */
+export function fixtureCity(seed = 1): CityMap {
   const rng = makeRng(seed);
+  const blocks = 5;
   const pitch = 128;
-  const size = blocks * pitch + 128;
+  const size = 1024;
+  const cityEnd = blocks * pitch + 128; // 768: the city grid lies in [0, 768] x [0, 768]
   const lines = blocks + 1;
   const pos = (i: number) => 64 + i * pitch;
   const cls = (i: number): RoadClass => (i === 0 || i === lines - 1 || i === Math.floor(lines / 2) ? 'avenue' : 'street');
-  // The east side is water: column `waterCol` of blocks, crossed by one bridge.
+  // A canal runs north-south through the last column of blocks, crossed by one bridge, and on south
+  // through the swamp to the sea.
   const waterX0 = pos(lines - 2) + 30;
   const waterX1 = pos(lines - 1) - 30;
   const bridgeRow = Math.floor(lines / 2);
+  const beachX = 760; // sand from here east
+  const seaX = 880; // open sea from here east
+  const wildZ = 790; // wilderness from here south
+  const seaZ = 990; // and the sea again along the south edge, east of the canal
 
   const surfN = size / SURF_CELL;
   const surface = new Uint8Array(surfN * surfN).fill(Surface.Ground);
   const districtN = size / DISTRICT_CELL;
   const district = new Uint8Array(districtN * districtN);
-  const districtOf = (bx: number, bz: number): DistrictId => DISTRICT_IDS[(bx + bz * 2) % DISTRICT_IDS.length];
+  const districtOf = (bx: number, bz: number): DistrictId => CITY_DISTRICTS[(bx + bz * 2) % CITY_DISTRICTS.length];
+  const paintS = (x0: number, z0: number, x1: number, z1: number, v: Surface) => paintRect(surface, surfN, SURF_CELL, x0, z0, x1, z1, v);
+  const paintD = (x0: number, z0: number, x1: number, z1: number, d: DistrictId) => paintRect(district, districtN, DISTRICT_CELL, x0, z0, x1, z1, DISTRICT_IDS.indexOf(d));
+
+  // ---- the lie of the land: forest, swamp, beach, sea, canal
+  paintD(0, cityEnd, 400, size, 'forest');
+  paintD(400, cityEnd, beachX, size, 'bayou');
+  paintD(beachX, 0, size, size, 'coast');
+  paintS(0, wildZ, 400, size, Surface.Forest);
+  paintS(400, wildZ, beachX, size, Surface.Swamp);
+  paintS(beachX, 0, seaX, size, Surface.Sand);
+  paintS(seaX, 0, size, size, Surface.Water);
+  paintS(waterX0, 0, waterX1, size, Surface.Water);
+  paintS(waterX0, seaZ, size, size, Surface.Water);
 
   // ---- nodes and edges
   const nodes: RoadNode[] = [];
@@ -140,28 +162,32 @@ export function fixtureCity(seed = 1, blocks = 5): CityMap {
   for (let j = 0; j < lines; j++) {
     for (let i = 0; i < lines - 1; i++) {
       const overWater = i === lines - 2;
-      if (overWater && j !== bridgeRow) continue; // only one road crosses the water
+      if (overWater && j !== bridgeRow) continue; // only one road crosses the canal
       addEdge(nodeId(i, j), nodeId(i + 1, j), 0, cls(j), `${j + 1}th Street`, overWater);
     }
   }
   for (let i = 0; i < lines; i++) for (let j = 0; j < lines - 1; j++) addEdge(nodeId(i, j), nodeId(i, j + 1), 1, cls(i), `Avenue ${String.fromCharCode(65 + i)}`, false);
+  // a country road south from the middle of the city into the forest, ending at an outpost
+  const ruralX = pos(2);
+  const outpost: RoadNode = { id: nodes.length, x: ruralX, z: 980, edges: [-1, -1, -1, -1], half: ROADS.rural.half, signal: false };
+  nodes.push(outpost);
+  addEdge(nodeId(2, lines - 1), outpost.id, 1, 'rural', 'Bayou Road', false);
 
-  // ---- surface: water, then road corridors (sidewalk under roadway), junctions
-  paintRect(surface, surfN, SURF_CELL, waterX0, 0, waterX1, size, Surface.Water);
+  // ---- surface: road corridors (sidewalk under roadway), junctions
   for (const e of edges) {
     const w = e.half + e.walk;
     if (e.axis === 0) {
-      if (!e.bridge) paintRect(surface, surfN, SURF_CELL, e.x0, e.z0 - w, e.x1, e.z0 + w, Surface.Sidewalk);
-      paintRect(surface, surfN, SURF_CELL, e.x0, e.z0 - e.half, e.x1, e.z0 + e.half, Surface.Road);
-      if (e.bridge) paintRect(surface, surfN, SURF_CELL, waterX0, e.z0 - w, waterX1, e.z0 + w, Surface.Bridge);
+      if (!e.bridge) paintS(e.x0, e.z0 - w, e.x1, e.z0 + w, Surface.Sidewalk);
+      paintS(e.x0, e.z0 - e.half, e.x1, e.z0 + e.half, Surface.Road);
+      if (e.bridge) paintS(waterX0, e.z0 - w, waterX1, e.z0 + w, Surface.Bridge);
     } else {
-      paintRect(surface, surfN, SURF_CELL, e.x0 - w, e.z0, e.x0 + w, e.z1, Surface.Sidewalk);
-      paintRect(surface, surfN, SURF_CELL, e.x0 - e.half, e.z0, e.x0 + e.half, e.z1, Surface.Road);
+      if (e.walk > 0) paintS(e.x0 - w, e.z0, e.x0 + w, e.z1, Surface.Sidewalk);
+      paintS(e.x0 - e.half, e.z0, e.x0 + e.half, e.z1, Surface.Road);
     }
   }
-  for (const nd of nodes) paintRect(surface, surfN, SURF_CELL, nd.x - nd.half, nd.z - nd.half, nd.x + nd.half, nd.z + nd.half, Surface.Road);
+  for (const nd of nodes) paintS(nd.x - nd.half, nd.z - nd.half, nd.x + nd.half, nd.z + nd.half, Surface.Road);
 
-  // ---- blocks, buildings, props
+  // ---- city blocks, buildings, props
   const blocksOut: Block[] = [];
   const buildings: Building[] = [];
   const props: Prop[] = [];
@@ -178,26 +204,26 @@ export function fixtureCity(seed = 1, blocks = 5): CityMap {
       const z0 = pos(bz) + inset(bz);
       const z1 = pos(bz + 1) - inset(bz + 1);
       const d = districtOf(bx, bz);
-      paintRect(district, districtN, DISTRICT_CELL, pos(bx), pos(bz), pos(bx + 1), pos(bz + 1), DISTRICT_IDS.indexOf(d));
+      paintD(pos(bx), pos(bz), pos(bx + 1), pos(bz + 1), d);
       const isWater = bx === blocks - 1;
       const use: Block['use'] = isWater ? 'water' : bx === mid && bz === mid ? 'plaza' : bx === 1 && bz === 1 ? 'park' : 'built';
       const id = blocksOut.length;
       blocksOut.push({ id, x0, z0, x1, z1, district: d, use });
       if (use === 'water') continue;
       if (use === 'park') {
-        paintRect(surface, surfN, SURF_CELL, x0, z0, x1, z1, Surface.Park);
+        paintS(x0, z0, x1, z1, Surface.Park);
         for (let k = 0; k < 24; k++) prop(rng() < 0.7 ? 'tree' : 'bush', x0 + 4 + rng() * (x1 - x0 - 8), z0 + 4 + rng() * (z1 - z0 - 8), rng() * 6.28, { scale: 0.8 + rng() * 0.5 });
         prop('bench', (x0 + x1) / 2, z0 + 3, 0);
         continue;
       }
       if (use === 'plaza') {
-        paintRect(surface, surfN, SURF_CELL, x0, z0, x1, z1, Surface.Plaza);
+        paintS(x0, z0, x1, z1, Surface.Plaza);
         prop('fountain', (x0 + x1) / 2, (z0 + z1) / 2);
         prop('statue', x0 + 14, z0 + 14);
         prop('holo_ad', x1 - 12, z0 + 12);
         continue;
       }
-      paintRect(surface, surfN, SURF_CELL, x0, z0, x1, z1, Surface.Lot);
+      paintS(x0, z0, x1, z1, Surface.Lot);
       // four buildings, one in each quarter, each facing its nearest street
       const mx = (x0 + x1) / 2;
       const mz = (z0 + z1) / 2;
@@ -230,7 +256,7 @@ export function fixtureCity(seed = 1, blocks = 5): CityMap {
     }
   }
 
-  // ---- street furniture: lamps along every road, signals at the big junctions
+  // ---- street furniture: lamps along every city road, signals at the big junctions
   for (const e of edges) {
     if (e.walk <= 0) continue;
     const off = e.half + 0.8;
@@ -244,28 +270,92 @@ export function fixtureCity(seed = 1, blocks = 5): CityMap {
   }
   for (const nd of nodes) if (nd.signal) prop('traffic_light', nd.x + nd.half + 0.8, nd.z + nd.half + 0.8);
 
+  // ---- the wilderness
+  const trails: Trail[] = [];
+  // a dirt trail: off the country road, west through the forest to a clearing, then round to the swamp
+  const dirt = [ruralX - 5, 860, 250, 870, 190, 905, 140, 940, 170, 985, 260, 1000, 330, 1005, 392, 960, 420, 905];
+  trails.push({ id: 0, name: 'Glow Trail', kind: 'dirt', width: 5, pts: dirt });
+  paintPath(surface, surfN, SURF_CELL, dirt, 5, Surface.Dirt, [Surface.Road, Surface.Water]);
+  // a clearing with a camp
+  paintPath(surface, surfN, SURF_CELL, [140, 940, 141, 941], 26, Surface.Ground, [Surface.Dirt]);
+  prop('campfire', 132, 936);
+  prop('log', 128, 942, Math.PI / 2, { w: 0.6, h: 0.5, d: 3.2 });
+  // a boardwalk from the end of the trail across the swamp to a dock on the canal
+  const walkway = [420, 905, 500, 900, waterX0 + 4, 900];
+  trails.push({ id: 1, name: 'Bayou Boardwalk', kind: 'boardwalk', width: 4, pts: walkway });
+  paintPath(surface, surfN, SURF_CELL, walkway, 4, Surface.Boardwalk);
+  for (let x = 430; x < waterX0; x += 20) {
+    prop('dock_post', x, 897.6);
+    prop('dock_post', x, 902.4);
+  }
+  // an islet in the swamp with a shack: the chop shop
+  paintPath(surface, surfN, SURF_CELL, [470, 955, 471, 956], 36, Surface.Ground);
+  paintPath(surface, surfN, SURF_CELL, [470, 905, 470, 945], 4, Surface.Boardwalk);
+  const shack: Building = { id: buildings.length, block: -1, district: 'bayou', style: 'shack', parts: [{ x0: 464, z0: 952, x1: 476, z1: 961, y0: 0, y1: 4.5 }], x0: 464, z0: 952, x1: 476, z1: 961, h: 4.5, front: 2, seed: 77 };
+  buildings.push(shack);
+  // trees, rocks and glow
+  for (let k = 0; k < 150; k++) {
+    const x = 6 + rng() * 388;
+    const z = wildZ + 6 + rng() * (size - wildZ - 12);
+    const s = surface[Math.floor(z / SURF_CELL) * surfN + Math.floor(x / SURF_CELL)];
+    if (s !== Surface.Forest) continue;
+    const roll = rng();
+    prop(roll < 0.45 ? 'glow_tree' : roll < 0.85 ? 'tree' : roll < 0.95 ? 'rock' : 'glow_shroom', x, z, rng() * 6.28, { scale: 0.8 + rng() * 0.6 });
+  }
+  for (let k = 0; k < 70; k++) {
+    const x = 404 + rng() * (beachX - 408);
+    const z = wildZ + 4 + rng() * (seaZ - wildZ - 8);
+    const s = surface[Math.floor(z / SURF_CELL) * surfN + Math.floor(x / SURF_CELL)];
+    if (s !== Surface.Swamp) continue;
+    prop('cypress', x, z, rng() * 6.28, { scale: 0.8 + rng() * 0.5 });
+  }
+  for (let z = 30; z < seaZ - 20; z += 26) prop('palm', beachX + 8 + rng() * 30, z + rng() * 8, rng() * 6.28, { scale: 0.9 + rng() * 0.3 });
+  prop('buoy', seaX + 40, 400);
+  // a checkpoint on the country road and the outpost at its end
+  prop('gate_arm', ruralX + 2.4, 800, 0, { w: 4.2, h: 1.2, d: 0.3 });
+  prop('watchtower', ruralX + 9, 806);
+  prop('trail_sign', ruralX - 6.5, 856);
+  prop('crate', ruralX + 7, 972);
+  prop('cooler', ruralX - 10, 974);
+  prop('dish', ruralX - 10, 966);
+
   // ---- a few specials near the start
   const sx = pos(1) + 24;
   const sz = pos(2) + ROADS.street.half + 1.5; // on the south sidewalk of row 2
+  const kerb = pos(2) + ROADS.street.half - 1.1; // the parking strip, eastbound side
   ramps.push({ x0: pos(mid) - 4, z0: pos(2) + 30, x1: pos(mid) + 4, z1: pos(2) + 46, dir: 0, h: 3.5 });
   prop('barrier', waterX0 - 2, pos(1) + 64, 0, { w: 0.8, h: 1, d: 60 });
   prop('container', pos(0) + 26, pos(0) + 26, 0, { w: 2.6, h: 2.6, d: 12 });
   prop('billboard', pos(2) + 30, pos(0) + 22, 0, { w: 14, h: 12, d: 0.6 });
   prop('bus_stop', sx + 20, sz + 0.5, Math.PI);
   prop('charger', sx - 8, sz + 0.5, Math.PI);
-  pois.push({ id: 'safehouse', kind: 'safehouse', x: sx, y: 0, z: sz, yaw: Math.PI, name: 'Your place', district: districtOf(1, 2) });
-  pois.push({ id: 'garage-1', kind: 'garage', x: pos(2) + 24, y: 0, z: sz, yaw: Math.PI, name: 'Garage', district: districtOf(2, 2) });
-  pois.push({ id: 'job-claude', kind: 'job', x: sx + 40, y: 0, z: sz, yaw: Math.PI, name: 'Claude', district: districtOf(1, 2), tag: 'claude' });
-  pois.push({ id: 'car-1', kind: 'vehicle', x: sx + 6, y: 0, z: pos(2) + ROADS.street.half - 1.1, yaw: Math.PI / 2, name: 'Pebble', district: districtOf(1, 2), tag: 'pod' });
-  pois.push({ id: 'car-2', kind: 'vehicle', x: sx + 14, y: 0, z: pos(2) + ROADS.street.half - 1.1, yaw: Math.PI / 2, name: 'Stanza', district: districtOf(1, 2), tag: 'coupe' });
-  pois.push({ id: 'stunt-1', kind: 'stunt', x: pos(mid), y: 0, z: pos(2) + 30, yaw: 0, name: 'Ramp', district: districtOf(mid, 2) });
+  const poi = (id: string, kind: Poi['kind'], x: number, z: number, yaw: number, name: string, d: DistrictId, tag?: string, y = 0) => pois.push({ id, kind, x, y, z, yaw, name, district: d, tag });
+  const home = districtOf(1, 2);
+  poi('safehouse', 'safehouse', sx, sz, Math.PI, 'Your place', home);
+  poi('garage-1', 'garage', pos(2) + 24, sz, Math.PI, 'Garage', districtOf(2, 2));
+  poi('job-claude', 'job', sx + 40, sz, Math.PI, 'Claude', home, 'claude');
+  poi('car-1', 'vehicle', sx + 6, kerb, Math.PI / 2, 'Pebble', home, 'compact');
+  poi('car-2', 'vehicle', sx + 14, kerb, Math.PI / 2, 'Stanza', home, 'sports');
+  poi('car-3', 'vehicle', sx + 24, kerb, Math.PI / 2, 'Sentinel', home, 'police');
+  poi('car-4', 'vehicle', ruralX + 2.2, 846, 0, 'Ballad 4x4', 'forest', 'truck');
+  poi('car-5', 'vehicle', 146, 946, 1, 'Limerick', 'forest', 'buggy');
+  poi('car-6', 'vehicle', 414, 912, 0.4, 'Haiku', 'bayou', 'bike');
+  poi('boat-1', 'vehicle', waterX0 + 12, 908, 0, 'Riptide', 'bayou', 'boat');
+  poi('dock-1', 'dock', waterX0 + 2, 900, Math.PI / 2, 'Bayou dock', 'bayou');
+  poi('chopshop-1', 'chopshop', 470, 948, Math.PI, 'The Shack', 'bayou');
+  poi('checkpoint-1', 'checkpoint', ruralX, 800, 0, 'Bayou Road checkpoint', 'forest');
+  poi('outpost-1', 'outpost', ruralX, 972, 0, 'Relay outpost', 'forest');
+  poi('stunt-1', 'stunt', pos(mid), pos(2) + 30, 0, 'Ramp', districtOf(mid, 2));
+  poi('race-1', 'race', 250, 870, -1.4, 'Glow Trail sprint', 'forest');
   for (let k = 0; k < 8; k++) {
-    const nd = nodes[Math.floor(rng() * nodes.length)];
-    pois.push({ id: `spark-${k}`, kind: 'spark', x: nd.x + nd.half + 2, y: 1.2, z: nd.z + nd.half + 2, yaw: 0, name: 'Spark', district: 'core' });
+    const nd = nodes[Math.floor(rng() * (lines * lines))];
+    poi(`spark-${k}`, 'spark', nd.x + nd.half + 2, nd.z + nd.half + 2, 0, 'Spark', 'core', undefined, 1.2);
   }
+  poi('spark-8', 'spark', 136, 932, 0, 'Spark', 'forest', undefined, 1.2);
+  poi('spark-9', 'spark', 470, 946, 0, 'Spark', 'bayou', undefined, 1.2);
 
   return finalizeCity({
-    seed, size, nodes, edges, lanes: buildLanes(nodes, edges), walks: buildWalks(nodes, edges),
+    seed, size, nodes, edges, lanes: buildLanes(nodes, edges), walks: buildWalks(nodes, edges), trails,
     blocks: blocksOut, buildings, props, ramps, pois, surface, district,
     spawn: { x: sx, z: sz, yaw: Math.PI },
   });

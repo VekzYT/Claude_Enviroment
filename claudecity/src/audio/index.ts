@@ -203,7 +203,7 @@ class Engine implements AudioEngine {
       ctx.onstatechange = () => this.onStateChange();
       this.watchVisibility();
     } catch (err) {
-      console.warn('Claude City: audio is unavailable', err);
+      console.warn('Sonnet Coast: audio is unavailable', err);
       this.failed = true;
       this.ctx = null;
       this.graph = null;
@@ -236,7 +236,7 @@ class Engine implements AudioEngine {
       this.sfxBuffers = await prerenderSfx(ctx.sampleRate);
     } catch (err) {
       // Effects keep playing live (slightly more work per sound); nothing else changes.
-      console.warn('Claude City: could not pre-render sound effects', err);
+      console.warn('Sonnet Coast: could not pre-render sound effects', err);
     } finally {
       this.rendering = false;
     }
@@ -382,7 +382,7 @@ class Engine implements AudioEngine {
     try {
       fn();
     } catch (err) {
-      console.warn('Claude City audio:', err);
+      console.warn('Sonnet Coast audio:', err);
     }
   }
 }
