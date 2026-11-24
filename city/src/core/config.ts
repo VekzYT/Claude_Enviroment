@@ -61,16 +61,16 @@ export const ROAD_REACH = 3;
 /** Level 2 and above need water; level 1 needs only power and a road. */
 export const WATER_FROM_LEVEL = 2;
 /** Desirability (0..1) a lot needs to reach each level (index = target level). */
-export const LEVEL_DESIRABILITY = [0, 0, 0.35, 0.6];
+export const LEVEL_DESIRABILITY = [0, 0, 0.38, 0.6];
 /** Base chance per day that a qualifying lot grows one level, scaled by demand and desirability. */
-export const GROWTH_CHANCE = 0.05;
+export const GROWTH_CHANCE = 0.006;
 /** Days of unmet needs before a developed lot drops a level. */
 export const DECLINE_DAYS = 25;
 
 // ---------- Population & demand ----------
 export const WORKFORCE_RATIO = 0.6;
 /** Demand that exists before anything is built, so the first houses and factories appear. */
-export const BASE_RES_DEMAND = 40;
+export const BASE_RES_DEMAND = 30;
 export const BASE_IND_DEMAND = 20;
 /** Commerce the population wants, in jobs per resident. */
 export const COM_PER_RESIDENT = 0.22;
@@ -81,9 +81,9 @@ export const TAX_DEMAND_EFFECT = 0.05;
 
 // ---------- Economy (monthly) ----------
 /** Monthly income per resident / per job at 1% tax. */
-export const TAX_PER_RESIDENT = 0.1;
-export const TAX_PER_COM_JOB = 0.14;
-export const TAX_PER_IND_JOB = 0.12;
+export const TAX_PER_RESIDENT = 0.05;
+export const TAX_PER_COM_JOB = 0.065;
+export const TAX_PER_IND_JOB = 0.055;
 export const ROAD_UPKEEP = 1;
 
 // ---------- Land value & pollution ----------
