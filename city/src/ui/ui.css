@@ -2158,9 +2158,12 @@ button.hud-cell:active {
   position: absolute;
   right: var(--edge-r);
   bottom: var(--edge-b);
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: rgba(255, 250, 241, 0.75);
   font-size: 12px;
   font-weight: 700;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .ui-sheet.newcity {

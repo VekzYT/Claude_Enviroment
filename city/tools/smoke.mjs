@@ -175,6 +175,11 @@ async function tap(sel, text, what = `${sel}${text ? ` "${text}"` : ''}`) {
     await dismissTip();
     r = await waitEl(sel, text);
   }
+  // A milestone card can pop up between two steps and cover everything: close it like a player would.
+  if (r && r.covered && !sel.startsWith('.celebrate') && (await findEl('.celebrate .pbtn', 'Keep building'))) {
+    await handleMilestone();
+    r = await waitEl(sel, text);
+  }
   if (!r) throw new Error(`could not find ${what}`);
   if (r.covered) throw new Error(`${what} is covered by ${r.by}`);
   if (r.x < SAFE.left || r.x > W - SAFE.right || r.y > H - SAFE.bottom) throw new Error(`${what} sits in a safe-area inset at ${r.x},${r.y}`);
