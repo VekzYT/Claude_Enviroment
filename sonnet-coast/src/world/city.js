@@ -195,12 +195,12 @@ function makePavingTexture() {
   const g = c.getContext('2d'), gr = r.getContext('2d');
   gr.scale(0.5, 0.5);
   const rng = new RNG(88);
-  g.fillStyle = '#a9a398'; g.fillRect(0, 0, S, S);
+  g.fillStyle = '#8a857b'; g.fillRect(0, 0, S, S);
   gr.fillStyle = 'rgb(255,200,0)'; gr.fillRect(0, 0, S, S);
   const n = 4, t = S / n;
   for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
     const v = rng.int(-12, 12);
-    g.fillStyle = `rgb(${182 + v},${176 + v},${164 + v})`;
+    g.fillStyle = `rgb(${152 + v},${147 + v},${137 + v})`;
     g.fillRect(i * t + 2, j * t + 2, t - 4, t - 4);
     gr.fillStyle = `rgb(255,${rng.int(150, 215)},0)`; gr.fillRect(i * t + 2, j * t + 2, t - 4, t - 4);
   }

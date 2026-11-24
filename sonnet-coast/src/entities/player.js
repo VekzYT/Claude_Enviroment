@@ -94,9 +94,9 @@ function buildModel() {
 
 export class Player {
   constructor() {
-    this.pos = new THREE.Vector3(POI.safehouse.x, 3, POI.safehouse.z);
+    this.pos = new THREE.Vector3(POI.safehouse.x + 4, 3, POI.safehouse.z + 4);
     this.vel = new THREE.Vector3();
-    this.heading = Math.PI;
+    this.heading = Math.PI / 2;
     this.onGround = true;
     this.vehicle = null;
     this.state = 'foot';       // foot | entering | ragdoll | dead | busted

@@ -87,6 +87,11 @@ async function boot() {
   world.quality = G.settings.quality;
   G.fx.setScale(window.innerHeight);
   window.addEventListener('resize', () => G.fx.setScale(window.innerHeight));
+  // Compile every shader up front so the first minute of play does not hitch.
+  progress('Compiling shaders', 0.99); await tick();
+  try {
+    await Promise.race([R.renderer.compileAsync(R.scene, R.camera), new Promise((r) => setTimeout(r, 12000))]);
+  } catch (e) { /* the renderer will compile lazily instead */ }
   if (params.get('hour')) world.env.setHour(parseFloat(params.get('hour')));
 
   G.mode = 'title';

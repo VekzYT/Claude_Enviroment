@@ -45,7 +45,8 @@ export class Game {
     this.perf = { t: 0, frames: 0, settle: 3 };
     this.wire();
     this.applySave();
-    const car = new Vehicle('sport', POI.safehouse.x + 8, POI.safehouse.z - 9.5, Math.PI / 2, { paint: 0xff7a59 });
+    // parked on the forecourt, out of the traffic lanes
+    const car = new Vehicle('sport', POI.safehouse.x + 15, POI.safehouse.z + 5.5, Math.PI / 2, { paint: 0xff7a59 });
     car.keep = true;
     this.starterCar = car;
   }

@@ -45,7 +45,7 @@ class Intro extends Job {
     this.say('MERIDIAN', 'Kestrel. Officially this call is not happening, and neither are you.');
     this.say('MERIDIAN', 'Field Ops has problems that cannot go in an incident report. You are how they get solved.');
     this.say('MERIDIAN', 'There is a Haiku GT outside your building. Bring it to Claude Tower. Try to arrive with all four wheels.');
-    this.car = G.game.starterCar && !G.game.starterCar.removed && !G.game.starterCar.destroyed ? G.game.starterCar : this.spawn('sport', POI.safehouse.x + 8, POI.safehouse.z - 9.5, Math.PI / 2, { paint: 0xff7a59 });
+    this.car = G.game.starterCar && !G.game.starterCar.removed && !G.game.starterCar.destroyed ? G.game.starterCar : this.spawn('sport', POI.safehouse.x + 15, POI.safehouse.z + 5.5, Math.PI / 2, { paint: 0xff7a59 });
     this.step = 'car';
     this.tips = 0;
   }
@@ -467,7 +467,7 @@ const RACES = {
 
 // ------------------------------------------------------------------ manager
 const JOBS = [
-  { id: 'intro', title: 'Off the Books', where: 'Context Window Lofts', cls: Intro, reward: 500, at: () => ({ x: POI.safehouse.x + 14, z: POI.safehouse.z + 1 }), type: 'mission', foot: false },
+  { id: 'intro', title: 'Off the Books', where: 'Context Window Lofts', cls: Intro, reward: 500, at: () => ({ x: POI.safehouse.x - 7, z: POI.safehouse.z + 4 }), type: 'mission', foot: false },
   { id: 'prototype', title: 'Grand Theft Prototype', where: 'Claude Tower', cls: Prototype, reward: 4000, req: 'intro', at: () => ({ x: POI.tower.x - 12, z: POI.tower.z + 4 }), type: 'mission' },
   { id: 'heist', title: 'Badge Swap', where: 'Claude Tower', cls: Heist, reward: 4000, req: 'intro', at: () => ({ x: POI.tower.x + 12, z: POI.tower.z + 4 }), type: 'mission' },
   { id: 'bayou', title: 'Bayou Run', where: 'Port of Sonnet', cls: BayouRun, reward: 3500, req: 'intro', at: () => ({ x: POI.port.x, z: POI.port.z - 52 }), type: 'mission' },

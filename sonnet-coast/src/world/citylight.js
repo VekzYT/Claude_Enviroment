@@ -95,7 +95,8 @@ const LIGHTING = /* glsl */`
       if ( uLampColor.r > 0.001 ) {
         for ( int s = 0; s < 2; s ++ ) {
           float sgn = s == 0 ? -1.0 : 1.0;
-          float alive = texture2D( uCityLampTex, ( vec2( cell * 3.0 + slot, rowBase + float( s ) ) + 0.5 ) / ${TEX}.0 ).r;
+          // textureLod: no screen-space derivatives, so it is legal inside loops and branches on every backend
+          float alive = textureLod( uCityLampTex, ( vec2( cell * 3.0 + slot, rowBase + float( s ) ) + 0.5 ) / ${TEX}.0, 0.0 ).r;
           if ( alive < 0.5 ) continue;
           float la = line * 100.0 + sgn * ( hw - 0.6 );
           vec3 lp = ax == 0 ? vec3( uCityRect.x + la, uLampY, uCityRect.y + lampAlong )
@@ -117,7 +118,7 @@ const LIGHTING = /* glsl */`
       if ( uNeonK > 0.001 && vCityPos.y < 14.0 ) {
         float sgn = off < 0.0 ? -1.0 : 1.0;
         float side = off < 0.0 ? 0.0 : 1.0;
-        vec4 neon = texture2D( uCityNeonTex, ( vec2( cell, rowBase + side ) + 0.5 ) / ${TEX}.0 );
+        vec4 neon = textureLod( uCityNeonTex, ( vec2( cell, rowBase + side ) + 0.5 ) / ${TEX}.0, 0.0 );
         if ( neon.a > 0.02 ) {
           float la = line * 100.0 + sgn * ( hw + 4.2 );
           float al = cell * 100.0 + clamp( f, 14.0, 86.0 );

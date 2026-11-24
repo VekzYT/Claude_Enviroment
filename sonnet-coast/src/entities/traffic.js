@@ -154,7 +154,7 @@ export class Traffic {
     const add = (type, x, z, heading, r = 320) => this.fixed.push({ type, x, z, heading, r, v: null, cool: 0 });
     for (const b of boatSpawns) add('boat', b.x, b.z, b.heading, 360);
     // hover-bikes
-    add('hoverbike', POI.safehouse.x + 26, POI.safehouse.z - 3, Math.PI / 2);
+    add('hoverbike', POI.safehouse.x + 27, POI.safehouse.z + 6, Math.PI / 2);
     add('hoverbike', 824, 14, 0);
     add('hoverbike', 470, -12, Math.PI / 2);
     add('hoverbike', POI.lookout.x + 8, POI.lookout.z + 6, 0);
@@ -169,7 +169,7 @@ export class Traffic {
     add('buggy', POI.port.x + 20, POI.port.z - 62, Math.PI / 2);
     add('buggy', 866, 120, 0);
     add('truck', 866, -330, 0);
-    add('sport', POI.safehouse.x - 10, POI.safehouse.z - 3, Math.PI / 2);
+    add('sedan', POI.safehouse.x - 18, POI.safehouse.z + 6, Math.PI / 2);
   }
 
   playerPos() {
