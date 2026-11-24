@@ -203,7 +203,7 @@ buildPlan();
 
 // Where pedestrians walk: a rectangle loop just inside each block's kerb.
 export function sidewalkLoop(block) {
-  const m = 2.2;
+  const m = 3.3;
   return [
     { x: block.x0 + m, z: block.z0 + m }, { x: block.x1 - m, z: block.z0 + m },
     { x: block.x1 - m, z: block.z1 - m }, { x: block.x0 + m, z: block.z1 - m },

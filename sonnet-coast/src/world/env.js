@@ -215,7 +215,7 @@ export class Environment {
 
     // analytic lamps and neon
     const on = this.cityLights ? 1 : 0;
-    cityUniforms.uLampColor.value.setRGB(1.0, 0.76, 0.48).multiplyScalar(11 * this.night * on);
+    cityUniforms.uLampColor.value.setRGB(1.0, 0.76, 0.48).multiplyScalar(8.5 * this.night * on);
     cityUniforms.uNeonK.value = (0.06 + 0.94 * this.night) * on;
     cityUniforms.uWet.value = this.wet;
     cityUniforms.uFogHeight.value.set(1.5, lerp(0.018, 0.03, this.cityK), (1 - this.cityK) * this.night * 0.22, 0);

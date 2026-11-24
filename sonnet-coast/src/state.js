@@ -28,6 +28,10 @@ export const G = {
     showFps: false,
   },
   save: null,
+  interact: { active: false },
+  game: null,
+  menus: null,
+  mode: 'loading',
   events: new Map(),
 };
 

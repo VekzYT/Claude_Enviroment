@@ -146,7 +146,7 @@ export function buildRoads(scene) {
   mats.plain = new THREE.MeshStandardMaterial({ color: 0x4a4a4f, roughness: 0.6, ...off, polygonOffsetFactor: -3 });
   mats.plain.defines = { ...mats.plain.defines, WET_SURFACE: '' };
   add(builders.plain.build(), mats.plain);
-  add(builders.stripes.build(), new THREE.MeshStandardMaterial({ color: 0xe8e2d4, roughness: 0.7, ...off, polygonOffsetFactor: -4 }));
+  add(builders.stripes.build(), new THREE.MeshStandardMaterial({ color: 0xa9a498, roughness: 0.7, ...off, polygonOffsetFactor: -4 }));
   const deck = add(builders.deck.build(), new THREE.MeshStandardMaterial({ color: 0xb9b2a4, roughness: 0.9, flatShading: true, side: THREE.DoubleSide }));
   if (deck) deck.castShadow = true;
   add(builders.wood.build(), new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1, flatShading: true, side: THREE.DoubleSide }));

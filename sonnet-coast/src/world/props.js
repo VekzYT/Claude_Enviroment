@@ -243,7 +243,7 @@ export function buildProps(scene, env, quality) {
         const g = vendGlow.add(tmpMatrix(P.x + inward.x * 0.42, GY + 1.08, P.z + inward.z * 0.42, face, 1), rng.pick(neonCols));
         place(vending, P.x, P.z, face, 0.6, 'vending', 6, [g]);
       }
-      if (D !== 'docks' && rng.chance(0.3)) { at(70, 3.3); place(benches, P.x, P.z, face, 0.7, 'bench', 4); }
+      if (D !== 'docks' && rng.chance(0.3)) { at(70, 4.0); place(benches, P.x, P.z, face, 0.6, 'bench', 4); }
       if (e.type === 'blvd' && rng.chance(0.55)) {
         at(74, 2.7);
         shelters.add(tmpMatrix(P.x, GY, P.z, face, 1));
