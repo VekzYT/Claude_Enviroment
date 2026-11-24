@@ -1,0 +1,21 @@
+// Claude-inspired palette: warm terracotta, cream, slate, against tropical greens and blues.
+export const PAL = {
+  terracotta: 0xc8643b,
+  terracottaLight: 0xd97757,
+  clay: 0xb5532f,
+  cream: 0xf0e8d8,
+  ivory: 0xfaf6ee,
+  sand: 0xe3cfa6,
+  slate: 0x3d3d3a,
+  slateLight: 0x5e5d59,
+  graphite: 0x262624,
+  glass: 0x2a4a5a,
+  teal: 0x2ec4b6,
+  neonCyan: 0x3ff2ff,
+  neonCoral: 0xff7a59,
+  neonAmber: 0xffb347,
+  neonMagenta: 0xff4fd8,
+  neonLime: 0xa6ff4d,
+  police: 0x4da3ff,
+  policeRed: 0xff3355,
+};
