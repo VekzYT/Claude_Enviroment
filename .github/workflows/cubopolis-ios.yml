@@ -1,0 +1,81 @@
+# Builds the Cubopolis iOS app on a Mac runner, the same way Xcode would on a real Mac,
+# then launches it in the iPhone simulator to check that the game actually boots.
+# Nothing is signed or uploaded anywhere: this only proves the project builds and runs.
+name: Cubopolis iOS build
+
+on:
+  push:
+    paths:
+      - "city/**"
+      - ".github/workflows/cubopolis-ios.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: cubopolis-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: city/ios/App
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode and simulators
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes available
+
+      - name: Build for a real iPhone (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/device CODE_SIGNING_ALLOWED=NO build | tail -n 40
+
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/sim CODE_SIGNING_ALLOWED=NO build | tail -n 40
+
+      - name: Launch in the simulator
+        run: |
+          APP=$(find build/sim -path '*Debug-iphonesimulator/App.app' -maxdepth 6 | head -n 1)
+          echo "App bundle: $APP"
+          # Prefer an iPhone 15 Pro, otherwise the newest iPhone Pro the runner has.
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devs = [d for rt, ds in json.load(sys.stdin)["devices"].items() if "iOS" in rt for d in ds]
+          pick = [d for d in devs if d["name"] == "iPhone 15 Pro"] or [d for d in devs if "Pro" in d["name"] and "iPhone" in d["name"]] or [d for d in devs if "iPhone" in d["name"]]
+          print(pick[-1]["udid"])')
+          echo "Simulator: $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl launch --console-pty "$UDID" app.cubopolis.city > app.log 2>&1 &
+          sleep 45
+          xcrun simctl io "$UDID" screenshot shot.png
+          # The app is landscape-only; the simulator framebuffer is portrait, so turn the picture.
+          sips -r 270 shot.png >/dev/null
+          sips -s format jpeg -s formatOptions 55 -Z 1000 shot.png --out shot.jpg >/dev/null
+          echo "----- app log -----"
+          grep -v "^\s*$" app.log | tail -n 150 || true
+          echo "----- screenshot (base64 jpeg) -----"
+          echo "SCREENSHOT_BEGIN"
+          base64 -i shot.jpg | fold -w 1000
+          echo "SCREENSHOT_END"
+          if grep -q "CUBOPOLIS_BOOT_OK" app.log; then echo "Game booted."; else echo "::error::The game never reported CUBOPOLIS_BOOT_OK"; exit 1; fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: simulator-run
+          path: |
+            city/ios/App/shot.png
+            city/ios/App/app.log
+          if-no-files-found: ignore
