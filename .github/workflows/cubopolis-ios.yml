@@ -1,13 +1,10 @@
-# Builds the Cubopolis iOS app on a Mac runner, the same way Xcode would on a real Mac,
-# then launches it in the iPhone simulator to check that the game actually boots.
-# Nothing is signed or uploaded anywhere: this only proves the project builds and runs.
+# Builds the native Cubopolis iOS app on a Mac runner, boots it in the iPhone simulator, and packages
+# an unsigned Cubopolis.ipa. The game is played as a Home Screen web app (see city/IPHONE_SETUP.md),
+# so this only runs when started by hand (Actions -> Cubopolis iOS build -> Run workflow), e.g. to
+# check the native wrapper still builds or to sideload the native version with a paid Apple account.
 name: Cubopolis iOS build
 
 on:
-  push:
-    paths:
-      - "city/**"
-      - ".github/workflows/cubopolis-ios.yml"
   workflow_dispatch:
 
 concurrency:
