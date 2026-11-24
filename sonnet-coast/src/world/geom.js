@@ -94,13 +94,17 @@ export class FacadeBatch {
   }
 }
 
-// Collects instances per world chunk so each chunk can be frustum-culled on its own.
+// Collects instances per world chunk so each chunk can be frustum-culled on its own, and
+// hidden entirely once it is further away than `maxDist`.
+const allChunked = [];
 export class ChunkedInstances {
-  constructor(geometry, material, { chunk = 300, shadow = false, colors = false } = {}) {
+  constructor(geometry, material, { chunk = 300, shadow = false, colors = false, maxDist = 1200 } = {}) {
     this.geometry = geometry; this.material = material; this.chunk = chunk;
-    this.shadow = shadow; this.colors = colors;
+    this.shadow = shadow; this.colors = colors; this.maxDist = maxDist;
     this.buckets = new Map();
     this.meshes = [];
+    this.forceHidden = false;
+    allChunked.push(this);
   }
   add(matrix, color = null) {
     const e = matrix.elements;
@@ -112,7 +116,7 @@ export class ChunkedInstances {
     return { bucket: b, index: b.mats.length - 1 };
   }
   build(parent) {
-    for (const b of this.buckets.values()) {
+    for (const [key, b] of this.buckets) {
       const mesh = new THREE.InstancedMesh(this.geometry, this.material, b.mats.length);
       for (let i = 0; i < b.mats.length; i++) {
         mesh.setMatrixAt(i, b.mats[i]);
@@ -124,12 +128,25 @@ export class ChunkedInstances {
       mesh.castShadow = this.shadow;
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
+      const [cx, cz] = key.split(',').map(Number);
+      mesh.userData.cx = (cx + 0.5) * this.chunk; mesh.userData.cz = (cz + 0.5) * this.chunk;
       b.mesh = mesh;
       b.mats = null;
       parent.add(mesh);
       this.meshes.push(mesh);
     }
     return this;
+  }
+}
+// Call a few times a second: hides instance chunks beyond their draw distance.
+export function cullChunks(x, z, scale = 1) {
+  for (const ci of allChunked) {
+    const lim = ci.maxDist * scale + ci.chunk * 0.71;
+    const lim2 = lim * lim;
+    for (const m of ci.meshes) {
+      const dx = m.userData.cx - x, dz = m.userData.cz - z;
+      m.visible = !ci.forceHidden && dx * dx + dz * dz < lim2;
+    }
   }
 }
 

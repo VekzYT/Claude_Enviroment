@@ -54,11 +54,13 @@ export function queryColliders(x, z, r) {
   return tmp;
 }
 
-// Push a circle (x,z,r) at height y out of static geometry. Returns contact info or null.
-// out receives the corrected position and the collision normal of the deepest hit.
-export function resolveCircle(x, z, r, y, out, heightAbove = 1.5) {
+// Push a circle (x,z,r) at height y out of static geometry. Returns the deepest contact or null.
+// out receives the corrected position. If breakSpeed > 0, breakable props slower-rated than that
+// are not solid: their indices are collected in out.broken instead.
+export function resolveCircle(x, z, r, y, out, heightAbove = 1.5, breakSpeed = 0) {
   const list = queryColliders(x, z, r + 1);
   let hit = null;
+  if (out.broken) out.broken.length = 0; else out.broken = [];
   for (let k = 0; k < list.length; k++) {
     const c = list[k];
     if (y + heightAbove < c.y0 || y > c.y1) continue;
@@ -66,7 +68,7 @@ export function resolveCircle(x, z, r, y, out, heightAbove = 1.5) {
     if (c.type === 'box') {
       const cx = Math.max(c.x0, Math.min(x, c.x1));
       const cz = Math.max(c.z0, Math.min(z, c.z1));
-      let dx = x - cx, dz = z - cz;
+      const dx = x - cx, dz = z - cz;
       const d2 = dx * dx + dz * dz;
       if (d2 > r * r) continue;
       if (d2 < 1e-6) {
@@ -86,6 +88,7 @@ export function resolveCircle(x, z, r, y, out, heightAbove = 1.5) {
       const rr = r + c.r;
       const d2 = dx * dx + dz * dz;
       if (d2 > rr * rr) continue;
+      if (breakSpeed > 0 && c.breakIdx !== undefined && breakSpeed >= c.breakMin) { out.broken.push(c.breakIdx); continue; }
       const d = Math.sqrt(d2) || 1e-4;
       nx = dx / d; nz = dz / d; pen = rr - d;
     }

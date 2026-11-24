@@ -1,6 +1,6 @@
 // Turns the road graph into ribbon meshes, junction patches, bridge decks and pillars.
 import * as THREE from 'three';
-import { edges, nodes, edgePoint } from './roads.js';
+import { edges, nodes, edgePoint, junctionTrim } from './roads.js';
 import { CITY } from './layout.js';
 import { makeRoadTexture } from './textures.js';
 import { rawHeight } from './terrain.js';
@@ -31,16 +31,15 @@ function nodeRadius(n) {
 }
 
 export function buildRoads(scene) {
-  const builders = { asphalt: new GeoBuilder(), dirt: new GeoBuilder(), plain: new GeoBuilder(), deck: new GeoBuilder(), wood: new GeoBuilder(), stripes: new GeoBuilder() };
+  const builders = { blvd: new GeoBuilder(), asphalt: new GeoBuilder(), dirt: new GeoBuilder(), plain: new GeoBuilder(), deck: new GeoBuilder(), wood: new GeoBuilder(), stripes: new GeoBuilder() };
   const P = {};
   const LIFT = 0.035;
 
   for (const e of edges) {
     const isDirt = e.type === 'dirt';
-    const b = isDirt ? builders.dirt : builders.asphalt;
+    const b = isDirt ? builders.dirt : e.type === 'blvd' ? builders.blvd : builders.asphalt;
     const hw = e.spec.hw;
-    const trimA = nodeRadius(e.a) * (e.a.edges.length >= 3 || e.type === 'city' ? 1 : 0);
-    const trimB = nodeRadius(e.b) * (e.b.edges.length >= 3 || e.type === 'city' ? 1 : 0);
+    const trimA = junctionTrim(e.a, e), trimB = junctionTrim(e.b, e);
     const s0 = trimA, s1 = e.len - trimB;
     if (s1 - s0 < 1) continue;
     const n = Math.max(1, Math.ceil((s1 - s0) / 5));
@@ -98,19 +97,19 @@ export function buildRoads(scene) {
   const pl = builders.plain;
   for (const n of nodes) {
     if (n.edges.length < 2) continue;
-    const isCity = n.edges.some((e) => e.type === 'city');
+    // (grid nodes always get a box; others only when three or more roads meet)
     const allDirt = n.edges.every((e) => e.type === 'dirt');
-    const r = nodeRadius(n);
     const y = n.y + LIFT - 0.004;
     const target = allDirt ? builders.dirt : pl;
-    if (isCity) {
-      const a = target.vert(n.x - r, y, n.z - r, 0, 0), b = target.vert(n.x - r, y, n.z + r, 0, 1);
-      const c = target.vert(n.x + r, y, n.z + r, 1, 1), d = target.vert(n.x + r, y, n.z - r, 1, 0);
+    if (n.grid) {
+      const hx = n.hx, hz = n.hz;
+      const a = target.vert(n.x - hx, y, n.z - hz, 0, 0), b = target.vert(n.x - hx, y, n.z + hz, 0, 1);
+      const c = target.vert(n.x + hx, y, n.z + hz, 1, 1), d = target.vert(n.x + hx, y, n.z - hz, 1, 0);
       target.quad(a, b, c, d);
-      // crosswalk bars
-      crosswalk(builders, n, r, y + 0.006);
+      crosswalk(builders, n, y + 0.006);
     } else {
-      const rr = r * 1.35;
+      if (n.edges.length < 3) continue;
+      const rr = nodeRadius(n) * 1.35;
       const c0 = target.vert(n.x, y, n.z, 0.5, 0.5);
       const ring = [];
       for (let k = 0; k < 14; k++) {
@@ -123,6 +122,7 @@ export function buildRoads(scene) {
 
   const group = new THREE.Group();
   group.name = 'roads';
+  const mats = {};
   const add = (geo, mat) => {
     if (!geo.getAttribute('position').count) return;
     const m = new THREE.Mesh(geo, mat);
@@ -132,34 +132,59 @@ export function buildRoads(scene) {
     return m;
   };
   const off = { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 };
-  add(builders.asphalt.build(), new THREE.MeshStandardMaterial({ map: makeRoadTexture('city'), roughness: 0.82, metalness: 0.05, ...off }));
-  add(builders.dirt.build(), new THREE.MeshStandardMaterial({ map: makeRoadTexture('dirt'), roughness: 1, ...off }));
-  add(builders.plain.build(), new THREE.MeshStandardMaterial({ color: 0x2b2b2e, roughness: 0.85, ...off, polygonOffsetFactor: -3 }));
+  const roadMat = (type) => {
+    const t = makeRoadTexture(type);
+    const m = new THREE.MeshStandardMaterial({ map: t.map, roughnessMap: t.rough, roughness: 1, metalness: 0.0, ...off });
+    m.defines = { ...m.defines, WET_SURFACE: '' };
+    return m;
+  };
+  mats.asphalt = roadMat('city');
+  mats.blvd = roadMat('blvd');
+  add(builders.asphalt.build(), mats.asphalt);
+  add(builders.blvd.build(), mats.blvd);
+  add(builders.dirt.build(), new THREE.MeshStandardMaterial({ map: makeRoadTexture('dirt').map, roughness: 1, ...off }));
+  mats.plain = new THREE.MeshStandardMaterial({ color: 0x4a4a4f, roughness: 0.6, ...off, polygonOffsetFactor: -3 });
+  mats.plain.defines = { ...mats.plain.defines, WET_SURFACE: '' };
+  add(builders.plain.build(), mats.plain);
   add(builders.stripes.build(), new THREE.MeshStandardMaterial({ color: 0xe8e2d4, roughness: 0.7, ...off, polygonOffsetFactor: -4 }));
   const deck = add(builders.deck.build(), new THREE.MeshStandardMaterial({ color: 0xb9b2a4, roughness: 0.9, flatShading: true, side: THREE.DoubleSide }));
   if (deck) deck.castShadow = true;
   add(builders.wood.build(), new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1, flatShading: true, side: THREE.DoubleSide }));
   scene.add(group);
+  group.userData.mats = mats;
   return group;
 }
 
-function crosswalk(builders, n, r, y) {
+function crosswalk(builders, n, y) {
   const s = builders.stripes;
   // four sides; bars run parallel to traffic
   for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-    const hasEdge = n.edges.some((e) => {
+    const edge = n.edges.find((e) => {
       const o = e.a === n ? e.b : e.a;
-      return Math.sign(o.x - n.x) === dx && Math.sign(o.z - n.z) === dz;
+      return e.grid && Math.sign(o.x - n.x) === dx && Math.sign(o.z - n.z) === dz;
     });
-    if (!hasEdge) continue;
-    const cx = n.x + dx * (r + 2.2), cz = n.z + dz * (r + 2.2);
-    for (let k = -4; k <= 4; k++) {
-      const ox = dz * k * 1.45, oz = dx * k * 1.45;
-      const hx = Math.abs(dx) * 1.5 + Math.abs(dz) * 0.42, hz = Math.abs(dz) * 1.5 + Math.abs(dx) * 0.42;
+    if (!edge) continue;
+    const reach = dx ? n.hx : n.hz;       // distance from the centre to this side of the box
+    const half = edge.spec.hw - 0.6;      // half-length of the crossing
+    const cx = n.x + dx * (reach + 2.4), cz = n.z + dz * (reach + 2.4);
+    const bars = Math.floor(half / 0.75);
+    for (let k = -bars; k <= bars; k++) {
+      if (k % 2) continue;
+      const ox = dz * k * 0.75, oz = dx * k * 0.75;
+      const hx = Math.abs(dx) * 1.5 + Math.abs(dz) * 0.36, hz = Math.abs(dz) * 1.5 + Math.abs(dx) * 0.36;
       const a = s.vert(cx + ox - hx, y, cz + oz - hz, 0, 0), b = s.vert(cx + ox - hx, y, cz + oz + hz, 0, 1);
       const c = s.vert(cx + ox + hx, y, cz + oz + hz, 1, 1), d = s.vert(cx + ox + hx, y, cz + oz - hz, 1, 0);
       s.quad(a, b, c, d);
     }
+    // stop line for traffic arriving on this side (their right-hand half of the road)
+    const sx = n.x + dx * (reach + 4.6), sz = n.z + dz * (reach + 4.6);
+    const lat = half / 2 + 0.3;
+    // arriving traffic drives towards the node: heading (-dx,-dz); its right side is (-(-dz), (-dx)) = (dz, -dx)
+    const mx = sx + dz * lat, mz = sz - dx * lat;
+    const lx = Math.abs(dz) * (half / 2) + Math.abs(dx) * 0.22, lz = Math.abs(dx) * (half / 2) + Math.abs(dz) * 0.22;
+    const a = s.vert(mx - lx, y, mz - lz, 0, 0), b = s.vert(mx - lx, y, mz + lz, 0, 1);
+    const c = s.vert(mx + lx, y, mz + lz, 1, 1), d = s.vert(mx + lx, y, mz - lz, 1, 0);
+    s.quad(a, b, c, d);
   }
 }
 

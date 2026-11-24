@@ -8,6 +8,7 @@ const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q0 = new THREE.Qua
 
 export function registerBreakable(b) {
   b.collider.breakIdx = breakables.length;
+  b.collider.breakMin = b.minSpeed ?? 6;
   breakables.push(b);
   return b;
 }
@@ -18,6 +19,7 @@ export function breakProp(idx, dx, dz) {
   if (!b || b.broken) return false;
   b.broken = true;
   removeCollider(b.collider);
+  if (b.onBreak) b.onBreak(b);
   const len = Math.hypot(dx, dz) || 1;
   b.dx = dx / len; b.dz = dz / len;
   b.t = 0;

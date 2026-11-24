@@ -2,7 +2,9 @@
 import * as THREE from 'three';
 import { WORLD_MIN, WORLD_MAX, FLAT_ZONES } from './layout.js';
 import { forestMask, swampMask, meadowMask, landDist, rawHeight } from './terrain.js';
-import { terrainHeight, roadAt } from './roads.js';
+import { terrainHeight, roadAt, edges, edgePoint } from './roads.js';
+import { blockAt } from './cityplan.js';
+import { CITY } from './layout.js';
 import { Batch, ChunkedInstances, tmpMatrix } from './geom.js';
 import { addCircle } from './colliders.js';
 import { parkSpots } from './city.js';
@@ -16,19 +18,19 @@ function palmGeo() {
   const b = new Batch();
   // curved trunk
   let x = 0, y = 0;
-  const segs = 6, h = 9;
+  const segs = 4, h = 9;
   for (let i = 0; i < segs; i++) {
     const t = i / segs;
     const lean = 0.12 + t * 0.18;
     const len = h / segs + 0.15;
-    b.add(new THREE.CylinderGeometry(0.2 - t * 0.06, 0.26 - t * 0.06, len, 6), 0x8a6a48, x + Math.sin(lean) * len / 2, y + Math.cos(lean) * len / 2, 0, 0, 0, -lean);
+    b.add(new THREE.CylinderGeometry(0.2 - t * 0.06, 0.26 - t * 0.06, len, 5, 1, true), 0x8a6a48, x + Math.sin(lean) * len / 2, y + Math.cos(lean) * len / 2, 0, 0, 0, -lean);
     x += Math.sin(lean) * (h / segs); y += Math.cos(lean) * (h / segs);
   }
   // fronds
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2 + (i % 2) * 0.2;
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2 + (i % 2) * 0.2;
     const droop = 0.35 + (i % 3) * 0.14;
-    const g = new THREE.PlaneGeometry(1.1, 4.6, 1, 4);
+    const g = new THREE.PlaneGeometry(1.2, 4.6, 1, 3);
     g.translate(0, 2.3, 0);
     const p = g.getAttribute('position');
     for (let k = 0; k < p.count; k++) {
@@ -60,10 +62,10 @@ function pineGlowGeo() {
 }
 function broadleafGeo() {
   const b = new Batch();
-  b.add(new THREE.CylinderGeometry(0.28, 0.45, 4.5, 6), 0x4a382a, 0, 2.25, 0);
-  b.sphere(3.0, 0, 6.2, 0, 0x2f7a3a, 1, 0.85, 1, 1);
-  b.sphere(2.2, 1.8, 5.2, 0.6, 0x3a8c40, 1, 0.8, 1, 1);
-  b.sphere(2.0, -1.5, 5.4, -0.9, 0x2a6e36, 1, 0.8, 1, 1);
+  b.add(new THREE.CylinderGeometry(0.28, 0.45, 4.5, 5, 1, true), 0x4a382a, 0, 2.25, 0);
+  b.sphere(3.0, 0, 6.2, 0, 0x2f7a3a, 1, 0.85, 1, 0);
+  b.sphere(2.2, 1.8, 5.2, 0.6, 0x3a8c40, 1, 0.8, 1, 0);
+  b.sphere(2.0, -1.5, 5.4, -0.9, 0x2a6e36, 1, 0.8, 1, 0);
   return b.merged();
 }
 function cypressGeo() {
@@ -167,23 +169,25 @@ export function buildNature(scene, env, quality) {
   };
 
   const sh = quality === 'high';
-  const palms = new ChunkedInstances(palmGeo(), leafMat, { shadow: sh });
-  const pines = new ChunkedInstances(pineGeo(), solidMat, { shadow: sh });
-  const pineGlow = [new ChunkedInstances(pineGlowGeo(), glowMat(PAL.neonCyan)), new ChunkedInstances(pineGlowGeo(), glowMat(PAL.neonMagenta)), new ChunkedInstances(pineGlowGeo(), glowMat(PAL.neonLime))];
-  const broad = new ChunkedInstances(broadleafGeo(), solidMat, { shadow: sh });
-  const cypress = new ChunkedInstances(cypressGeo(), leafMat, { shadow: sh });
-  const mangrove = new ChunkedInstances(mangroveGeo(), leafMat, { shadow: false });
+  const palms = new ChunkedInstances(palmGeo(), leafMat, { shadow: sh, chunk: 250, maxDist: 900 });
+  const pines = new ChunkedInstances(pineGeo(), solidMat, { shadow: sh, maxDist: 1250 });
+  const gl = { maxDist: 520 };
+  const pineGlow = [new ChunkedInstances(pineGlowGeo(), glowMat(PAL.neonCyan), gl), new ChunkedInstances(pineGlowGeo(), glowMat(PAL.neonMagenta), gl), new ChunkedInstances(pineGlowGeo(), glowMat(PAL.neonLime), gl)];
+  const broad = new ChunkedInstances(broadleafGeo(), solidMat, { shadow: sh, chunk: 250, maxDist: 800 });
+  const cypress = new ChunkedInstances(cypressGeo(), leafMat, { shadow: sh, maxDist: 950 });
+  const mangrove = new ChunkedInstances(mangroveGeo(), leafMat, { shadow: false, maxDist: 600 });
   const mg = mushroomGeo();
-  const stems = new ChunkedInstances(mg.stems, solidMat);
-  const caps = [new ChunkedInstances(mg.caps, glowMat(PAL.neonCyan)), new ChunkedInstances(mg.caps, glowMat(PAL.neonMagenta)), new ChunkedInstances(mg.caps, glowMat(0x7dffb0))];
+  const near = { chunk: 200, maxDist: 260 };
+  const stems = new ChunkedInstances(mg.stems, solidMat, near);
+  const caps = [new ChunkedInstances(mg.caps, glowMat(PAL.neonCyan), gl), new ChunkedInstances(mg.caps, glowMat(PAL.neonMagenta), gl), new ChunkedInstances(mg.caps, glowMat(0x7dffb0), gl)];
   const fernMatBase = (hex) => { const m = glowMat(hex); m.side = THREE.DoubleSide; return m; };
-  const ferns = [new ChunkedInstances(glowFernGeo(), fernMatBase(0x35e0c8)), new ChunkedInstances(glowFernGeo(), fernMatBase(0xb46bff))];
-  const reeds = new ChunkedInstances(reedGeo(), leafMat);
-  const rocks = new ChunkedInstances(rockGeo(), solidMat, { shadow: sh });
-  const umbrellas = new ChunkedInstances(umbrellaGeo(), leafMat);
+  const ferns = [new ChunkedInstances(glowFernGeo(), fernMatBase(0x35e0c8), gl), new ChunkedInstances(glowFernGeo(), fernMatBase(0xb46bff), gl)];
+  const reeds = new ChunkedInstances(reedGeo(), leafMat, near);
+  const rocks = new ChunkedInstances(rockGeo(), solidMat, { shadow: sh, maxDist: 500 });
+  const umbrellas = new ChunkedInstances(umbrellaGeo(), leafMat, { chunk: 200, maxDist: 380 });
   const lilyGeo = new THREE.CircleGeometry(0.55, 7, 0.4, 5.6);
   lilyGeo.rotateX(-Math.PI / 2);
-  const lilies = new ChunkedInstances(lilyGeo, new THREE.MeshStandardMaterial({ color: 0x3f8f45, roughness: 0.6, side: THREE.DoubleSide }));
+  const lilies = new ChunkedInstances(lilyGeo, new THREE.MeshStandardMaterial({ color: 0x3f8f45, roughness: 0.6, side: THREE.DoubleSide }), near);
 
   const placePalm = (x, z, y, breakable) => {
     const ref = palms.add(tmpMatrix(x, y - 0.1, z, rng.float(0, 6.28), rng.float(1.0, 1.5)));
@@ -266,10 +270,38 @@ export function buildNature(scene, env, quality) {
       }
     } else if (roll > 0.99) { const sc = rng.float(0.5, 1.4); rocks.add(tmpMatrix(x, h - 0.2, z, rng.float(0, 6.28), sc)); addCircle(x, z, sc * 0.8, 0, h + sc * 0.6, {}); }
   }
-  // City parks
+  // City parks and plaza planters
+  const GY = CITY.y + 0.16;
+  const placeBroad = (x, z, y, sc) => { broad.add(tmpMatrix(x, y - 0.15, z, rng.float(0, 6.28), sc)); addCircle(x, z, 0.4 * sc, 0, y + 5, {}); };
   for (const p of parkSpots) {
-    if (rng.chance(0.6)) placePalm(p.x, p.z, 2.16, true);
-    else { broad.add(tmpMatrix(p.x, 2.0, p.z, rng.float(0, 6.28), rng.float(0.8, 1.1))); addCircle(p.x, p.z, 0.45, 0, 7, {}); }
+    const y = p.planter ? GY + 0.7 : GY;
+    if (rng.chance(p.planter ? 0.5 : 0.45)) placePalm(p.x, p.z, y, !p.planter);
+    else placeBroad(p.x, p.z, y, rng.float(0.75, 1.15));
+  }
+  // Street trees along every kerb, palms down the boulevard medians and the boardwalk
+  const P = {};
+  const palmy = { ocean: 1, strip: 0.9, downtown: 0.55, midtown: 0.4, uptown: 0.25, riverside: 0.2, oldtown: 0.15 };
+  for (const e of edges) {
+    if (!e.grid) continue;
+    for (const side of [-1, 1]) {
+      edgePoint(e, 50, (e.spec.hw + 3) * side, P);
+      const block = blockAt(P.x, P.z);
+      const D = block ? block.district : 'ocean';
+      if (D === 'docks' || (block && block.park)) continue;
+      for (const s of [34, 66]) {
+        if (!rng.chance(0.82 * dens + 0.1)) continue;
+        edgePoint(e, s + rng.float(-2, 2), (e.spec.hw + 2.5) * side, P);
+        if (rng.chance(palmy[D] ?? 0.3)) placePalm(P.x, P.z, GY, true);
+        else placeBroad(P.x, P.z, GY, rng.float(0.6, 0.85));
+      }
+    }
+    if (e.type === 'blvd') {
+      for (let s = 22; s <= 78; s += 11) { edgePoint(e, s, 0, P); placePalm(P.x, P.z, CITY.y + 0.03, true); }
+    }
+  }
+  for (let z = CITY.promenade.z0 + 12; z < CITY.promenade.z1 - 8; z += 15) {
+    if (Math.abs(z) < 12) continue; // keep the pier entrance open
+    placePalm(CITY.promenade.x0 + 3.5, z + rng.float(-2, 2), GY, true);
   }
 
   for (const ci of [palms, pines, ...pineGlow, broad, cypress, mangrove, stems, ...caps, ...ferns, reeds, rocks, umbrellas, lilies]) ci.build(group);

@@ -1,12 +1,13 @@
 // Road graph (city grid + highways + dirt trails), road height profiles with bridges,
 // and the final ground-height / surface queries used by physics.
-import { CITY, ROADS, WATER_Y } from './layout.js';
+import { CITY, ROADS, WATER_Y, STREET_NAMES } from './layout.js';
 import { rawHeight, biomeAt, BIOME, swampMask } from './terrain.js';
 import { SegmentIndex } from '../util/segindex.js';
 import { catmullRom, smoothstep, lerp, clamp, segProject } from '../util/math.js';
 
 export const ROAD_SPEC = {
-  city: { hw: 7, lanes: [1.9, 5.2], speed: 15, bridge: 4, surface: 'asphalt' },
+  city: { hw: 7, lanes: [1.9, 5.2], speed: 14, bridge: 4, surface: 'asphalt' },
+  blvd: { hw: 11, lanes: [3.5, 7.0], speed: 18, bridge: 4, surface: 'asphalt' },
   highway: { hw: 9, lanes: [2.3, 6.6], speed: 24, bridge: 5.5, surface: 'asphalt' },
   road: { hw: 6.5, lanes: [1.9, 4.9], speed: 18, bridge: 4.2, surface: 'asphalt' },
   dirt: { hw: 3.8, lanes: [1.6], speed: 11, bridge: 2.4, surface: 'dirt' },
@@ -16,6 +17,7 @@ export const nodes = [];
 export const edges = [];
 export const roadIndex = new SegmentIndex(40);
 
+function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 function makeNode(x, z) {
   const n = { id: nodes.length, x, z, y: 0, edges: [] };
   nodes.push(n);
@@ -64,11 +66,16 @@ function attach(x, z) {
 }
 
 function buildGraph() {
-  const { xs, zs } = CITY;
+  const { xs, zs, xw, zw } = CITY;
   const grid = [];
   for (let i = 0; i < xs.length; i++) {
     grid[i] = [];
-    for (let j = 0; j < zs.length; j++) grid[i][j] = makeNode(xs[i], zs[j]);
+    for (let j = 0; j < zs.length; j++) {
+      const n = makeNode(xs[i], zs[j]);
+      n.grid = true; n.gi = i; n.gj = j;
+      n.hx = xw[i]; n.hz = zw[j]; // half-extents of the intersection box
+      grid[i][j] = n;
+    }
   }
   const straight = (a, b) => {
     const len = Math.hypot(b.x - a.x, b.z - a.z);
@@ -78,8 +85,16 @@ function buildGraph() {
     return pts;
   };
   for (let i = 0; i < xs.length; i++) for (let j = 0; j < zs.length; j++) {
-    if (i + 1 < xs.length) makeEdge(grid[i][j], grid[i + 1][j], straight(grid[i][j], grid[i + 1][j]), 'city', 'City Street');
-    if (j + 1 < zs.length) makeEdge(grid[i][j], grid[i][j + 1], straight(grid[i][j], grid[i][j + 1]), 'city', 'City Street');
+    if (i + 1 < xs.length) {
+      const blvd = zw[j] > 8;
+      const e = makeEdge(grid[i][j], grid[i + 1][j], straight(grid[i][j], grid[i + 1][j]), blvd ? 'blvd' : 'city', STREET_NAMES.z[zs[j]] || `${ordinal(j + 1)} Street`);
+      e.grid = true; e.axis = 'x';
+    }
+    if (j + 1 < zs.length) {
+      const blvd = xw[i] > 8;
+      const e = makeEdge(grid[i][j], grid[i][j + 1], straight(grid[i][j], grid[i][j + 1]), blvd ? 'blvd' : 'city', STREET_NAMES.x[xs[i]] || `${ordinal(i + 1)} Avenue`);
+      e.grid = true; e.axis = 'z';
+    }
   }
   for (const r of ROADS) {
     const ctrl = r.pts.map(([x, z]) => ({ x, z }));
@@ -100,8 +115,7 @@ function buildGraph() {
 function computeProfiles() {
   for (const n of nodes) {
     let y = rawHeight(n.x, n.z);
-    const types = n.edges.map((e) => e.type);
-    if (types.includes('city')) y = CITY.y;
+    if (n.grid) y = CITY.y;
     n.y = Math.max(y, 0.9);
   }
   for (const e of edges) {
@@ -114,7 +128,7 @@ function computeProfiles() {
       pts[i].s = s;
     }
     e.len = s;
-    if (e.type === 'city') { for (const p of pts) { p.y = CITY.y; p.bridge = false; } continue; }
+    if (e.grid) { for (const p of pts) { p.y = CITY.y; p.bridge = false; } continue; }
     const raw = pts.map((p) => rawHeight(p.x, p.z));
     const under = raw.map((h) => h < 0.7);
     // Smooth the ground profile.
@@ -198,10 +212,26 @@ export function terrainHeight(x, z) {
 // City blocks are raised kerbs.
 export const KERB = 0.16;
 function kerbAt(x, z) {
-  if (x <= CITY.x0 || x >= CITY.x1 || z <= CITY.z0 || z >= CITY.z1) return 0;
-  const fx = (x - CITY.x0) % 100, fz = (z - CITY.z0) % 100;
-  const hw = CITY.roadW / 2;
-  return fx > hw && fx < 100 - hw && fz > hw && fz < 100 - hw ? KERB : 0;
+  const { xs, zs, xw, zw } = CITY;
+  const i = Math.floor((x - CITY.x0) / 100), j = Math.floor((z - CITY.z0) / 100);
+  const pr = CITY.promenade;
+  if (x > pr.x0 && x < pr.x1 && z > pr.z0 && z < pr.z1) return KERB;
+  if (i < 0 || j < 0 || i >= xs.length - 1 || j >= zs.length - 1) return 0;
+  const fx = x - xs[i], fz = z - zs[j];
+  return fx > xw[i] && fx < 100 - xw[i + 1] && fz > zw[j] && fz < 100 - zw[j + 1] ? KERB : 0;
+}
+
+// How far a road ribbon is trimmed back from a junction node.
+export function junctionTrim(n, e) {
+  if (n.edges.length < 2) return 0;
+  if (n.grid) {
+    const o = e.a === n ? e.pts[Math.min(2, e.pts.length - 1)] : e.pts[Math.max(0, e.pts.length - 3)];
+    return Math.abs(o.z - n.z) > Math.abs(o.x - n.x) ? n.hz : n.hx;
+  }
+  if (n.edges.length < 3) return 0;
+  let r = 0;
+  for (const x of n.edges) r = Math.max(r, x.spec.hw);
+  return r;
 }
 
 export const ramps = [];

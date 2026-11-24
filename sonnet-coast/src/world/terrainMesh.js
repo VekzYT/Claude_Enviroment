@@ -1,6 +1,6 @@
 // Renders the analytic terrain as a grid of tiles with vertex colours per biome.
 import * as THREE from 'three';
-import { WORLD_MIN, WORLD_MAX, CITY } from './layout.js';
+import { WORLD_MIN, WORLD_MAX, CITY, RECT } from './layout.js';
 import { terrainHeight, roadAt } from './roads.js';
 import { forestMask, swampMask, meadowMask, landDist } from './terrain.js';
 import { makeNoise2D } from '../util/noise.js';
@@ -42,11 +42,11 @@ export function terrainColor(x, z, h, slope, out) {
   if (f > 0) mix(out, mix(C.forest, C.forestMoss, n, tmp), f, out);
   const s = swampMask(x, z);
   if (s > 0) mix(out, mix(C.swamp, C.mud, smoothstep(1.3, 0.2, h) * 0.8 + n2 * 0.2, tmp), s, out);
-  const cw = rectW(x, z, -322, 622, -322, 322, 14);
+  const cw = rectW(x, z, CITY.x0 - 9, CITY.x1 + 30, CITY.z0 - 9, CITY.z1 + 9, 7);
   if (cw > 0) mix(out, C.city, cw, out);
-  const pw = rectW(x, z, 440, 870, 890, 1100, 20);
+  const pw = rectW(x, z, RECT.port.x0 + 10, RECT.port.x1 - 10, RECT.port.z0 + 10, RECT.port.z1 - 10, 20);
   if (pw > 0) mix(out, C.port, pw, out);
-  const rw = rectW(x, z, 310, 730, -690, -470, 20);
+  const rw = rectW(x, z, RECT.ridge.x0 + 10, RECT.ridge.x1 - 10, RECT.ridge.z0 + 10, RECT.ridge.z1 - 10, 20);
   if (rw > 0) mix(out, C.ridge, rw, out);
   // Beach
   const d = landDist(x, z);
@@ -61,6 +61,65 @@ export function terrainColor(x, z, h, slope, out) {
   return out;
 }
 
+// One tile at a given vertex spacing. Coarse tiles get a skirt so LOD seams never show sky.
+function tileGeometry(tx, tz, step, skirt) {
+  const n = TILE / step;
+  const W = n + 3;
+  const hs = new Float32Array(W * W);
+  let maxH = -99;
+  for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) {
+    const h = terrainHeight(tx + (i - 1) * step, tz + (j - 1) * step);
+    hs[j * W + i] = h;
+    if (h > maxH) maxH = h;
+  }
+  if (maxH < -6) return null; // open sea, nothing to draw
+  const col = [0, 0, 0];
+  const pos = [], nor = [], colr = [], uv = [], idx = [];
+  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
+    const x = tx + i * step, z = tz + j * step;
+    const h = hs[(j + 1) * W + i + 1];
+    const hl = hs[(j + 1) * W + i], hr = hs[(j + 1) * W + i + 2];
+    const hu = hs[j * W + i + 1], hd = hs[(j + 2) * W + i + 1];
+    let nx = hl - hr, ny = 2 * step, nz = hu - hd;
+    const len = Math.hypot(nx, ny, nz);
+    nx /= len; ny /= len; nz /= len;
+    pos.push(x, h, z); nor.push(nx, ny, nz);
+    terrainColor(x, z, h, 1 - ny, col);
+    colr.push(clamp(col[0], 0, 1), clamp(col[1], 0, 1), clamp(col[2], 0, 1));
+    uv.push(x / 14, z / 14);
+  }
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const a = j * (n + 1) + i, b = a + 1, c = a + n + 1, d = c + 1;
+    idx.push(a, c, b, b, c, d);
+  }
+  if (skirt > 0) {
+    const edge = [];
+    for (let i = 0; i <= n; i++) edge.push(i);                          // north
+    for (let j = 1; j <= n; j++) edge.push(j * (n + 1) + n);            // east
+    for (let i = n - 1; i >= 0; i--) edge.push(n * (n + 1) + i);        // south
+    for (let j = n - 1; j >= 1; j--) edge.push(j * (n + 1));            // west
+    const base = pos.length / 3;
+    for (const e of edge) {
+      pos.push(pos[e * 3], pos[e * 3 + 1] - skirt, pos[e * 3 + 2]);
+      nor.push(nor[e * 3], nor[e * 3 + 1], nor[e * 3 + 2]);
+      colr.push(colr[e * 3], colr[e * 3 + 1], colr[e * 3 + 2]);
+      uv.push(uv[e * 2], uv[e * 2 + 1]);
+    }
+    for (let k = 0; k < edge.length; k++) {
+      const a = edge[k], b = edge[(k + 1) % edge.length], c = base + k, d = base + ((k + 1) % edge.length);
+      idx.push(a, b, c, b, d, c, a, c, b, b, c, d); // both windings: visible from either side
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.computeBoundingSphere();
+  return geo;
+}
+
 export function buildTerrain(scene) {
   const group = new THREE.Group();
   group.name = 'terrain';
@@ -68,58 +127,27 @@ export function buildTerrain(scene) {
     vertexColors: true, roughness: 0.96, metalness: 0,
     map: makeNoiseTexture(5, 256, 0.16),
   });
-  const n = TILE / STEP;
-  const col = [0, 0, 0];
-  // Pad one tile of open sea around the island so the seabed reaches the fog.
+  const tiles = [];
   for (let tx = WORLD_MIN; tx < WORLD_MAX; tx += TILE) for (let tz = WORLD_MIN; tz < WORLD_MAX; tz += TILE) {
-    // heights with a 1-sample border for normals
-    const W = n + 3;
-    const hs = new Float32Array(W * W);
-    let maxH = -99;
-    for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) {
-      const h = terrainHeight(tx + (i - 1) * STEP, tz + (j - 1) * STEP);
-      hs[j * W + i] = h;
-      if (h > maxH) maxH = h;
-    }
-    if (maxH < -6) continue; // open sea, nothing to draw
-    const V = (n + 1) * (n + 1);
-    const pos = new Float32Array(V * 3), nor = new Float32Array(V * 3), colr = new Float32Array(V * 3), uv = new Float32Array(V * 2);
-    let p = 0, q = 0;
-    for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
-      const x = tx + i * STEP, z = tz + j * STEP;
-      const h = hs[(j + 1) * W + i + 1];
-      const hl = hs[(j + 1) * W + i], hr = hs[(j + 1) * W + i + 2];
-      const hu = hs[j * W + i + 1], hd = hs[(j + 2) * W + i + 1];
-      let nx = hl - hr, ny = 2 * STEP, nz = hu - hd;
-      const len = Math.hypot(nx, ny, nz);
-      nx /= len; ny /= len; nz /= len;
-      pos[p] = x; pos[p + 1] = h; pos[p + 2] = z;
-      nor[p] = nx; nor[p + 1] = ny; nor[p + 2] = nz;
-      terrainColor(x, z, h, 1 - ny, col);
-      // Darken the verge under dirt trails a touch, so they read from a distance.
-      colr[p] = clamp(col[0], 0, 1); colr[p + 1] = clamp(col[1], 0, 1); colr[p + 2] = clamp(col[2], 0, 1);
-      uv[q] = x / 14; uv[q + 1] = z / 14;
-      p += 3; q += 2;
-    }
-    const idx = new Uint32Array(n * n * 6);
-    let k = 0;
-    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-      const a = j * (n + 1) + i, b = a + 1, c = a + n + 1, d = c + 1;
-      idx[k++] = a; idx[k++] = c; idx[k++] = b;
-      idx[k++] = b; idx[k++] = c; idx[k++] = d;
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(colr, 3));
-    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    geo.setIndex(new THREE.BufferAttribute(idx, 1));
-    geo.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geo, mat);
+    const fine = tileGeometry(tx, tz, STEP, 0);
+    if (!fine) continue;
+    const coarse = tileGeometry(tx, tz, STEP * 3, 4);
+    const mesh = new THREE.Mesh(fine, mat);
     mesh.receiveShadow = true;
     mesh.matrixAutoUpdate = false;
     group.add(mesh);
+    tiles.push({ mesh, fine, coarse, cx: tx + TILE / 2, cz: tz + TILE / 2, lod: 0 });
   }
   scene.add(group);
-  return group;
+  return {
+    group,
+    // Swap distant tiles to the coarse mesh.
+    update(x, z) {
+      for (const t of tiles) {
+        const d = Math.max(Math.abs(t.cx - x), Math.abs(t.cz - z));
+        const lod = d > (t.lod ? 520 : 600) ? 1 : 0;
+        if (lod !== t.lod) { t.lod = lod; t.mesh.geometry = lod ? t.coarse : t.fine; }
+      }
+    },
+  };
 }

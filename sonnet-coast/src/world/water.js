@@ -16,7 +16,7 @@ export function buildWater(scene) {
     const shallow = smoothstep(3.5, 0, depth);
     // sea
     let r = lerp(0.02, 0.10, shallow), g = lerp(0.20, 0.62, shallow), b = lerp(0.36, 0.62, shallow);
-    const sw = Math.max(swampMask(x, z), smoothstep(60, 20, riverDist(x, z)) * (1 - forestMask(x, z) * 0.5));
+    const sw = Math.max(smoothstep(0.12, 0.5, swampMask(x, z)), smoothstep(100, 34, riverDist(x, z)) * (1 - forestMask(x, z) * 0.5));
     if (sw > 0) {
       const k = clamp(sw, 0, 1);
       r = lerp(r, 0.10, k); g = lerp(g, 0.19, k); b = lerp(b, 0.11, k);
@@ -49,16 +49,19 @@ export function buildWater(scene) {
     uniforms,
     fog: true,
     vertexShader: /* glsl */`
+      #include <common>
       varying vec3 vWorld;
       #include <fog_pars_vertex>
       void main() {
         vec4 wp = modelMatrix * vec4(position, 1.0);
         vWorld = wp.xyz;
+        vCityPos = wp.xyz;
         vec4 mvPosition = viewMatrix * wp;
         gl_Position = projectionMatrix * mvPosition;
         #include <fog_vertex>
       }`,
     fragmentShader: /* glsl */`
+      #include <common>
       uniform sampler2D uMap;
       uniform float uTime, uAmbient;
       uniform vec3 uSunDir, uSunColor, uSkyColor, uHorizon;

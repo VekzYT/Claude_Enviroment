@@ -3,7 +3,7 @@
 import { makeNoise2D, fbm } from '../util/noise.js';
 import { smoothstep, lerp, clamp, catmullRom } from '../util/math.js';
 import { SegmentIndex } from '../util/segindex.js';
-import { FLAT_ZONES, RIVER, RIVER_HALF_W, WATER_Y } from './layout.js';
+import { FLAT_ZONES, RIVER, RIVER_HALF_W, WATER_Y, RECT } from './layout.js';
 
 const nHill = makeNoise2D(11);
 const nSwamp = makeNoise2D(23);
@@ -18,7 +18,7 @@ for (let i = 0; i < riverPts.length - 1; i++) {
   riverIndex.add(a.x, a.z, b.x, b.z, 140, null);
 }
 
-export function coastEastX(z) { return 940 + 55 * Math.sin(z * 0.0061) + 25 * Math.sin(z * 0.017 + 1.3) + 12 * nCoast(z * 0.01, 3.1); }
+export function coastEastX(z) { return 972 + 55 * Math.sin(z * 0.0061) + 25 * Math.sin(z * 0.017 + 1.3) + 12 * nCoast(z * 0.01, 3.1); }
 export function coastSouthZ(x) {
   return 1190 + 45 * Math.sin(x * 0.007 + 0.5) + 18 * Math.sin(x * 0.021) + 12 * nCoast(x * 0.01, 7.7)
     + smoothstep(-500, -900, x) * 210;
@@ -36,14 +36,14 @@ export function riverDist(x, z) {
   return r ? r.d : 999;
 }
 
-export function forestMask(x, z) { return smoothstep(-400, -580, z); }
+export function forestMask(x, z) { return smoothstep(-610, -770, z); }
 export function swampMask(x, z) {
-  const west = smoothstep(-380, -520, x) * smoothstep(-260, -60, z);
-  const south = smoothstep(420, 560, z) * smoothstep(520, 380, x);
+  const west = smoothstep(-570, -690, x) * smoothstep(-580, -430, z);
+  const south = smoothstep(680, 800, z) * smoothstep(520, 400, x);
   return clamp(Math.max(west, south), 0, 1) * (1 - forestMask(x, z));
 }
 export function meadowMask(x, z) {
-  return smoothstep(-360, -480, x) * (1 - forestMask(x, z)) * (1 - swampMask(x, z));
+  return smoothstep(-560, -660, x) * (1 - forestMask(x, z)) * (1 - swampMask(x, z));
 }
 
 function flatWeight(zone, x, z) {
@@ -110,13 +110,14 @@ export const isUnderwater = (h) => h < WATER_Y - 0.15;
 // Biome id used for colouring and surfaces.
 export const BIOME = { SEA: 0, BEACH: 1, CITY: 2, FOREST: 3, SWAMP: 4, MEADOW: 5, GRASS: 6, PORT: 7, RIDGE: 8 };
 
+const inRect = (r, x, z, pad) => x > r.x0 + pad && x < r.x1 - pad && z > r.z0 + pad && z < r.z1 - pad;
 export function biomeAt(x, z, h) {
   const d = landDist(x, z);
   if (h < WATER_Y - 0.2) return BIOME.SEA;
+  if (inRect(RECT.city, x, z, 12)) return BIOME.CITY;
+  if (inRect(RECT.port, x, z, 0)) return BIOME.PORT;
+  if (inRect(RECT.ridge, x, z, 0)) return BIOME.RIDGE;
   if (d < 95 && h < 3.5 && forestMask(x, z) < 0.5) return BIOME.BEACH;
-  if (x > -330 && x < 630 && z > -330 && z < 330) return BIOME.CITY;
-  if (x > 430 && x < 880 && z > 880 && z < 1110) return BIOME.PORT;
-  if (x > 300 && x < 740 && z > -700 && z < -460) return BIOME.RIDGE;
   if (forestMask(x, z) > 0.5) return BIOME.FOREST;
   if (swampMask(x, z) > 0.5) return BIOME.SWAMP;
   if (meadowMask(x, z) > 0.5) return BIOME.MEADOW;
