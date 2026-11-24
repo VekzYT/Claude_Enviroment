@@ -1,65 +1,59 @@
-# Putting Cubopolis on your iPhone
+# Putting Cubopolis on your iPhone (from a Windows 11 PC)
 
-You need: a Mac, the USB-C cable for your iPhone 15 Pro, an Apple ID (yours is fine, it doesn't have to be your parents'), and about an hour the first time (most of it is Xcode downloading). After that, installing an update takes about 2 minutes.
+You need your Windows 11 PC, the USB-C cable for your iPhone 15 Pro, an Apple ID, and your GitHub login.
+You don't need a Mac. GitHub's own Mac builds the app every time the game is updated, and you download the finished file.
 
-It's free. With a free Apple ID, Apple makes apps you install yourself **stop opening after 7 days**. When that happens, plug the phone back into the Mac and press Run again (step 7). Your city is saved on the phone and survives that, as long as you don't delete the app.
+It's free. Apple only lets apps you install yourself this way run for **7 days** with a free Apple ID. When it stops opening,
+reinstall it the same way (step 5). Your city is saved on the phone and survives that, as long as you don't delete the app.
 
 ---
 
 ## One-time setup
 
-### 1. Install Xcode on the Mac
-Open the **App Store** on the Mac, search **Xcode**, and click **Get**. It's a big download. When it's done, open Xcode once. If it asks which platforms you want, tick **iOS**, then let it finish installing.
+### 1. Install Sideloadly and Apple's iTunes + iCloud
+1. Go to **https://sideloadly.io** and download **Sideloadly for Windows**. Install it.
+2. Sideloadly needs **iTunes and iCloud from Apple's website, not the Microsoft Store versions**. Its download page links the
+   right installers. If you already have iTunes or iCloud from the Microsoft Store, uninstall those first, then install the ones it links.
+3. Restart the PC.
 
-> If the App Store says Xcode needs a newer macOS, update the Mac first: **System Settings → General → Software Update**. If the Mac is too old to update, tell Claude which macOS version it's on.
+### 2. Download the game file (Cubopolis.ipa)
+1. On the PC, sign in to GitHub and open:
+   **https://github.com/VekzYT/Claude_Enviroment/actions/workflows/cubopolis-ios.yml**
+2. Click the newest run with a **green check mark**.
+3. Scroll down to **Artifacts** and click **Cubopolis-iPhone-app**. A zip downloads.
+4. Right-click the zip → **Extract All**. Inside is **Cubopolis.ipa**.
 
-### 2. Sign Xcode in with your Apple ID
-In Xcode: **Xcode menu → Settings… → Accounts**, click **+** at the bottom left, choose **Apple ID**, and sign in. You'll see a team called **"Your Name (Personal Team)"**.
+### 3. Connect the iPhone
+Plug the iPhone into the PC and unlock it. If it asks **Trust This Computer?**, tap **Trust** and enter your passcode.
 
-### 3. Download the game onto the Mac
-In Safari on the Mac, open this link. It downloads a zip of the game:
+### 4. Turn on Developer Mode on the iPhone
+**Settings → Privacy & Security → Developer Mode** → switch it **On**. Let the phone restart, then tap **Turn On** to confirm.
+If Developer Mode isn't in the list yet, do step 5 once. It shows up after the first install.
 
-**https://github.com/VekzYT/Claude_Enviroment/archive/refs/heads/claude/eager-feynman-yofliv.zip**
+### 5. Install with Sideloadly
+1. Open Sideloadly. Your iPhone should show in the **iDevice** box.
+2. Drag **Cubopolis.ipa** onto the big IPA icon on the left.
+3. Type your Apple ID email in the **Apple account** box and click **Start**.
+4. Enter your Apple ID password when it asks. If a code pops up on your phone, type it into Sideloadly.
+5. Wait for **Done**.
 
-Double-click the zip in Downloads to unzip it.
+Sideloadly sends your login only to Apple to sign the app. If you'd still rather not type your main Apple ID into it,
+make a free spare Apple ID and use that instead. It works the same.
 
-### 4. Open the project
-In the unzipped folder, go into **city → ios → App** and double-click **App.xcodeproj**.
+### 6. Trust yourself as the developer (first time only)
+On the iPhone: **Settings → General → VPN & Device Management** → tap your Apple ID under *Developer App* → **Trust**.
 
-Xcode will show "Resolving package graph" for a minute while it downloads Capacitor, the part that turns the game into an iPhone app. Wait for it to finish. You need internet for this.
-
-### 5. Choose your signing team
-1. In the left sidebar, click the blue **App** icon at the very top.
-2. In the middle, under **TARGETS**, click **App**, then open the **Signing & Capabilities** tab.
-3. Make sure **Automatically manage signing** is ticked, and set **Team** to your Personal Team.
-
-If a red error says the bundle identifier **app.cubopolis.city** "is not available" or "cannot be registered", click in the **Bundle Identifier** box and add something unique to the end, like `app.cubopolis.city.yourname`.
-
-### 6. Connect your iPhone and turn on Developer Mode
-1. Plug the iPhone into the Mac. On the iPhone, tap **Trust** and enter your passcode.
-2. On the iPhone: **Settings → Privacy & Security → Developer Mode**, switch it **On**, and let the phone restart. After the restart, tap **Turn On** to confirm.
-   (If you don't see Developer Mode yet, do step 7 once first and it will appear.)
-
-### 7. Install it
-At the top of the Xcode window, in the middle, click the device name and choose **your iPhone** from the list (not a simulator). Then press the **▶ Run** button at the top left.
-
-The first time, Xcode may spend a few minutes "Preparing" or "Copying shared cache" from the phone. Leave it plugged in. If the Mac asks for its password to use a "codesign" key, type it and click **Always Allow**.
-
-### 8. Trust yourself as the developer (first time only)
-The first launch may be blocked with "Untrusted Developer". On the iPhone:
-**Settings → General → VPN & Device Management → (your Apple ID) → Trust**.
-
-Then open **Cubopolis** from your home screen. Hold the phone sideways.
+Then open **Cubopolis** from your home screen and hold the phone sideways.
 
 ---
 
 ## Every week (when the app stops opening)
-Don't delete the app. Plug the phone into the Mac, open **App.xcodeproj**, pick your iPhone, and press **▶ Run**. Done. Your city is still there.
-
-**Tip:** after the first cable install, open **Window → Devices and Simulators** in Xcode, select your iPhone, and tick **Connect via network**. After that, Xcode can install over Wi-Fi whenever the phone and the Mac are on the same network. No cable needed.
+Don't delete the app. Plug the phone in, open Sideloadly, drag in the same **Cubopolis.ipa**, and press **Start** again.
+Your city is still there afterwards.
 
 ## Getting a new version
-Download the zip again (step 3), open the new **App.xcodeproj** (step 4), check the Team (step 5), and press **▶ Run**. Your city carries over.
+Download the newest **Cubopolis.ipa** (step 2) and install it with Sideloadly (step 5) using the **same Apple ID**. It replaces the old
+version and your city carries over.
 
 ---
 
@@ -67,10 +61,18 @@ Download the zip again (step 3), open the new **App.xcodeproj** (step 4), check 
 
 | What you see | What to do |
 |---|---|
-| "Failed to register bundle identifier" / "not available" | Change the Bundle Identifier (step 5) to something unique. |
-| Your iPhone isn't in the device list, or "iOS version not supported" | Update Xcode in the App Store (and macOS if Xcode needs it). Unplug and replug the phone, and tap **Trust**. |
-| "Could not launch App" / "Security" / "Untrusted Developer" | Do step 8 on the phone, then press ▶ again. |
-| "Developer Mode disabled" | Step 6.2. |
-| Package resolving fails or hangs | Check the Mac's internet, then **File → Packages → Reset Package Caches**. |
-| "Maximum number of apps for free development" | A free Apple ID can have 3 self-installed apps on a phone at once. Delete an old one. |
+| Sideloadly doesn't see the iPhone | Unlock the phone and tap **Trust**. Make sure iTunes/iCloud are the **apple.com** versions (step 1.2). Try another USB port or cable. |
+| A login or "Apple ID" error in Sideloadly | Re-type the password. If you use two-factor sign-in, enter the code shown on your phone. Check the clock on the PC is right. |
+| "Maximum number of apps" | A free Apple ID can have 3 self-installed apps at once. Delete one you don't use. |
+| "Untrusted Developer" when opening | Step 6. |
+| "Developer Mode disabled" / app won't open | Step 4. |
+| No **Artifacts** section on the GitHub page | You need to be signed in to GitHub. Or the build is still running. Wait for the green check mark. |
 | The game shows an error banner | Take a screenshot and send it to Claude. |
+
+---
+
+## If you ever use a Mac instead
+Install **Xcode** from the Mac App Store and sign it in to your Apple ID (**Xcode → Settings → Accounts**).
+Then download the project zip, **https://github.com/VekzYT/Claude_Enviroment/archive/refs/heads/claude/eager-feynman-yofliv.zip**,
+and open **city/ios/App/App.xcodeproj**. Under **Signing & Capabilities**, set **Team** to your Personal Team.
+Pick your iPhone at the top of the window and press **▶ Run**. Developer Mode and the trust step are the same as above.

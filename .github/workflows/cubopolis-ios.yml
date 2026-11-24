@@ -32,9 +32,28 @@ jobs:
       - name: Build for a real iPhone (unsigned)
         run: |
           set -o pipefail
-          xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' \
             -derivedDataPath build/device CODE_SIGNING_ALLOWED=NO build | tail -n 40
+
+      # An unsigned .ipa: Sideloadly (Windows) or AltStore signs it with the player's own Apple ID
+      # when installing, so no Mac and no developer account are needed on the player's side.
+      - name: Package Cubopolis.ipa
+        run: |
+          APP=build/device/Build/Products/Release-iphoneos/App.app
+          test -d "$APP"
+          rm -rf ipa && mkdir -p ipa/Payload
+          cp -R "$APP" ipa/Payload/
+          (cd ipa && zip -qry ../Cubopolis.ipa Payload)
+          ls -la Cubopolis.ipa
+          unzip -l Cubopolis.ipa | tail -n 3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cubopolis-iPhone-app
+          path: city/ios/App/Cubopolis.ipa
+          retention-days: 30
+          if-no-files-found: error
 
       - name: Build for the simulator
         run: |
