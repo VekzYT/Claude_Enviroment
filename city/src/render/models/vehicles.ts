@@ -16,7 +16,7 @@ interface Body {
   paint: string;
   /** Second colour (roof, cargo box, stripe). */
   accent?: string;
-  kind: 'sedan' | 'hatch' | 'van' | 'truck' | 'police' | 'fire';
+  kind: 'sedan' | 'hatch' | 'van' | 'truck' | 'police' | 'fire' | 'bus' | 'ambulance';
 }
 
 /** Paint jobs for CAR_VARIANTS, in order. Variants 3 and 5 are the van and the small truck. */
@@ -79,7 +79,21 @@ function build(b: Body): VoxelGrid {
     lights(g, W, 13, 0, 2);
     return g;
   }
-  if (b.kind === 'van') {
+  if (b.kind === 'bus') {
+    // a stubby yellow school bus with a row of windows
+    const g = new VoxelGrid(W + 1, 11, 24);
+    const BW = W + 1;
+    g.box(0, 1, 0, BW, 8, 24, body);
+    g.box(0, 1, 0, BW, 2, 24, col('#2c2f36'));
+    g.box(0, 7, 0, BW, 8, 24, col(b.paint, 1.06));
+    for (let z = 2; z < 20; z += 3) g.box(0, 4, z, BW, 6, z + 2, glass);
+    g.box(1, 4, 23, BW - 1, 6, 24, glass);
+    g.box(0, 3, 0, BW, 4, 24, col('#2c2f36'));
+    wheels(g, BW, [2, 18]);
+    lights(g, BW, 23, 0, 2);
+    return g;
+  }
+  if (b.kind === 'van' || b.kind === 'ambulance') {
     const g = new VoxelGrid(W, 10, 15);
     g.box(0, 1, 0, W, 7, 15, body);
     g.box(0, 1, 0, W, 2, 15, bodyDark);
@@ -91,6 +105,11 @@ function build(b: Body): VoxelGrid {
     g.box(1, 4, 13, W - 1, 6, 14, glass);
     // a stripe along the side
     if (b.accent) g.box(0, 3, 1, W, 4, 11, col(b.accent));
+    if (b.kind === 'ambulance') {
+      g.set(1, 7, 11, glow('#ff3b3b'));
+      g.set(W - 2, 7, 11, glow('#3b7bff'));
+      g.box(2, 7, 4, W - 2, 8, 6, col(b.accent ?? '#e0504a'));
+    }
     g.box(0, 1, 14, W, 2, 15, trim);
     wheels(g, W, [2, 10]);
     lights(g, W, 14, 0, 2);
@@ -163,6 +182,14 @@ export function carHeight(v: number): number {
 
 export function policeCarMesh(): MeshAcc {
   return meshed('police', { paint: '#2f4f9a', kind: 'police' });
+}
+
+export function busMesh(): MeshAcc {
+  return meshed('bus', { paint: '#f6c234', kind: 'bus' });
+}
+
+export function ambulanceMesh(): MeshAcc {
+  return meshed('ambulance', { paint: '#f7f7f4', accent: '#e0504a', kind: 'ambulance' });
 }
 
 export function fireTruckMesh(): MeshAcc {

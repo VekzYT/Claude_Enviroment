@@ -2,7 +2,7 @@
 // standard grid (vehicles at a finer scale, smoke points, a spinning rotor). finish() bakes it into
 // the ModelParts the world renderer consumes.
 import * as THREE from 'three';
-import { MeshAcc, VPT, VoxelGrid, meshGrid, meshLot } from './voxel';
+import { MeshAcc, VPT, VoxelGrid, meshLot } from './voxel';
 
 export interface PropPlacement {
   mesh: MeshAcc;
@@ -17,15 +17,15 @@ export interface PropPlacement {
 }
 
 export interface SpinnerDesign {
-  grid: VoxelGrid;
-  /** The pivot inside the spinner's grid, in grid units. */
-  centre: [number, number, number];
+  /** The spinning part in world units, centred on its pivot. */
+  mesh: MeshAcc;
   /** The pivot inside the model's grid, in grid units. */
   at: [number, number, number];
   axis: 'x' | 'y' | 'z';
+  /** Radians per second. */
   speed: number;
-  /** Voxels per world unit of the spinner's grid (default VPT). */
-  vpt?: number;
+  /** How far the part reaches from the pivot, in world units (for the model height). */
+  reach: number;
 }
 
 export interface Design {
@@ -62,16 +62,12 @@ export function finish(d: Design): Finished {
   }
   if (d.spinner) {
     const s = d.spinner;
-    const vpt = s.vpt ?? VPT;
-    const sacc = new MeshAcc();
-    meshGrid(s.grid, sacc, 1 / vpt, s.centre[0], s.centre[1], s.centre[2]);
-    const sg = sacc.toGeometries();
+    const sg = s.mesh.toGeometries();
     const pivot = new THREE.Vector3((s.at[0] - ox) / VPT, s.at[1] / VPT, (s.at[2] - oz) / VPT);
     out.spinner = { geometry: sg.body, pivot, axis: s.axis, speed: s.speed };
-    out.triangles += sacc.triangles;
+    out.triangles += s.mesh.triangles;
     // the rotor reaches above the hub
-    const reach = Math.max(s.grid.nx, s.grid.ny, s.grid.nz) / 2 / vpt;
-    height = Math.max(height, pivot.y + reach);
+    height = Math.max(height, pivot.y + s.reach);
     out.height = height;
   }
   return out;

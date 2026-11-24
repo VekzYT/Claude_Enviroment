@@ -1,6 +1,16 @@
 // OWNER: input agent. Touch/mouse gestures, the camera rig, and turning drags into tool plans.
+//
+// main.ts, once per frame:  input.update(dt); input.rig.apply(world.camera); world.render();
+// input.update advances the camera rig itself, so do not also call rig.update.
+// The pieces: controller.ts (gestures), rig.ts (the camera), math.ts (pure camera and gesture
+// math), tiles.ts (drag tile tracking and plan shapes).
 import * as THREE from 'three';
 import type { Plan, TilePos, ToolId } from '../core/types';
+import { createInputController } from './controller';
+
+export type { InputControllerFull, InputOptions } from './controller';
+export { createInputController } from './controller';
+export { OrbitRig } from './rig';
 
 /** An orbiting camera looking at a point on the ground. */
 export interface CameraRig {
@@ -46,34 +56,5 @@ export interface InputController {
 }
 
 export function createInput(_el: HTMLElement, _hooks: InputHooks, mapSize: number): InputController {
-  let tool: ToolId = 'inspect';
-  const target = new THREE.Vector3(mapSize / 2, 0, mapSize / 2);
-  const rig: CameraRig = {
-    target,
-    yaw: Math.PI / 4,
-    pitch: 0.9,
-    distance: 40,
-    focus(x, z) {
-      target.set(x + 0.5, 0, z + 0.5);
-    },
-    update() {},
-    apply(camera) {
-      const h = Math.cos(rig.pitch) * rig.distance;
-      camera.position.set(target.x + Math.sin(rig.yaw) * h, Math.sin(rig.pitch) * rig.distance, target.z + Math.cos(rig.yaw) * h);
-      camera.lookAt(target);
-    },
-  };
-  return {
-    rig,
-    setTool(t) {
-      tool = t;
-    },
-    getTool() {
-      return tool;
-    },
-    cancel() {},
-    update() {},
-    setMapSize() {},
-    dispose() {},
-  };
+  return createInputController(_el, _hooks, mapSize);
 }

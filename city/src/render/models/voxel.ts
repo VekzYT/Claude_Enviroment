@@ -138,6 +138,26 @@ export class MeshAcc {
     }
   }
 
+  /** Add `other` rotated by `angle` radians around the z axis (spinning parts), then moved. */
+  appendRotZ(other: MeshAcc, angle: number, tx = 0, ty = 0, tz = 0): void {
+    const c = Math.cos(angle);
+    const sn = Math.sin(angle);
+    for (const [src, dst] of [
+      [other.body, this.body],
+      [other.glow, this.glow],
+    ] as Array<[TriList, TriList]>) {
+      for (let i = 0; i < src.pos.length; i += 3) {
+        const x = src.pos[i];
+        const y = src.pos[i + 1];
+        dst.pos.push(c * x - sn * y + tx, sn * x + c * y + ty, src.pos[i + 2] + tz);
+        const nx = src.nor[i];
+        const ny = src.nor[i + 1];
+        dst.nor.push(c * nx - sn * ny, sn * nx + c * ny, src.nor[i + 2]);
+        dst.col.push(src.col[i], src.col[i + 1], src.col[i + 2]);
+      }
+    }
+  }
+
   /** Bake into geometries. Body always exists (possibly empty); glow is null when there is none. */
   toGeometries(): { body: THREE.BufferGeometry; glow: THREE.BufferGeometry | null } {
     return { body: toGeometry(this.body), glow: this.glow.pos.length ? toGeometry(this.glow) : null };
