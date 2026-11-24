@@ -96,15 +96,16 @@ function cottageAFrame(): Design {
   const wall = mat('#f7e2a0', { seed: 21 });
   g.box(4, 0, 3, 12, 4, 12, wall);
   plinth(g, 4, 3, 12, 12);
-  const roof = mat('#4f9d69', { seed: 22, cell: [1, 2, 3] });
-  gableRoof(g, 4, 3, 12, 12, 4, 'z', roof, wall, { rise: 2, ridge: col('#3d7f54') });
+  const roof = mat('#8a63b8', { seed: 22, cell: [1, 2, 3] });
+  gableRoof(g, 4, 3, 12, 12, 4, 'z', roof, wall, { rise: 2, ridge: col('#6c4c96') });
   frontDoor(g, 7, 2, 0, 3, 11, '#8a4b2f');
   // tall window in the gable end above the door, and side windows
   pane(g, 0, 7, 9, 6, 9, 11, glow('#ffcf7a'));
   pane(g, 2, 7, 9, 6, 8, 3, glow('#ffe0a0'));
   windows(g, 4, 3, 12, 12, { y0: 0, floors: 1, floorH: 4, sill: 1, h: 2, w: 2, pitch: 4, style: 'home', seed: 23, faces: 10 });
   // chimney through the back slope
-  g.box(9, 6, 4, 11, 14, 6, mat('#b9b2a6', { seed: 24, cell: [1, 1, 1] }));
+  g.box(9, 8, 5, 11, 14, 7, mat(C.brick, { seed: 24, cell: [1, 1, 1] }));
+  g.box(9, 14, 5, 11, 15, 7, col(C.brickDark));
   // vegetable patch on the right, pine on the left, a mailbox by the path
   g.box(12, 0, 4, 15, 1, 11, col(C.soil));
   for (let z = 4; z < 11; z += 2) g.box(12, 1, z, 15, 2, z + 1, mat('#6fc04f', { seed: 25, cell: [1, 1, 1] }));
@@ -136,7 +137,7 @@ function cottageFarm(): Design {
   g.box(12, 0, 10, 13, 3, 11, col(C.woodDark));
   bench(g, 9, 10, 0, 'x');
   // round tree on the right, a little doghouse, flowers at the corner
-  smallTree(g, 13, 13, 0, 35, 2, '#62b85a');
+  smallTree(g, 14, 13, 0, 35, 1, '#62b85a');
   g.box(9, 0, 13, 11, 2, 15, col('#c2884f'));
   g.box(9, 2, 13, 11, 3, 15, col('#b5463c'));
   g.set(10, 0, 15, 0);
@@ -225,7 +226,7 @@ function modernApartments(): Design {
   parapet(g, 3, 3, 13, 13, 25, col('#dedbd4'));
   solarPanels(g, 4, 4, 8, 9, 25);
   roofGarden(g, 8, 8, 12, 12, 25, 72);
-  // bike rack + planters at street level
+  // planters at street level
   bush(g, 2, 13, 0, 1, 2, 1, 73);
   bush(g, 13, 13, 0, 1, 2, 1, 74);
   return { g };

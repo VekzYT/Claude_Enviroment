@@ -8,9 +8,12 @@ import {
   acUnit,
   antenna,
   barrel,
+  chimney,
   crates,
   cylinder,
   ellipsoid,
+  heap,
+  lights,
   gableRoof,
   hcylinder,
   lampPost,
@@ -25,20 +28,6 @@ import { VoxelGrid } from './voxel';
 
 function lot(h: number): VoxelGrid {
   return new VoxelGrid(16, h, 16);
-}
-
-/** A round chimney with a darker lip; returns the smoke point (top centre) in grid units. */
-function chimney(g: VoxelGrid, cx: number, cz: number, r: number, y0: number, y1: number, hex: string, bands?: string): [number, number, number] {
-  if (bands) {
-    // horizontal red/white bands
-    const a = col(hex);
-    const b = col(bands);
-    cylinder(g, cx, cz, r, y0, y1, (_x, y) => (Math.floor((y - y0) / 3) % 2 === 0 ? a : b));
-  } else cylinder(g, cx, cz, r, y0, y1, courses(hex, 2, 0.93));
-  cylinder(g, cx, cz, r + 0.5, y1 - 1, y1, col('#4a4d55'));
-  // hollow top
-  if (r >= 1) cylinder(g, cx, cz, Math.max(0.6, r - 0.8), y1 - 1, y1, 0);
-  return [cx, y1, cz];
 }
 
 /** A square brick stack (for small chimneys). */
@@ -161,27 +150,30 @@ function lumberYard(): Design {
   }
   barrel(g, 12, 11, 0, '#4f9d69');
   crates(g, 11, 12, 0, 433);
-  const smoke = [stack(g, 12, 3, 1, 6, 9)];
-  return { g, smoke };
+  // the cabin's stove pipe (too small to bother the sky with smoke)
+  stack(g, 12, 3, 1, 6, 9);
+  return { g };
 }
 
 // ---------------------------------------------------------------- level 2
 
 function sawtoothFactory(): Design {
-  const g = lot(32);
+  const g = lot(30);
   const brick = courses('#c06a4c', 1, 0.94);
-  g.box(2, 0, 2, 14, 8, 10, brick);
-  g.box(2, 0, 2, 14, 1, 10, col('#6e665e'));
-  sawtooth(g, 2, 2, 14, 10, 8, 4, '#7d8a99');
-  windows(g, 2, 2, 14, 10, { y0: 0, floors: 1, floorH: 8, sill: 3, h: 3, w: 2, pitch: 3, style: 'factory', seed: 440, faces: 10 });
-  rollDoor(g, 0, 4, 8, 0, 6, 9, '#f2c94c');
-  pane(g, 0, 10, 12, 1, 5, 9, glow('#ffd98e'));
-  // tall brick chimney at the back right
-  const smoke = [chimney(g, 12.5, 12.5, 1.6, 0, 28, '#b5604a')];
-  g.box(11, 0, 11, 14, 2, 14, col('#7a726a'));
-  barrel(g, 2, 11, 0, '#f2c94c');
-  barrel(g, 3, 11, 0, '#f2c94c');
-  crates(g, 5, 12, 0, 441);
+  g.box(1, 0, 3, 15, 9, 12, brick);
+  g.box(1, 0, 3, 15, 1, 12, col('#6e665e'));
+  g.box(1, 8, 3, 15, 9, 12, col('#e3d6c0'));
+  // three sawtooth bays with glazing facing the street
+  sawtooth(g, 1, 3, 15, 12, 9, 3, '#7d8a99');
+  windows(g, 1, 3, 15, 12, { y0: 0, floors: 1, floorH: 8, sill: 3, h: 3, w: 2, pitch: 3, style: 'factory', seed: 440, faces: 10 });
+  rollDoor(g, 0, 3, 8, 0, 6, 11, '#f2c94c');
+  pane(g, 0, 10, 13, 1, 5, 11, glow('#ffd98e'));
+  lights(g, [[5, 7, 12]]);
+  // brick chimney rising from the back corner
+  const smoke = [chimney(g, 13, 2, 1.4, 0, 27, '#b5604a')];
+  barrel(g, 1, 13, 0, '#f2c94c');
+  barrel(g, 2, 13, 0, '#f2c94c');
+  crates(g, 12, 13, 0, 441);
   return { g, smoke };
 }
 
@@ -192,6 +184,10 @@ function twinChimneyPlant(): Design {
   g.box(2, 11, 3, 11, 12, 10, col('#3d7be0'));
   windows(g, 2, 3, 11, 10, { y0: 0, floors: 2, floorH: 6, sill: 2, h: 3, w: 2, pitch: 3, style: 'factory', seed: 451 });
   rollDoor(g, 0, 3, 7, 0, 5, 9, '#3d7be0');
+  lights(g, [
+    [5, 6, 10],
+    [9, 6, 10],
+  ]);
   // two steel stacks with red and white bands
   const smoke = [chimney(g, 13, 5, 1.3, 0, 30, '#f4f1ea', '#e0504a'), chimney(g, 13, 10, 1.3, 0, 25, '#f4f1ea', '#e0504a')];
   // pipes from the hall to the stacks
@@ -211,6 +207,7 @@ function siloPlant(): Design {
   g.box(6, 0, 3, 14, 9, 10, wall);
   gableRoof(g, 6, 3, 14, 10, 9, 'x', col('#6f7c8a'), wall, { overhang: 0 });
   rollDoor(g, 0, 8, 12, 0, 5, 9, '#d65a4a');
+  lights(g, [[10, 6, 10]]);
   windows(g, 6, 3, 14, 10, { y0: 0, floors: 1, floorH: 9, sill: 5, h: 2, w: 2, pitch: 3, style: 'factory', seed: 460, faces: 10 });
   // tall silo with a domed top
   cylinder(g, 3.5, 5.5, 2.6, 0, 22, courses('#d9dde2', 3, 0.93));
@@ -234,6 +231,7 @@ function brickMill(): Design {
   parapet(g, 2, 3, 14, 10, 15, col('#d9c7a8'));
   windows(g, 2, 3, 14, 10, { y0: 0, floors: 3, floorH: 5, sill: 1, h: 3, w: 1, pitch: 2, style: 'factory', seed: 470, inset: true, skip: (f, a, fl) => f === 0 && fl === 0 && a >= 6 && a <= 9 });
   rollDoor(g, 0, 6, 10, 0, 4, 9, '#5a6270');
+  lights(g, [[8, 4, 10]]);
   // rooftop water tank and a chimney
   const legs = col(C.darkMetal);
   for (const [x, z] of [
@@ -254,36 +252,47 @@ function brickMill(): Design {
 // ---------------------------------------------------------------- level 3
 
 function refinery(): Design {
-  const g = lot(72);
-  // storage tanks with coloured bands
+  const g = lot(68);
+  // big storage tanks with coloured bands along the front
   for (const [cx, cz, r, h, band] of [
-    [4, 11.5, 2.8, 8, '#3d7be0'],
-    [10.5, 12, 2.4, 7, '#f2c94c'],
+    [4, 11.5, 3.4, 12, '#3d7be0'],
+    [11.5, 12, 3.2, 10, '#f2c94c'],
   ] as Array<[number, number, number, number, string]>) {
-    cylinder(g, cx, cz, r, 0, h, col('#eceae2'));
-    cylinder(g, cx, cz, r, h - 2, h - 1, col(band));
-    cylinder(g, cx, cz, r - 0.8, h, h + 1, col('#d4d0c4'));
+    cylinder(g, cx, cz, r, 0, h, courses('#eceae2', 4, 0.95));
+    cylinder(g, cx, cz, r, h - 3, h - 2, col(band));
+    cylinder(g, cx, cz, r - 0.9, h, h + 1, col('#d4d0c4'));
+    g.box(Math.floor(cx), h + 1, Math.floor(cz), Math.floor(cx) + 1, h + 2, Math.floor(cz) + 1, col(C.metalDark));
   }
-  // distillation column with ring platforms
-  cylinder(g, 5, 4.5, 1.7, 0, 48, courses('#d6dbe0', 4, 0.92));
-  for (let y = 10; y < 46; y += 9) cylinder(g, 5, 4.5, 2.6, y, y + 1, col('#f2c94c'));
-  g.box(4, 48, 4, 6, 50, 5, col(C.steel));
-  // a slim flare stack with a burning tip
-  g.box(12, 0, 4, 13, 58, 5, col('#cfd3d8'));
-  g.box(11, 56, 3, 14, 57, 6, col('#e0504a'));
-  g.set(12, 58, 4, glow('#ffb347'));
-  g.set(12, 59, 4, glow('#ffd56a'));
+  // two distillation columns with yellow ring platforms
+  cylinder(g, 4.5, 4, 2.6, 0, 50, courses('#d6dbe0', 4, 0.93));
+  for (let y = 10; y < 48; y += 9) cylinder(g, 4.5, 4, 3.5, y, y + 1, col('#f2c94c'));
+  cylinder(g, 4.5, 4, 1.6, 50, 53, col('#b9c0c8'));
+  cylinder(g, 10, 4.5, 1.9, 0, 38, courses('#c9d0d8', 4, 0.93));
+  for (let y = 8; y < 36; y += 9) cylinder(g, 10, 4.5, 2.8, y, y + 1, col('#f2c94c'));
+  // slim flare stack with a burning tip
+  g.box(14, 0, 2, 15, 62, 3, col('#cfd3d8'));
+  g.box(13, 58, 1, 16, 59, 4, col('#e0504a'));
+  g.set(14, 62, 2, glow('#ffb347'));
+  g.set(14, 63, 2, glow('#ffd56a'));
   // pipe racks joining it all
-  g.box(5, 6, 4, 13, 7, 5, col(C.steel));
-  g.box(4, 3, 7, 5, 4, 12, col(C.steel));
-  g.box(7, 4, 5, 8, 5, 12, col('#e0504a'));
+  g.box(4, 7, 4, 15, 8, 5, col(C.steel));
+  g.box(4, 4, 7, 5, 5, 12, col(C.steel));
+  g.box(7, 5, 5, 8, 6, 12, col('#e0504a'));
+  g.box(12, 3, 6, 13, 4, 10, col(C.steel));
   // control room
-  g.box(8, 0, 7, 14, 4, 9, col('#f4f1ea'));
-  pane(g, 0, 9, 13, 1, 3, 8, glow('#e8f0ff'));
-  const smoke: Array<[number, number, number]> = [
-    [12.5, 60, 4.5],
-    [5, 50, 4.5],
-  ];
+  g.box(7, 0, 7, 10, 4, 9, col('#f4f1ea'));
+  pane(g, 0, 7, 10, 1, 3, 8, glow('#e8f0ff'));
+  // work lights on the column platforms and red lamps on the tank roofs: refineries sparkle at night
+  const pts: Array<[number, number, number]> = [];
+  for (let y = 10; y < 48; y += 9) pts.push([1, y + 1, 4], [8, y + 1, 4], [4, y + 1, 0], [4, y + 1, 7]);
+  for (let y = 8; y < 36; y += 9) pts.push([7, y + 1, 4], [12, y + 1, 4]);
+  lights(g, pts);
+  lights(g, [
+    [4, 13, 11],
+    [11, 11, 12],
+  ], '#ff4436');
+  // only the flare smokes; distillation columns do not
+  const smoke: Array<[number, number, number]> = [[14.5, 64, 2.5]];
   return { g, smoke };
 }
 
@@ -309,60 +318,93 @@ function siloComplex(): Design {
   g.box(11, 56, 6, 12, 58, 9, col(C.steel));
   g.box(12, 60, 6, 15, 62, 9, col('#8a3c32'));
   antenna(g, 13, 7, 62, 5);
+  // lamps along the top of the silos and the gallery
+  lights(g, [
+    [3, 47, 3],
+    [10, 47, 3],
+    [3, 47, 10],
+    [10, 47, 10],
+    [11, 58, 7],
+  ]);
   // loading shed and a truck at the front
   g.box(2, 0, 12, 10, 4, 15, col('#efe7d2'));
   g.box(2, 4, 12, 10, 5, 15, col('#8a3c32'));
   rollDoor(g, 0, 4, 8, 0, 3, 14, '#d7dbe0');
-  return { g, smoke: [[13.5, 62, 7.5]] };
+  return { g };
 }
 
 function steelMill(): Design {
   const g = lot(84);
-  const hall = courses('#6f7a86', 3, 0.94);
-  g.box(1, 0, 4, 15, 16, 12, hall);
-  // dark roof with a raised clerestory
-  g.box(0, 16, 3, 16, 17, 13, col('#4a525c'));
-  g.box(3, 17, 6, 13, 19, 10, col('#565f6a'));
-  for (let x = 4; x < 13; x += 2) g.set(x, 17, 10, glow('#ffb35c'));
-  windows(g, 1, 4, 15, 12, { y0: 0, floors: 2, floorH: 8, sill: 4, h: 3, w: 2, pitch: 3, style: 'factory', seed: 490, faces: 10 });
+  const hall = courses('#8d98a5', 3, 0.94);
+  // big casting hall with a raised clerestory
+  g.box(1, 0, 6, 15, 22, 14, hall);
+  g.box(0, 22, 5, 16, 23, 15, col('#4a525c'));
+  g.box(3, 23, 7, 13, 26, 13, col('#565f6a'));
+  for (let x = 4; x < 13; x += 2) g.set(x, 24, 13, glow('#ffb35c'));
+  windows(g, 1, 6, 15, 14, { y0: 0, floors: 2, floorH: 10, sill: 5, h: 3, w: 2, pitch: 3, style: 'factory', seed: 490, faces: 10 });
   // glowing furnace mouth on the front
-  g.box(5, 0, 12, 11, 8, 13, col('#3a3f47'));
-  pane(g, 0, 6, 10, 1, 6, 12, glow('#ff8a2a'));
-  g.box(4, 8, 12, 12, 9, 14, col('#f2c94c'));
-  // two tall banded chimneys at the back
-  const smoke = [chimney(g, 4, 1.5, 1.4, 0, 82, '#e0504a', '#f4f1ea'), chimney(g, 12, 1.5, 1.4, 0, 72, '#e0504a', '#f4f1ea')];
-  // ore heap and a skip
-  g.box(1, 0, 13, 4, 2, 16, mat('#5c4a3e', { cell: [1, 1, 1], dark: 0.4, seed: 491 }));
-  g.box(2, 2, 14, 3, 3, 15, col('#5c4a3e'));
-  g.box(12, 0, 13, 15, 2, 15, col('#f2c94c'));
+  g.box(5, 0, 14, 11, 9, 15, col('#3a3f47'));
+  pane(g, 0, 6, 10, 1, 7, 14, glow('#ff8a2a'));
+  g.box(4, 9, 14, 12, 10, 16, col('#f2c94c'));
+  // blast furnace at the back with a skip hoist
+  cylinder(g, 5, 3, 3, 0, 40, courses('#8a5a48', 4, 0.92));
+  cylinder(g, 5, 3, 3.8, 18, 19, col(C.darkMetal));
+  cylinder(g, 5, 3, 2, 40, 46, col('#5a4a44'));
+  for (let k = 0; k < 14; k++) g.box(8 + Math.floor(k / 3), 22 + k, 3, 9 + Math.floor(k / 3), 23 + k, 4, col('#f2c94c'));
+  // two tall banded chimneys
+  const smoke = [chimney(g, 13, 2, 1.5, 0, 82, '#e0504a', '#f4f4f0'), [5, 46, 3] as [number, number, number]];
+  // lamps on the hall front and the furnace gallery
+  lights(g, [
+    [2, 14, 14],
+    [13, 14, 14],
+    [2, 20, 5],
+    [8, 37, 4],
+  ]);
+  // ore heap and a skip at the front
+  heap(g, 0, 15, 4, 16, 2, '#5c4a3e', 491);
+  g.box(12, 0, 14, 15, 2, 16, col('#f2c94c'));
   return { g, smoke };
 }
 
 function coolingWorks(): Design {
-  const g = lot(68);
-  // hyperboloid cooling tower: narrowest two thirds of the way up
+  const g = lot(72);
+  // hyperboloid cooling tower: widest at the foot, narrowest two thirds up, flaring at the rim
   const shell = courses('#e6e2d8', 3, 0.95);
-  const h = 40;
-  const cx = 6.5;
-  const cz = 7.5;
+  const h = 48;
+  const cx = 7;
+  const cz = 8;
   for (let y = 0; y < h; y++) {
     const t = y / h;
-    const r = 4.9 - 1.6 * Math.sin(Math.min(1, t / 0.75) * Math.PI * 0.5) + (t > 0.75 ? (t - 0.75) * 2.4 : 0);
-    cylinder(g, cx, cz, r, y, y + 1, shell);
-    cylinder(g, cx, cz, r - 1.2, y, y + 1, 0);
+    const r = t < 0.7 ? 6.6 - 2.0 * Math.sin((t / 0.7) * Math.PI * 0.5) : 4.6 + (t - 0.7) * 3.2;
+    cylinder(g, cx, cz, r, y, y + 1, y >= h - 5 && y < h - 2 ? col('#e0504a') : shell);
+    cylinder(g, cx, cz, r - 1.3, y, y + 1, 0);
   }
-  cylinder(g, cx, cz, 4.4, 0, 1, col('#bdb8ac'));
-  // red warning band near the rim
-  for (let y = h - 4; y < h - 2; y++) {
-    for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) if (g.get(x, y, z)) g.set(x, y, z, col('#e0504a'));
+  // aviation lights around the rim
+  for (const [dx, dz] of [
+    [0, -1],
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+  ] as Array<[number, number]>) {
+    const x = Math.floor(cx + dx * 5.6);
+    const z = Math.floor(cz + dz * 5.6);
+    if (g.get(x, h - 1, z)) g.set(x, h - 1, z, glow('#ff4436'));
   }
-  // slim chimney beside it
-  const smoke: Array<[number, number, number]> = [[cx, h, cz], chimney(g, 13.5, 3, 1.1, 0, 64, '#f4f1ea', '#e0504a')];
-  // turbine hall
-  g.box(11, 0, 7, 16, 9, 14, mat('#5f8fbf', { seed: 500, cell: [3, 3, 3] }));
-  g.box(11, 9, 7, 16, 10, 14, col('#4a525c'));
-  windows(g, 11, 7, 16, 14, { y0: 0, floors: 1, floorH: 9, sill: 4, h: 3, w: 1, pitch: 2, style: 'factory', seed: 501, faces: 3 });
-  g.box(10, 4, 9, 11, 5, 10, col(C.steel));
+  // legs around the foot
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * Math.PI * 2;
+    const x = Math.floor(cx + Math.cos(a) * 6.3);
+    const z = Math.floor(cz + Math.sin(a) * 6.3);
+    g.box(x, 0, z, x + 1, 2, z + 1, col('#bdb8ac'));
+  }
+  cylinder(g, cx, cz, 5.4, 0, 2, 0);
+  cylinder(g, cx, cz, 5.4, 0, 1, col('#6fb6d8'));
+  // slim chimney and the turbine hall beside it
+  const smoke: Array<[number, number, number]> = [[cx, h, cz], chimney(g, 14, 2.5, 1.1, 0, 70, '#f4f1ea', '#e0504a', 15)];
+  g.box(12, 0, 8, 16, 12, 15, mat('#5f8fbf', { seed: 500, cell: [3, 3, 3] }));
+  g.box(12, 12, 8, 16, 13, 15, col('#4a525c'));
+  windows(g, 12, 8, 16, 15, { y0: 0, floors: 1, floorH: 12, sill: 6, h: 3, w: 1, pitch: 2, style: 'factory', seed: 501, faces: 3 });
+  rollDoor(g, 0, 13, 15, 0, 5, 14, '#d7dbe0');
   return { g, smoke };
 }
 

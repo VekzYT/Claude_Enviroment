@@ -1,0 +1,115 @@
+/* Integrator styles: the error banner and the ?debug=1 readout. Owner: integrator (main.ts). */
+
+.boot-banner {
+  position: fixed;
+  z-index: 1000;
+  top: calc(var(--safe-top, 0px) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - var(--safe-left, 0px) - var(--safe-right, 0px) - 24px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  border-radius: 18px;
+  background: #fffaf1;
+  color: #3a3227;
+  box-shadow: 0 3px 0 #e2453a, 0 10px 28px rgba(48, 36, 16, 0.28);
+  font-family: ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.3;
+  pointer-events: auto;
+  -webkit-user-select: text;
+  user-select: text;
+  box-sizing: border-box;
+  animation: boot-banner-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.25);
+}
+@keyframes boot-banner-in {
+  from {
+    transform: translate(-50%, -24px);
+    opacity: 0;
+  }
+}
+.boot-banner .bb-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #ffe8e3;
+}
+.boot-banner .bb-icon svg {
+  width: 26px;
+  height: 26px;
+}
+.boot-banner .bb-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.boot-banner .bb-title {
+  font-size: 15px;
+  font-weight: 800;
+}
+.boot-banner .bb-sub {
+  font-size: 12px;
+  color: #776b59;
+}
+.boot-banner .bb-detail {
+  font: 600 12px/1.3 ui-monospace, Menlo, monospace;
+  color: #b8322a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.boot-banner .bb-btns {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.boot-banner .bb-btn {
+  min-height: 44px;
+  min-width: 96px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 14px;
+  font: inherit;
+  font-weight: 800;
+  color: #3a3227;
+  background: #f5ecdc;
+  box-shadow: 0 3px 0 #e0d1b6;
+  cursor: pointer;
+}
+.boot-banner .bb-reload {
+  color: #fff;
+  background: #ff7a3d;
+  box-shadow: 0 3px 0 #d65a20;
+}
+.boot-banner .bb-btn:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+@media (max-height: 420px) {
+  .boot-banner .bb-btns {
+    flex-direction: row;
+  }
+}
+
+.boot-debug {
+  position: fixed;
+  z-index: 999;
+  left: 50%;
+  top: calc(var(--safe-top, 0px) + 2px);
+  transform: translateX(-50%);
+  padding: 1px 8px;
+  border-radius: 8px;
+  background: rgba(20, 24, 32, 0.55);
+  color: #fff;
+  font: 600 11px/1.4 ui-monospace, Menlo, monospace;
+  white-space: nowrap;
+  pointer-events: none;
+}

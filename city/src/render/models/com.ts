@@ -44,7 +44,7 @@ function shopfront(g: VoxelGrid, x0: number, x1: number, layer: number, h: numbe
 // ---------------------------------------------------------------- level 1
 
 function cafe(): Design {
-  const g = lot(12);
+  const g = lot(15);
   const wall = mat('#f7c9a4', { seed: 200 });
   g.box(2, 0, 3, 14, 8, 11, wall);
   g.box(2, 0, 3, 14, 1, 11, col('#a9826a'));
@@ -52,7 +52,7 @@ function cafe(): Design {
   windows(g, 2, 3, 14, 11, { y0: 0, floors: 1, floorH: 8, sill: 2, h: 3, w: 2, pitch: 4, style: 'shop', seed: 201, faces: 14 });
   // cornice and a sign on the parapet
   g.box(1, 8, 2, 15, 9, 12, col('#fff3e4'));
-  sign(g, 4, 12, 9, 12, 10, '#6a3d2a', '#ffd27a', 202);
+  sign(g, 3, 13, 9, 14, 10, '#6a3d2a', '#ffd27a', 202);
   // red and white striped awning
   awning(g, 3, 13, 6, 11, 2, stripes('#e5483f', '#fff6ec', 'x'));
   // tables with parasols on the pavement
@@ -67,7 +67,7 @@ function cafe(): Design {
 }
 
 function grocery(): Design {
-  const g = lot(16);
+  const g = lot(19);
   const wall = mat('#f1ede2', { seed: 210 });
   g.box(2, 0, 2, 13, 11, 11, wall);
   g.box(2, 0, 2, 13, 1, 11, col('#7d8a6a'));
@@ -79,7 +79,7 @@ function grocery(): Design {
   // rooftop sign box on legs
   g.box(5, 12, 6, 6, 13, 7, col(C.darkMetal));
   g.box(10, 12, 6, 11, 13, 7, col(C.darkMetal));
-  sign(g, 4, 12, 13, 16, 6, '#3f9a4f', '#fff2c0', 213);
+  sign(g, 3, 13, 13, 18, 6, '#3f9a4f', '#fff2c0', 213);
   // fruit crates out front
   const fruit = ['#e5483f', '#f5a623', '#f5d742', '#7ac943'];
   for (let k = 0; k < 4; k++) {
@@ -87,14 +87,14 @@ function grocery(): Design {
     g.box(x, 0, 12, x + 2, 1, 13, col(C.wood));
     g.box(x, 1, 12, x + 2, 2, 13, col(fruit[k]));
   }
-  // side wall: a bike and an AC unit
+  // an AC unit on the side wall and a shrub by the door
   acUnit(g, 13, 2, 4, 1, 2);
   bush(g, 13, 12, 0, 2, 2, 1, 214);
   return { g };
 }
 
 function diner(): Design {
-  const g = lot(14);
+  const g = lot(16);
   const teal = mat('#6cc8c0', { seed: 220 });
   g.box(1, 0, 4, 15, 6, 11, teal);
   // rounded ends
@@ -119,10 +119,9 @@ function diner(): Design {
   // big rooftop sign on posts: red board, glowing letters and a star
   g.box(4, 7, 7, 5, 9, 8, col(C.darkMetal));
   g.box(11, 7, 7, 12, 9, 8, col(C.darkMetal));
-  sign(g, 3, 13, 9, 13, 7, '#e5483f', '#fff2a8', 222);
-  g.set(8, 13, 7, glow('#ffd84a'));
-  g.set(7, 13, 7, glow('#ffd84a'));
-  // parking with one car
+  sign(g, 3, 13, 9, 14, 7, '#e5483f', '#fff2a8', 222);
+  g.box(7, 14, 7, 9, 15, 8, glow('#ffd84a'));
+  // a customer's car parked out front
   return {
     g,
     props: [{ mesh: carMesh(2), x: 12.5, z: 13.3, rot: 1 }],
@@ -136,7 +135,8 @@ function shopWithFlat(): Design {
   g.box(3, 0, 3, 13, 6, 12, lower);
   g.box(3, 6, 3, 13, 12, 12, upper);
   g.box(2, 6, 2, 14, 7, 13, col(C.frame));
-  g.box(2, 12, 2, 14, 13, 13, col(C.frame));
+  g.box(3, 12, 3, 13, 13, 12, col('#a9aeb6'));
+  parapet(g, 2, 2, 14, 13, 12, col(C.frame), 2);
   shopfront(g, 4, 12, 11, 4, 9, '#2f4f7a');
   windows(g, 3, 3, 13, 12, { y0: 7, floors: 1, floorH: 5, sill: 1, h: 3, w: 2, pitch: 3, style: 'home', seed: 231 });
   awning(g, 3, 13, 5, 12, 2, stripes('#3d7be0', '#eef4ff', 'x'));
@@ -146,8 +146,8 @@ function shopWithFlat(): Design {
   // roof: AC units and a satellite dish
   acUnit(g, 4, 13, 4);
   acUnit(g, 8, 13, 4);
-  g.box(10, 13, 8, 11, 14, 9, col(C.metal));
-  g.box(9, 14, 8, 12, 15, 9, col('#f4f4f0'));
+  g.box(10, 13, 8, 11, 15, 9, col(C.metal));
+  g.box(9, 15, 7, 12, 16, 10, col('#f4f4f0'));
   // potted plants and a bench outside
   bush(g, 2, 13, 0, 1, 1, 2, 232);
   bush(g, 13, 13, 0, 1, 1, 2, 233);
@@ -195,7 +195,7 @@ function mall(): Design {
   pane(g, 0, 7, 9, 0, 4, 14, col('#2f3b4a'));
   g.box(3, 4, 15, 13, 5, 16, col('#f08a3c'));
   // big sign above the atrium and skylights on the roof
-  sign(g, 3, 13, 16, 20, 14, '#f08a3c', '#fff6dc', 253);
+  sign(g, 3, 13, 16, 21, 14, '#f08a3c', '#fff6dc', 253);
   for (const x of [3, 8]) {
     g.box(x, 18, 4, x + 4, 19, 11, col('#d8d0c2'));
     g.box(x + 1, 19, 5, x + 3, 20, 10, glow('#e8f0ff'));

@@ -30,6 +30,8 @@ export function clampedTileAt(gx: number, gz: number, size: number): TilePos {
 export function cleanTile(t: TilePos | null | undefined, size: number): TilePos | null {
   if (!t || !Number.isFinite(t.x) || !Number.isFinite(t.z)) return null;
   const lim = Math.max(0, size - 1);
+  // already clean (the usual case): no copy
+  if (Number.isInteger(t.x) && Number.isInteger(t.z) && t.x >= 0 && t.z >= 0 && t.x <= lim && t.z <= lim) return t;
   return { x: Math.min(lim, Math.max(0, Math.round(t.x))), z: Math.min(lim, Math.max(0, Math.round(t.z))) };
 }
 

@@ -21,7 +21,7 @@ import {
 
 /** Smoothing times (seconds, roughly the time to cover most of the way). */
 const SMOOTH_PAN = 0.1;
-const SMOOTH_FOCUS = 0.24;
+const SMOOTH_FOCUS = 0.2;
 const SMOOTH_ROTATE = 0.09;
 const SMOOTH_ZOOM = 0.1;
 /** Fling inertia decays by e^(-FLING_DECAY * t): a fling coasts about v / FLING_DECAY world units. */

@@ -2,7 +2,7 @@
 // make lots feel lived in (fences, AC units, water tanks, antennas, benches, lamps, crates).
 // Grid convention: x east, y up, z toward the front (+z faces the road). All boxes are half-open.
 import { hash01 } from '../../core/rng';
-import { col, glow, mat, windowColor, LAMP, type Paint, type WindowStyle } from './palette';
+import { col, courses, glow, mat, windowColor, LAMP, type Paint, type WindowStyle } from './palette';
 import type { VoxelGrid } from './voxel';
 
 // ---------------------------------------------------------------- shared colours
@@ -182,36 +182,6 @@ export function ellipsoid(
   }
 }
 
-/** Foliage paint: lighter on top, darker underneath, with a few speckles. */
-export function leafPaint(hex: string, cy: number, seed: number): Paint {
-  const base = col(hex);
-  const top = col(hex, 1.1);
-  const under = col(hex, 0.84);
-  const speck = col(hex, 0.92);
-  return (x, y, z) => {
-    if (y + 0.5 < cy - 0.5) return under;
-    const h = hash01(x + seed * 31, y, z + seed * 17);
-    if (y + 0.5 > cy + 0.8 && h < 0.75) return top;
-    return h < 0.12 ? speck : base;
-  };
-}
-
-/** A leafy blob: an ellipsoid with a slightly ragged outline. */
-export function blob(g: VoxelGrid, cx: number, cy: number, cz: number, rx: number, ry: number, rz: number, p: Paint, seed: number, rough = 0.3): void {
-  for (let y = Math.floor(cy - ry - 1); y <= Math.ceil(cy + ry + 1); y++) {
-    for (let z = Math.floor(cz - rz - 1); z <= Math.ceil(cz + rz + 1); z++) {
-      for (let x = Math.floor(cx - rx - 1); x <= Math.ceil(cx + rx + 1); x++) {
-        const dx = (x + 0.5 - cx) / rx;
-        const dy = (y + 0.5 - cy) / ry;
-        const dz = (z + 0.5 - cz) / rz;
-        const d = dx * dx + dy * dy + dz * dz;
-        const lim = 1 + (hash01(x * 3 + seed, y * 5, z * 7 + seed) - 0.5) * rough;
-        if (d <= lim) g.put(x, y, z, p);
-      }
-    }
-  }
-}
-
 // ---------------------------------------------------------------- windows and doors
 
 export interface WinOpts {
@@ -295,21 +265,22 @@ export function ribbons(g: VoxelGrid, x0: number, z0: number, x1: number, z1: nu
  * darker underside and a sunlit top. Cheap after greedy meshing (a few dozen quads).
  */
 export function crown(g: VoxelGrid, x: number, z: number, y0: number, r: number, h: number, hex: string, seed: number): void {
-  const under = col(hex, 0.82);
-  const base = col(hex);
+  // each tree gets a slightly different green so groves do not look stamped
+  const j = 0.96 + hash01(seed, 71) * 0.08;
+  const under = col(hex, 0.82 * j);
+  const base = col(hex, j);
   const top = col(hex, 1.1);
-  const speck = col(hex, 0.92);
   for (let k = 0; k < h; k++) {
-    const rr = k === 0 || k === h - 1 ? r - 1 : r;
+    const edge = k === 0 || k === h - 1;
+    const rr = edge ? r - 1 : r;
     if (rr < 0) continue;
     const p = k === 0 ? under : k === h - 1 ? top : base;
+    // only the wide middle layers get their corners cut: rounder look, few extra faces
+    const cut = !edge && rr > 1;
     for (let dz = -rr; dz <= rr; dz++) {
       for (let dx = -rr; dx <= rr; dx++) {
-        if (rr > 0 && Math.abs(dx) === rr && Math.abs(dz) === rr) continue;
-        // a few darker leaf clusters on the sides
-        const side = Math.abs(dx) === rr || Math.abs(dz) === rr;
-        const c = side && k > 0 && k < h - 1 && hash01(x + dx + seed, y0 + k, z + dz) < 0.16 ? speck : p;
-        g.set(x + dx, y0 + k, z + dz, c);
+        if (cut && Math.abs(dx) === rr && Math.abs(dz) === rr) continue;
+        g.set(x + dx, y0 + k, z + dz, p);
       }
     }
   }
@@ -324,25 +295,33 @@ export function smallTree(g: VoxelGrid, x: number, z: number, y: number, seed: n
   crown(g, x, z, y + trunkH, size, size + 2, leafHex, seed);
 }
 
-/** A conifer: stacked shrinking square tiers with alternating shades. */
-export function smallPine(g: VoxelGrid, x: number, z: number, y: number, seed: number, h = 7, hex: string = C.pine): void {
+/**
+ * A conifer: a trunk and stacked tiers, each tier a wide skirt (darker, it is in its own shade)
+ * topped by a narrower layer, shrinking toward a pointed tip. `h` is the total height in voxels.
+ */
+export function smallPine(g: VoxelGrid, x: number, z: number, y: number, seed: number, h = 9, hex: string = C.pine): void {
+  const j = 0.96 + hash01(seed, 73) * 0.08;
+  const skirt = col(hex, 0.84 * j);
+  const mid = col(hex, j);
+  const top = col(hex, 1.1);
   g.box(x, y, z, x + 1, y + 2, z + 1, col(C.trunk));
-  const a = col(hex);
-  const b = col(hex, 0.86);
-  const tip = col(hex, 1.08);
-  for (let k = 0; k < h; k++) {
-    const t = k / h;
-    const r = t < 0.3 ? 2 : t < 0.7 ? 1 : 0;
-    const wide = k % 3 === 0 && r > 0;
-    const rr = wide ? r : Math.max(0, r - (k % 3 === 2 ? 1 : 0));
-    for (let dz = -rr; dz <= rr; dz++) {
-      for (let dx = -rr; dx <= rr; dx++) {
-        if (rr > 1 && Math.abs(dx) === rr && Math.abs(dz) === rr) continue;
-        g.set(x + dx, y + 1 + k, z + dz, k === h - 1 ? tip : wide ? b : a);
+  // tiers of (radius, layers); fewer and smaller tiers for short trees
+  const tiers: Array<[number, number]> = h >= 10 ? [[3, 2], [2, 2], [2, 2], [1, 2]] : h >= 8 ? [[2, 2], [2, 2], [1, 2]] : [[2, 2], [1, 2]];
+  let yy = y + 2;
+  for (const [r, n] of tiers) {
+    for (let k = 0; k < n; k++) {
+      const rr = Math.max(0, r - k);
+      const p = k === 0 ? skirt : mid;
+      for (let dz = -rr; dz <= rr; dz++) {
+        for (let dx = -rr; dx <= rr; dx++) {
+          if (rr >= 3 && Math.abs(dx) === rr && Math.abs(dz) === rr) continue;
+          g.set(x + dx, yy, z + dz, p);
+        }
       }
+      yy++;
     }
   }
-  void seed;
+  g.box(x, yy, z, x + 1, yy + 1, z + 1, top);
 }
 
 export function bush(g: VoxelGrid, x: number, z: number, y: number, w: number, d: number, h: number, seed: number, hex: string = C.hedge): void {
@@ -465,11 +444,6 @@ export function flag(g: VoxelGrid, x: number, z: number, y: number, h: number, h
   g.box(x + 1, y + h - 2, z, x + 4, y + h - 1, z + 1, col(hexB));
 }
 
-/** Ground cover patch (lawn, soil, paving) one voxel thick at row 0. */
-export function patch(g: VoxelGrid, x0: number, z0: number, x1: number, z1: number, p: Paint, y = 0): void {
-  g.box(x0, y, z0, x1, y + 1, z1, p);
-}
-
 /**
  * Windows on any outline (round towers): every solid voxel in the given rows with an empty
  * horizontal neighbour becomes glass. The ring is split into `segments` panes around (cx, cz),
@@ -515,17 +489,42 @@ export function awning(g: VoxelGrid, x0: number, x1: number, y: number, zFace: n
   for (let k = 0; k < depth; k++) g.box(x0, y - k, zFace + k, x1, y - k + 1, zFace + k + 1, p);
 }
 
+// 3×3 pixel glyphs for sign lettering (read as "text" from a distance, spell nothing in particular)
+const GLYPHS = [
+  [0b111, 0b101, 0b111], // O
+  [0b111, 0b110, 0b111], // E-ish
+  [0b101, 0b111, 0b101], // H
+  [0b110, 0b111, 0b110], // B-ish
+  [0b111, 0b010, 0b010], // T
+  [0b100, 0b100, 0b111], // L
+  [0b011, 0b010, 0b110], // S
+  [0b101, 0b101, 0b111], // U
+  [0b111, 0b101, 0b101], // N/A
+];
+
 /**
  * A sign board on the front (+z) of a wall: a coloured board one voxel thick in front of zFace,
- * with "lettering" in glow voxels (dark glass by day, shining at night).
+ * with 3×3 pixel letters in glow voxels (dark glass by day, shining at night). Boards shorter than
+ * five rows get a single lit stripe instead of letters.
  */
 export function sign(g: VoxelGrid, x0: number, x1: number, y0: number, y1: number, zFace: number, board: string, letters: string, seed: number): void {
   g.box(x0, y0, zFace, x1, y1, zFace + 1, col(board));
   const lit = glow(letters);
-  for (let x = x0 + 1; x < x1 - 1; x++) {
-    if ((x - x0) % 4 === 0) continue; // gaps between letters
-    for (let y = y0 + 1; y < y1 - 1; y++) {
-      if (hash01(x + seed * 7, y, seed) < 0.62) g.set(x, y, zFace, lit);
+  if (y1 - y0 < 5) {
+    for (let x = x0 + 1; x < x1 - 1; x++) if ((x - x0) % 4 !== 0 || x1 - x0 < 6) g.set(x, y0 + 1 + ((y1 - y0 - 2) >> 1), zFace, lit);
+    if (y1 - y0 === 4) for (let x = x0 + 1; x < x1 - 1; x++) if (hash01(x, seed, 3) < 0.5) g.set(x, y0 + 2, zFace, lit);
+    return;
+  }
+  const inner = x1 - x0 - 2;
+  const count = Math.max(1, Math.floor((inner + 1) / 4));
+  const start = x0 + 1 + Math.floor((inner - (count * 4 - 1)) / 2);
+  const yb = y0 + 1 + Math.floor((y1 - y0 - 2 - 3) / 2);
+  for (let k = 0; k < count; k++) {
+    const gl = GLYPHS[Math.floor(hash01(seed, k, 11) * GLYPHS.length)];
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        if (gl[r] & (4 >> c)) g.set(start + k * 4 + c, yb + 2 - r, zFace, lit);
+      }
     }
   }
 }
@@ -549,4 +548,81 @@ export function roofGarden(g: VoxelGrid, x0: number, z0: number, x1: number, z1:
 export function frontDoor(g: VoxelGrid, x0: number, w: number, y: number, h: number, layer: number, hex: string = C.door, lamp = true): void {
   pane(g, 0, x0, x0 + w, y, y + h, layer, col(hex));
   if (lamp) g.set(x0 + w, y + h, layer + 1, glow(LAMP));
+}
+
+/**
+ * A round chimney. With `bands`, the top `bandRows` rows (all of it if omitted) get horizontal
+ * stripes of `hex` and `bands`. Returns the smoke point (top centre) in grid units.
+ */
+export function chimney(
+  g: VoxelGrid,
+  cx: number,
+  cz: number,
+  r: number,
+  y0: number,
+  y1: number,
+  hex: string,
+  bands?: string,
+  bandRows?: number,
+): [number, number, number] {
+  const plain = courses(hex, 2, 0.93);
+  if (bands) {
+    const a = col(hex);
+    const b = col(bands);
+    const from = bandRows !== undefined ? y1 - bandRows : y0;
+    cylinder(g, cx, cz, r, y0, y1, (x, y, z) => (y < from ? (plain as (x: number, y: number, z: number) => number)(x, y, z) : Math.floor((y1 - y) / 3) % 2 === 0 ? a : b));
+  } else cylinder(g, cx, cz, r, y0, y1, plain);
+  cylinder(g, cx, cz, r + 0.5, y1 - 1, y1, col('#4a4d55'));
+  // hollow top
+  if (r >= 1) cylinder(g, cx, cz, Math.max(0.6, r - 0.8), y1 - 1, y1, 0);
+  // tall stacks carry red aviation lights just under the lip
+  if (y1 - y0 >= 40) {
+    const red = glow('#ff4436');
+    const yl = y1 - 3;
+    const ix = Math.floor(cx);
+    const iz = Math.floor(cz);
+    // scan in from each side and light the first wall voxel met
+    for (const dir of [-1, 1]) {
+      for (let k = Math.ceil(r) + 1; k >= 0; k--) {
+        const z = iz + dir * k;
+        if (g.get(ix, yl, z) !== 0) {
+          g.set(ix, yl, z, red);
+          break;
+        }
+      }
+    }
+  }
+  return [cx, y1, cz];
+}
+
+/** Small work lights (glow voxels) at the given grid positions. */
+export function lights(g: VoxelGrid, points: Array<[number, number, number]>, hex = '#fff0b8'): void {
+  const p = glow(hex);
+  for (const [x, y, z] of points) g.set(x, y, z, p);
+}
+
+/** A stepped heap (coal, gravel, ore): layers shrinking by one voxel per row. */
+export function heap(g: VoxelGrid, x0: number, z0: number, x1: number, z1: number, h: number, hex: string, seed: number): void {
+  const p = mat(hex, { cell: [2, 1, 2], dark: 0.3, dk: 0.85, light: 0.2, lk: 1.1, seed });
+  for (let k = 0; k < h; k++) {
+    if (x0 + k >= x1 - k || z0 + k >= z1 - k) break;
+    g.box(x0 + k, k, z0 + k, x1 - k, k + 1, z1 - k, p);
+  }
+}
+
+/** A light box with a glowing plus-shaped cross on its front (+z) and back faces. */
+export function crossSign(g: VoxelGrid, x0: number, y0: number, z0: number, w: number, h: number, d: number, crossHex = '#ff4a4a'): void {
+  g.box(x0, y0, z0, x0 + w, y0 + h, z0 + d, col('#fbfbf8'));
+  const cx = x0 + Math.floor(w / 2);
+  const cy = y0 + Math.floor(h / 2);
+  const arm = Math.max(1, Math.floor(Math.min(w, h) / 2) - 1);
+  const lit = glow(crossHex);
+  for (const z of [z0, z0 + d - 1]) {
+    for (let k = -arm; k < arm; k++) {
+      for (const t of [-1, 0]) {
+        g.set(cx + k, cy + t, z, lit);
+        g.set(cx + t, cy + k, z, lit);
+      }
+    }
+  }
 }

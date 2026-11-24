@@ -50,7 +50,7 @@ const MOUSE_PITCH_PER_PX = 0.005;
 /** Auto-pan while a plan is dragged within this many px of a screen edge. */
 const EDGE_BAND = 48;
 /** Auto-pan speed at the very edge, in camera distances per second, and its ease-in time (s). */
-const AUTO_PAN_RATE = 0.5;
+const AUTO_PAN_RATE = 0.3;
 const AUTO_PAN_RAMP = 0.35;
 /** Keyboard: pan in camera distances per second, rotate in rad/s, zoom in e-folds per second. */
 const KEY_PAN = 0.9;
@@ -465,20 +465,18 @@ export function createInputController(el: HTMLElement, hooks: InputHooks, mapSiz
     rig.fling(wx, wz);
   }
 
-  function releaseCaptures(): void {
-    for (const p of ptrs) {
-      try {
-        if (el.hasPointerCapture?.(p.id)) el.releasePointerCapture(p.id);
-      } catch {
-        // the pointer is already gone
-      }
+  function release(id: number): void {
+    try {
+      if (el.hasPointerCapture?.(id)) el.releasePointerCapture(id);
+    } catch {
+      // the pointer is already gone
     }
   }
 
   /** Forget every pointer and drop any plan (no apply). */
   function resetGesture(): void {
-    releaseCaptures();
-    ptrs.length = 0;
+    // detach the list first: releasing capture may fire lostpointercapture right away
+    const gone = ptrs.splice(0);
     if (drag) cancelPlan();
     mode = 'idle';
     camOnly = false;
@@ -486,6 +484,7 @@ export function createInputController(el: HTMLElement, hooks: InputHooks, mapSiz
     tapOk = false;
     dirty = false;
     resetSamples();
+    for (const p of gone) release(p.id);
   }
 
   /** After a pointer left: settle what the remaining fingers do. */
@@ -604,6 +603,8 @@ export function createInputController(el: HTMLElement, hooks: InputHooks, mapSiz
   }
 
   function onUp(e: PointerEvent): void {
+    // again on release: some WebKit versions only let audio start from the end of a touch
+    if (e.type === 'pointerup' && !disposed) safe('touched', () => hooks.touched(), undefined);
     const p = find(e.pointerId);
     if (!p) return;
     if (Number.isFinite(e.clientX) && Number.isFinite(e.clientY)) {
@@ -614,11 +615,7 @@ export function createInputController(el: HTMLElement, hooks: InputHooks, mapSiz
     dirty = true;
     flush();
     ptrs.splice(ptrs.indexOf(p), 1);
-    try {
-      if (el.hasPointerCapture?.(p.id)) el.releasePointerCapture(p.id);
-    } catch {
-      // already released
-    }
+    release(p.id);
     if (mode === 'plan' && p.id === dragId) {
       commitPlan();
     } else if (mode === 'pan') {
@@ -640,11 +637,7 @@ export function createInputController(el: HTMLElement, hooks: InputHooks, mapSiz
     const p = find(e.pointerId);
     if (!p) return;
     ptrs.splice(ptrs.indexOf(p), 1);
-    try {
-      if (el.hasPointerCapture?.(p.id)) el.releasePointerCapture(p.id);
-    } catch {
-      // already released
-    }
+    release(p.id);
     if (mode === 'plan' && p.id === dragId) cancelPlan();
     tapOk = false;
     afterRemoval();
@@ -728,6 +721,13 @@ export function createInputController(el: HTMLElement, hooks: InputHooks, mapSiz
     const ex = edgeDepth(p.x, vw, EDGE_BAND);
     const ey = edgeDepth(p.y, vh, EDGE_BAND);
     if (!ex && !ey) {
+      edgeTime = 0;
+      return;
+    }
+    // once the finger already points past the map's border there is nothing more to reach
+    const G = ground(rig.current, p.x, p.y, gA);
+    const m = 0.5;
+    if (!G || G.x < -m || G.z < -m || G.x > size + m || G.z > size + m) {
       edgeTime = 0;
       return;
     }

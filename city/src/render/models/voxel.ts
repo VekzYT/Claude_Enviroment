@@ -22,10 +22,6 @@ export class VoxelGrid {
     this.data = new Uint16Array(nx * ny * nz);
   }
 
-  inside(x: number, y: number, z: number): boolean {
-    return x >= 0 && y >= 0 && z >= 0 && x < this.nx && y < this.ny && z < this.nz;
-  }
-
   get(x: number, y: number, z: number): number {
     if (x < 0 || y < 0 || z < 0 || x >= this.nx || y >= this.ny || z >= this.nz) return 0;
     return this.data[(y * this.nz + z) * this.nx + x];
@@ -65,18 +61,6 @@ export class VoxelGrid {
         for (let x = Math.max(0, x0); x < Math.min(this.nx, x1); x++) {
           const i = (y * this.nz + z) * this.nx + x;
           if (this.data[i] !== 0) this.data[i] = typeof p === 'number' ? p : p(x, y, z);
-        }
-      }
-    }
-  }
-
-  /** Like box, but only fills empty voxels (planting around existing things). */
-  fillEmpty(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, p: Paint): void {
-    for (let y = Math.max(0, y0); y < Math.min(this.ny, y1); y++) {
-      for (let z = Math.max(0, z0); z < Math.min(this.nz, z1); z++) {
-        for (let x = Math.max(0, x0); x < Math.min(this.nx, x1); x++) {
-          const i = (y * this.nz + z) * this.nx + x;
-          if (this.data[i] === 0) this.data[i] = typeof p === 'number' ? p : p(x, y, z);
         }
       }
     }
@@ -178,7 +162,7 @@ function toGeometry(t: TriList): THREE.BufferGeometry {
  * Greedy-mesh a grid into `acc`. Voxel (x, y, z) covers [x, x+1] in grid units; the world position
  * of grid point p is (p − origin) × scale.
  */
-export function meshGrid(g: VoxelGrid, acc: MeshAcc, scale: number, ox: number, oy: number, oz: number): void {
+export function meshGrid(g: VoxelGrid, acc: MeshAcc, scale: number, ox: number, oy: number, oz: number, skipBase = false): void {
   const dims = [g.nx, g.ny, g.nz];
   const strides = [1, g.nx * g.nz, g.nx];
   const org = [ox, oy, oz];
@@ -204,7 +188,9 @@ export function meshGrid(g: VoxelGrid, acc: MeshAcc, scale: number, ox: number, 
           const base = i * su + j * sv;
           const a = sl > 0 ? data[base + (sl - 1) * sd] : 0;
           const b = sl < dd ? data[base + sl * sd] : 0;
-          const m = a !== 0 && b === 0 ? a : b !== 0 && a === 0 ? -b : 0;
+          let m = a !== 0 && b === 0 ? a : b !== 0 && a === 0 ? -b : 0;
+          // faces looking straight down at the ground plane are never seen
+          if (skipBase && d === 1 && sl === 0) m = 0;
           mask[n] = m;
           if (m !== 0) any = true;
         }
@@ -264,6 +250,6 @@ export function meshGrid(g: VoxelGrid, acc: MeshAcc, scale: number, ox: number, 
 
 /** Mesh a footprint-sized grid (w×h tiles at VPT voxels per tile) centred on the origin, base at y = 0. */
 export function meshLot(g: VoxelGrid, acc: MeshAcc = new MeshAcc()): MeshAcc {
-  meshGrid(g, acc, 1 / VPT, g.nx / 2, 0, g.nz / 2);
+  meshGrid(g, acc, 1 / VPT, g.nx / 2, 0, g.nz / 2, true);
   return acc;
 }

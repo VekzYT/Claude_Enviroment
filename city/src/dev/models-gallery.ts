@@ -7,10 +7,17 @@ import { hash01 } from '../core/rng';
 import type { BuildingType } from '../core/types';
 import { ZoneType } from '../core/types';
 import { CAR_VARIANTS, ZONE_VARIANTS, buildingModel, carModel, treeModel, zoneModel, type ModelParts } from '../render/models';
+import { combine, modelMaterial } from './models-material';
 
 declare global {
   interface Window {
-    __gallery: { ready: boolean; shot(name: string, opts?: ShotOpts): Promise<void>; info: Record<string, unknown> };
+    __gallery: {
+      ready: boolean;
+      shot(name: string, opts?: ShotOpts): Promise<void>;
+      sheet(keys: string[], cols: number, rows: number, night?: number, yaw?: number): Promise<void>;
+      keys(): string[];
+      info: Record<string, unknown>;
+    };
   }
 }
 
@@ -35,71 +42,7 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const uNight = { value: 0 };
 const uGlass = { value: new THREE.Color('#4f7398') };
-const uGlowBoost = { value: 1.25 };
-
-function modelMaterial(): THREE.MeshLambertMaterial {
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uNight = uNight;
-    shader.uniforms.uGlass = uGlass;
-    shader.uniforms.uGlowBoost = uGlowBoost;
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\nattribute float aGlow;\nvarying float vGlow;\nvarying float vLit;\nuniform float uNight;`)
-      .replace(
-        '#include <color_vertex>',
-        `#include <color_vertex>
-vGlow = aGlow;
-float glowTh = 0.18;
-float glowLvl = 1.0;
-#ifdef USE_INSTANCING
-  vec2 ip = vec2(instanceMatrix[3][0], instanceMatrix[3][2]);
-  float gh = fract(sin(dot(ip, vec2(12.9898, 78.233))) * 43758.5453);
-  glowTh = 0.05 + gh * 0.5;
-  glowLvl = 0.7 + 0.3 * fract(gh * 7.31);
-#endif
-vLit = smoothstep(glowTh, glowTh + 0.15, uNight) * glowLvl;`,
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying float vGlow;\nvarying float vLit;\nuniform vec3 uGlass;\nuniform float uGlowBoost;`)
-      .replace(
-        '#include <color_fragment>',
-        `#include <color_fragment>
-vec3 glowLitCol = diffuseColor.rgb;
-diffuseColor.rgb = mix(diffuseColor.rgb, mix(uGlass, glowLitCol * 0.2, vLit), vGlow);`,
-      )
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance += glowLitCol * (vGlow * vLit * uGlowBoost);`);
-  };
-  mat.customProgramCacheKey = () => 'gallery-glow';
-  return mat;
-}
-const material = modelMaterial();
-
-/** body + glow in one geometry with aGlow, like render/instances.ts combineParts. */
-function combine(body: THREE.BufferGeometry, glow: THREE.BufferGeometry | null): THREE.BufferGeometry {
-  const list: Array<[THREE.BufferGeometry, number]> = [[body, 0]];
-  if (glow) list.push([glow, 1]);
-  let n = 0;
-  for (const [g] of list) n += g.getAttribute('position').count;
-  const pos = new Float32Array(n * 3);
-  const nor = new Float32Array(n * 3);
-  const col = new Float32Array(n * 3);
-  const gl = new Float32Array(n);
-  let o = 0;
-  for (const [g, f] of list) {
-    const c = g.getAttribute('position').count;
-    pos.set(g.getAttribute('position').array as Float32Array, o * 3);
-    nor.set(g.getAttribute('normal').array as Float32Array, o * 3);
-    col.set(g.getAttribute('color').array as Float32Array, o * 3);
-    gl.fill(f, o, o + c);
-    o += c;
-  }
-  const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  out.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  out.setAttribute('aGlow', new THREE.BufferAttribute(gl, 1));
-  return out;
-}
+const material = modelMaterial({ uNight, uGlass, uGlowBoost: { value: 1.25 } });
 
 const scene = new THREE.Scene();
 const sun = new THREE.DirectionalLight(0xfff3df, 2.35);
@@ -167,8 +110,17 @@ function finishGround(): void {
 }
 
 const spinners: Array<{ mesh: THREE.Mesh; axis: 'x' | 'y' | 'z' }> = [];
+/** Gallery placements by key, for the contact sheet: object, footprint size, height. */
+const placed = new Map<string, { obj: THREE.Object3D; size: number; height: number }>();
+let placeKey = '';
+let placeSize = 1;
 function place(parts: ModelParts, cx: number, cz: number, rot = 0): void {
   const m = new THREE.Mesh(combine(parts.body, parts.glow), material);
+  if (placeKey) {
+    placed.set(placeKey, { obj: m, size: placeSize, height: parts.height });
+    placeKey = '';
+    placeSize = 1;
+  }
   m.position.set(cx, 0, cz);
   m.rotation.y = rot * (Math.PI / 2);
   m.castShadow = true;
@@ -206,6 +158,7 @@ function buildZones(): void {
       const z = (3 - lvl) * 3;
       for (let v = 0; v < ZONE_VARIANTS; v++) {
         tile(x0 + v, z, kinds[zi]);
+        placeKey = `${kinds[zi]}${lvl}-${v}`;
         place(zoneModel(zones[zi], lvl, v), x0 + v + 0.5, z + 0.5, 0);
       }
       for (let v = 0; v < ZONE_VARIANTS; v++) tile(x0 + v, z + 1, 'road');
@@ -227,6 +180,8 @@ function buildBuildings(): void {
     }
     const ground: Ground = t === 'park_small' ? 'park' : BUILDINGS[t].power || BUILDINGS[t].water ? 'gravel' : 'plaza';
     tile(x, z, ground, s, s);
+    placeKey = t;
+    placeSize = s;
     place(buildingModel(t as BuildingType), x + s / 2, z + s / 2, 0);
     for (let k = 0; k < s; k++) tile(x + k, z + s, 'road');
     x += s + 1;
@@ -238,10 +193,13 @@ function buildBuildings(): void {
 function buildNature(): void {
   for (let v = 1; v <= 3; v++) {
     tile(20 + v, 0, 'grass');
+    placeKey = `tree${v}`;
     place(treeModel(v), 20 + v + 0.5, 0.5, 0);
   }
   for (let v = 0; v < CAR_VARIANTS; v++) {
     tile(20 + (v % 3), 2 + Math.floor(v / 3), 'road');
+    placeKey = `car${v}`;
+    placeSize = 0.4;
     place(carModel(v), 20 + (v % 3) + 0.5, 2 + Math.floor(v / 3) + 0.5, v % 2 ? 1 : 0);
   }
 }
@@ -349,4 +307,54 @@ async function shot(name: string, o: ShotOpts = {}): Promise<void> {
   info.last = name;
 }
 
-window.__gallery = { ready: true, shot, info };
+/** Render several models, each alone in its own cell, framed to its size. */
+async function sheet(keys: string[], cols: number, rows: number, night = 0, yaw = 0.62): Promise<void> {
+  setLight(night);
+  const W = renderer.domElement.width / renderer.getPixelRatio();
+  const H = renderer.domElement.height / renderer.getPixelRatio();
+  const cw = W / cols;
+  const ch = H / rows;
+  const all = [...placed.values()];
+  renderer.setScissorTest(true);
+  renderer.setClearColor(scene.background as THREE.Color);
+  renderer.clear();
+  for (let k = 0; k < keys.length && k < cols * rows; k++) {
+    const p = placed.get(keys[k]);
+    if (!p) continue;
+    for (const o of all) o.obj.visible = o === p;
+    const c = k % cols;
+    const r = Math.floor(k / cols);
+    const x = c * cw;
+    const y = H - (r + 1) * ch;
+    renderer.setViewport(x, y, cw, ch);
+    renderer.setScissor(x, y, cw, ch);
+    const pos = p.obj.position;
+    const h = Math.max(0.15, p.height);
+    const tall = h > p.size * 2.2;
+    const pitch = tall ? 0.3 : 0.55;
+    // fit the footprint diagonal and the height into the cell
+    const span = Math.max(p.size * 1.35, tall ? h * 0.98 : h * 1.3);
+    const dist = span / (2 * Math.tan((20 * Math.PI) / 180)) + p.size * 0.3;
+    const ty = tall ? h * 0.48 : h * 0.35;
+    const hd = Math.cos(pitch) * dist;
+    camera.aspect = cw / ch;
+    camera.updateProjectionMatrix();
+    camera.position.set(pos.x + Math.sin(yaw) * hd, ty + Math.sin(pitch) * dist, pos.z + Math.cos(yaw) * hd);
+    camera.lookAt(pos.x, ty, pos.z);
+    sun.position.set(pos.x - 30, 50, pos.z + 22);
+    sun.target.position.set(pos.x, 0, pos.z);
+    const sc = sun.shadow.camera;
+    const ext = Math.max(4, span);
+    sc.left = -ext;
+    sc.right = ext;
+    sc.top = ext;
+    sc.bottom = -ext;
+    sc.updateProjectionMatrix();
+    renderer.render(scene, camera);
+  }
+  for (const o of all) o.obj.visible = true;
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, W, H);
+}
+
+window.__gallery = { ready: true, shot, sheet, keys: () => [...placed.keys()], info };

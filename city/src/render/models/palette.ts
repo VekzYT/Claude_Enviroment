@@ -113,13 +113,6 @@ export function stripes(a: string, b: string, axis: 'x' | 'z', width = 1): Paint
     : (_x, _y, z) => (Math.floor(z / width) % 2 === 0 ? ia : ib);
 }
 
-/** Checkerboard of two colours (cells of `size` voxels). */
-export function checker(a: string, b: string, size = 1): Paint {
-  const ia = col(a);
-  const ib = col(b);
-  return (x, y, z) => ((Math.floor(x / size) + Math.floor(y / size) + Math.floor(z / size)) % 2 === 0 ? ia : ib);
-}
-
 // ---------------------------------------------------------------- windows
 
 export type WindowStyle = 'home' | 'office' | 'shop' | 'factory' | 'tower';

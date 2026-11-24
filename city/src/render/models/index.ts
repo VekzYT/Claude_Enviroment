@@ -8,6 +8,7 @@
 // and greedy merging into non-indexed geometry with position, flat normal and linear vertex colour.
 // Windows, lamps and signs are in the separate glow geometry. Results are cached forever.
 import * as THREE from 'three';
+import { BUILDING_TYPES } from '../../core/defs';
 import type { BuildingType } from '../../core/types';
 import { ZoneType } from '../../core/types';
 import { buildingDesign } from './buildings';
@@ -97,6 +98,7 @@ export function warmModels(): void {
   for (const zone of [ZoneType.Res, ZoneType.Com, ZoneType.Ind]) {
     for (let level = 1; level <= 3; level++) for (let v = 0; v < ZONE_VARIANTS; v++) zoneModel(zone, level, v);
   }
+  for (const t of BUILDING_TYPES) buildingModel(t);
   for (let v = 1; v <= 3; v++) treeModel(v);
   for (let v = 0; v < CAR_VARIANTS; v++) carModel(v);
 }

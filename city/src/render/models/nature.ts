@@ -22,10 +22,9 @@ export function treeGrid(variant: number): VoxelGrid {
     roundTree(g, 11, 10, 2, 12, LEAVES[2]);
     roundTree(g, 4, 12, 2, 13, LEAVES[1]);
   } else if (v === 2) {
-    smallPine(g, 5, 4, 0, 21, 10, C.pine);
-    smallPine(g, 11, 8, 0, 22, 8, '#2a7d4f');
-    smallPine(g, 5, 11, 0, 23, 7, C.pine);
-    smallPine(g, 12, 13, 0, 24, 5, '#3a945c');
+    smallPine(g, 5, 5, 0, 21, 10, C.pine);
+    smallPine(g, 11, 9, 0, 22, 8, '#2a7d4f');
+    smallPine(g, 5, 12, 0, 23, 7, '#3a945c');
   } else {
     roundTree(g, 10, 5, 3, 31, LEAVES[3]);
     smallPine(g, 4, 9, 0, 32, 9, C.pine);

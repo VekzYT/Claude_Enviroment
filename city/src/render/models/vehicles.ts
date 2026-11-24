@@ -159,7 +159,7 @@ function meshed(key: string, b: Body): MeshAcc {
     const g = build(b);
     acc = new MeshAcc();
     // centred in x/z, wheels on y = 0
-    meshGrid(g, acc, 1 / CAR_VPT, g.nx / 2, 0, g.nz / 2);
+    meshGrid(g, acc, 1 / CAR_VPT, g.nx / 2, 0, g.nz / 2, true);
     accCache.set(key, acc);
   }
   return acc;

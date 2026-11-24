@@ -58,8 +58,31 @@ const SHOTS = {
   cityCloseNight: { night: 1, target: [50, 11], dist: 16, pitch: 0.75, yaw: 0.6 },
 };
 
+// contact sheets: [keys, cols, rows, night]
+const res = (l) => [0, 1, 2, 3].map((v) => `res${l}-${v}`);
+const com = (l) => [0, 1, 2, 3].map((v) => `com${l}-${v}`);
+const ind = (l) => [0, 1, 2, 3].map((v) => `ind${l}-${v}`);
+const SHEETS = {
+  sheetRes: [[...res(1), ...res(2), ...res(3)], 4, 3, 0],
+  sheetCom: [[...com(1), ...com(2), ...com(3)], 4, 3, 0],
+  sheetInd: [[...ind(1), ...ind(2), ...ind(3)], 4, 3, 0],
+  sheetResNight: [[...res(1), ...res(2), ...res(3)], 4, 3, 1],
+  sheetComNight: [[...com(1), ...com(2), ...com(3)], 4, 3, 1],
+  sheetIndNight: [[...ind(1), ...ind(2), ...ind(3)], 4, 3, 1],
+  sheetUtil: [['power_coal', 'power_wind', 'power_solar', 'water_tower', 'water_pump', 'park_small', 'park_plaza', 'police'], 4, 2, 0],
+  sheetCivic: [['fire', 'clinic', 'school', 'hospital', 'college', 'stadium', 'landmark'], 4, 2, 0],
+  sheetUtilNight: [['power_coal', 'power_wind', 'power_solar', 'water_tower', 'water_pump', 'park_small', 'park_plaza', 'police'], 4, 2, 1],
+  sheetCivicNight: [['fire', 'clinic', 'school', 'hospital', 'college', 'stadium', 'landmark'], 4, 2, 1],
+  sheetBig: [['landmark', 'stadium', 'power_coal', 'college'], 2, 2, 0],
+  sheetBigNight: [['landmark', 'stadium', 'power_coal', 'hospital'], 2, 2, 1],
+  sheetTowers: [['res3-0', 'res3-1', 'res3-2', 'res3-3', 'com3-0', 'com3-1', 'com3-2', 'com3-3'], 8, 1, 0],
+  sheetHeavy: [['ind3-0', 'ind3-1', 'ind3-2', 'ind3-3', 'ind2-0', 'ind2-1', 'ind2-2', 'ind2-3'], 8, 1, 0],
+  sheetSmall: [['tree1', 'tree2', 'tree3', 'car0', 'car1', 'car2', 'car3', 'car4', 'car5'], 3, 3, 0],
+  sheetSmallNight: [['tree1', 'tree2', 'tree3', 'car0', 'car1', 'car2', 'car3', 'car4', 'car5'], 3, 3, 1],
+};
+
 const want = process.argv.slice(2);
-const names = want.length ? want : Object.keys(SHOTS);
+const names = want.length ? want : [...Object.keys(SHOTS), ...Object.keys(SHEETS)];
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -71,6 +94,13 @@ page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 await page.goto(`file://${join(out, 'gallery.html')}`);
 await page.waitForFunction(() => window.__gallery && window.__gallery.ready, null, { timeout: 120000 });
 for (const name of names) {
+  if (SHEETS[name]) {
+    const [keys, cols, rows, night] = SHEETS[name];
+    await page.evaluate(([k, c, r, n]) => window.__gallery.sheet(k, c, r, n), [keys, cols, rows, night]);
+    await page.screenshot({ path: join(out, `${name}.png`) });
+    console.log('saved', name);
+    continue;
+  }
   const opts = SHOTS[name];
   if (!opts) {
     console.log('unknown shot', name);
