@@ -111,17 +111,22 @@ const frames = (n = 1) =>
       }),
     n,
   );
-const touch = (type, pts) =>
+/** `ts` (seconds since the epoch) sets the event's own timestamp. */
+const touch = (type, pts, ts) =>
   cdp.send('Input.dispatchTouchEvent', {
     type,
     touchPoints: pts.map(([id, x, y]) => ({ id, x, y, radiusX: 10, radiusY: 10, force: 1 })),
+    ...(ts ? { timestamp: ts } : {}),
   });
 const lerp = (a, b, t) => a + (b - a) * t;
 
+// A 60 ms tap. The two events carry their own timestamps: the game times taps from them, and a slow
+// software-rendered frame between the two must not turn the tap into a long press.
 async function tapAt(x, y) {
-  await touch('touchStart', [[1, x, y]]);
+  const t = Date.now() / 1000;
+  await touch('touchStart', [[1, x, y]], t);
   await sleep(60);
-  await touch('touchEnd', []);
+  await touch('touchEnd', [], t + 0.06);
   await frames(1);
 }
 
