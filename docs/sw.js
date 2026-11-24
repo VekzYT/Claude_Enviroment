@@ -1,42 +1,12 @@
-// Cubopolis offline cache. Everything the game needs is a handful of files, so they are all
-// cached on install and served from the cache from then on: the Home Screen app opens instantly
-// and works with no signal. tools/pages.mjs stamps BUILD_ID with a hash of the build, so every new
-// version is a new service worker; the browser installs it in the background, and the next launch
-// runs the new version.
-const BUILD_ID = 'a24978a46430';
-const CACHE = 'cubopolis-' + BUILD_ID;
-const FILES = ["./","./apple-touch-icon.png","./game.css","./game.js","./icon-192.png","./icon-512.png","./index.html","./launch-landscape.png","./manifest.webmanifest"];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((cache) => cache.addAll(FILES.map((f) => new Request(f, { cache: 'reload' }))))
-      .then(() => self.skipWaiting()),
-  );
-});
-
+// Clears the previous game's offline copy so this page shows. The real game installs its own
+// service worker when it is published.
+self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('cubopolis-') && k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
-  );
-});
-
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  event.respondWith(
-    caches.open(CACHE).then((cache) =>
-      cache.match(req, { ignoreSearch: true }).then(
-        (hit) =>
-          hit ||
-          fetch(req).catch(() =>
-            req.mode === 'navigate' ? cache.match('./index.html') : Response.error(),
-          ),
-      ),
-    ),
+    (async () => {
+      for (const key of await caches.keys()) await caches.delete(key);
+      await self.registration.unregister();
+      for (const client of await self.clients.matchAll({ type: 'window' })) client.navigate(client.url);
+    })(),
   );
 });
