@@ -237,41 +237,81 @@ const fingerprint = () =>
     return { name: s.name, day: s.day, money: s.money, pop: s.stats.population, buildings: s.buildings.filter(Boolean).length, hash: h };
   });
 
-/** The usable part of the screen for map gestures (clear of the HUD, dock and edge auto-pan). */
-const SAFE_RECT = { x0: 130, x1: W - 130, y0: 80, y1: H - 95 };
-const inRect = (p) => p.inFront && p.x >= SAFE_RECT.x0 && p.x <= SAFE_RECT.x1 && p.y >= SAFE_RECT.y0 && p.y <= SAFE_RECT.y1;
+/** Screen rectangles the interface covers right now (HUD, dock, chip, tips, cards), with a margin. */
+const obstructions = () =>
+  G(() => {
+    const out = [];
+    for (const el of document.querySelectorAll('#ui .panel, #ui .dock-row, #ui .chip, #ui .pill, #ui .tip, #ui .toasts > *, .boot-banner')) {
+      if (el.closest('[hidden]')) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      out.push({ x0: r.left - 14, y0: r.top - 14, x1: r.right + 14, y1: r.bottom + 14 });
+    }
+    return out;
+  });
+/** Edge auto-pan zone and a little extra stay clear too. */
+const EDGE = { x0: 70, x1: W - 70, y0: 56, y1: H - 40 };
+function freeAt(p, obs) {
+  if (!p.inFront || p.x < EDGE.x0 || p.x > EDGE.x1 || p.y < EDGE.y0 || p.y > EDGE.y1) return false;
+  return !obs.some((o) => p.x >= o.x0 && p.x <= o.x1 && p.y >= o.y0 && p.y <= o.y1);
+}
+/** Centre of the biggest clear band of the screen (between the HUD and whatever sits on the dock). */
+async function freeCentre(obs) {
+  let top = EDGE.y0;
+  let bottom = EDGE.y1;
+  for (const o of obs) {
+    const cx = (o.x0 + o.x1) / 2;
+    if (o.x1 < W * 0.25 || o.x0 > W * 0.75) continue; // side panels do not limit the band
+    if (o.y1 < H / 2) top = Math.max(top, o.y1);
+    else if (cx > 0) bottom = Math.min(bottom, o.y0);
+  }
+  return { x: W / 2, y: (top + bottom) / 2 };
+}
 
 /** One-finger pan (Look tool) so that tile (x, z) moves to screen point (sx, sy). */
 async function panTile(x, z, sx = W / 2, sy = H / 2 - 8) {
   const p = await screenOf(x, z);
-  const from = { x: Math.min(W - 140, Math.max(140, p.x)), y: Math.min(H - 100, Math.max(85, p.y)) };
-  // Ground under the finger stays under it, so drag from the tile's point (clamped on screen) to the target.
+  const obs = await obstructions();
+  // Grab the ground somewhere clear (the tile itself if it is), and move it by the tile's offset.
+  let from = { x: Math.min(W - 140, Math.max(140, p.x)), y: Math.min(H - 110, Math.max(90, p.y)) };
+  if (!freeAt({ ...from, inFront: true }, obs)) from = await freeCentre(obs);
   const dx = sx - p.x;
   const dy = sy - p.y;
-  const steps = 14;
-  await touch('touchStart', [[1, from.x, from.y]]);
-  await frames(1);
-  for (let s = 1; s <= steps; s++) {
-    await touch('touchMove', [[1, from.x + (dx * s) / steps, from.y + (dy * s) / steps]]);
+  // Long moves go in a few strokes so the finger stays on the map.
+  const strokes = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 180));
+  for (let k = 0; k < strokes; k++) {
+    const steps = 12;
+    await touch('touchStart', [[1, from.x, from.y]]);
     await frames(1);
+    for (let s = 1; s <= steps; s++) {
+      await touch('touchMove', [[1, from.x + (dx / strokes) * (s / steps), from.y + (dy / strokes) * (s / steps)]]);
+      await frames(1);
+    }
+    await sleep(200); // hold still: no fling
+    await touch('touchEnd', []);
+    await frames(3);
   }
-  await sleep(200); // hold still: no fling
-  await touch('touchEnd', []);
-  await frames(3);
 }
 
-/** Make sure every given tile is on screen in the usable area: pan (in Look mode) when not. */
-async function ensureVisible(tiles, needLook = true) {
-  for (let attempt = 0; attempt < 4; attempt++) {
+/** Make sure every given tile is on screen and clear of the interface: dismiss tips, pan (in Look mode). */
+async function ensureVisible(tiles, tool = null) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const obs = await obstructions();
     const pts = await Promise.all(tiles.map(([x, z]) => screenOf(x, z)));
-    if (pts.every(inRect)) return true;
-    if (needLook) await selectTool('inspect');
+    if (pts.every((p) => freeAt(p, obs))) return true;
+    if (await dismissTip()) continue;
+    await selectTool('inspect');
+    // the Look chip is gone now: measure again before panning
+    const obs2 = await obstructions();
+    const c = await freeCentre(obs2);
     const cx = tiles.reduce((a, t) => a + t[0], 0) / tiles.length;
     const cz = tiles.reduce((a, t) => a + t[1], 0) / tiles.length;
-    await panTile(Math.round(cx), Math.round(cz));
+    await panTile(Math.round(cx), Math.round(cz), c.x, c.y + (tool && tool !== 'inspect' ? -30 : 0));
+    if (tool) await selectTool(tool);
   }
+  const obs = await obstructions();
   const pts = await Promise.all(tiles.map(([x, z]) => screenOf(x, z)));
-  return pts.every(inRect);
+  return pts.every((p) => freeAt(p, obs));
 }
 
 /** Current tool, and picking tools through the dock like a player. */
@@ -332,8 +372,8 @@ async function tapTile(x, z) {
 
 /** Use a tool on the map the way a player would, and check that it took effect. */
 async function build(tool, label, fn, tiles) {
-  if (!(await ensureVisible(tiles))) throw new Error(`could not bring ${label} on screen`);
   await selectTool(tool);
+  if (!(await ensureVisible(tiles, tool))) throw new Error(`could not bring ${label} on screen, clear of the interface`);
   const before = await cityInfo();
   await fn();
   await sleep(150);
