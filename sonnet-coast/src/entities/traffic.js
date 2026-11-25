@@ -17,10 +17,11 @@ import { pick, rand, chance, hash2 } from '../util/rng.js';
 import { PED_LOOKS } from './pedlooks.js';
 
 const P = {}, Q = {};
-// Moving traffic appears 45-190 m out, likelier nearer, but no closer than 150 m in plain view, and goes
-// beyond 200 m (280 m while still in view): the streets around the player are the busy ones.
-const SPAWN_HIDDEN = 45, SPAWN_VIEW = 150, SPAWN_MAX = 190, DESPAWN = 200, DESPAWN_SEEN = 280, ABANDON = 370;
-const CITY_CARS = 76, OUT_CARS = 24, BUSES = 3, LOT_CARS = 44, KERB_CARS = 40;
+// Moving traffic appears 40-150 m out, likelier nearer, but no closer than 115 m in plain view, and goes
+// beyond 160 m (240 m while still in view): the streets around the player are the busy ones.
+const SPAWN_HIDDEN = 40, SPAWN_VIEW = 115, SPAWN_MAX = 150, DESPAWN = 160, DESPAWN_SEEN = 240, ABANDON = 370;
+const CITY_CARS = 70, OUT_CARS = 24, BUSES = 3, LOT_CARS = 44, KERB_CARS = 40;
+const SLOT_CELL = 60;   // parking slots are bucketed on this grid
 // what parks in a bay (nothing longer than the bay)
 const PARK_POOL = TRAFFIC_POOL.filter((id) => VEHICLES[id].len < 5.5);
 // how much more often each kind of road gets a car, per metre
@@ -382,6 +383,12 @@ export class Traffic {
         if (st[0] !== null || st[1] !== null) busStops.set(e, st);
       }
     }
+    this.slotCells = new Map();
+    this.slots.forEach((sl, i) => {
+      const k = Math.floor(sl.x / SLOT_CELL) * 1000 + Math.floor(sl.z / SLOT_CELL);
+      if (!this.slotCells.has(k)) this.slotCells.set(k, []);
+      this.slotCells.get(k).push(i);
+    });
   }
 
   playerPos() {
@@ -523,13 +530,17 @@ export class Traffic {
     if (moving < want) {
       this.candidates(pp);
       if (inCity && buses < Math.round(BUSES * (1 - night * 0.4)) && this.spawnOnRoad(pp, 'bus')) moving++;
-      for (let k = 0; k < 4 && moving < want; k++) if (this.spawnOnRoad(pp)) moving++;
+      // a few at a time, so no single tick stalls a frame
+      for (let k = moving < want * 0.5 ? 4 : 2; k > 0 && moving < want; k--) if (this.spawnOnRoad(pp)) moving++;
     }
 
     // parked cars in the lots and along the kerbs (capped; each slot is decided once per visit)
     if (!G.indoors) {
       let made = 0;
-      for (let i = 0; i < this.slots.length && made < 6; i++) {
+      const c0 = Math.floor((pp.x - 170) / SLOT_CELL), c1 = Math.floor((pp.x + 170) / SLOT_CELL);
+      const r0 = Math.floor((pp.z - 170) / SLOT_CELL), r1 = Math.floor((pp.z + 170) / SLOT_CELL);
+      for (let cx = c0; cx <= c1; cx++) for (let cz = r0; cz <= r1; cz++) for (const i of this.slotCells.get(cx * 1000 + cz) || []) {
+        if (made >= 3) break;
         if (this.slotUsed.has(i)) continue;
         const kerb = i >= this.lotCount;
         if (kerb ? kerbs >= KERB_CARS * this.density : lots >= LOT_CARS * this.density) continue;
@@ -550,7 +561,7 @@ export class Traffic {
       }
     }
     // forget empty slots once the player has moved away, so streets refill on the next visit
-    if (this.slotUsed.size > 600) {
+    if (this.slotUsed.size > 900) {
       for (const i of this.slotUsed) {
         const sl = this.slots[i];
         if (Math.hypot(sl.x - pp.x, sl.z - pp.z) > 260) this.slotUsed.delete(i);
