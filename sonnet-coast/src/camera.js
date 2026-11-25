@@ -20,6 +20,7 @@ export class GameCamera {
     this.zoom = 1;       // 0.75 near, 1 normal, 1.45 far (cycled with V)
     this.first = true;
     this.cinematic = null;
+    this.slide = 0;      // smoothed drift angle of the player's vehicle
   }
   forward(out = new THREE.Vector3()) { return this.cam.getWorldDirection(out); }
 
@@ -41,17 +42,20 @@ export class GameCamera {
       dist = (T.len * 1.15 + 3.4) * this.zoom;
       height = T.hgt * 0.55 + 0.9;
       _t.set(v.pos.x, v.pos.y + height, v.pos.z);
+      // in a drift the view swings part of the way towards the direction of travel, so the slide reads from behind
+      this.slide += ((v.drift ? v.slideAngle : 0) - this.slide) * Math.min(1, dt * 3);
       // swing back behind the vehicle when the mouse is left alone
       const lookBack = Input.key('KeyC');
       if (lookBack) { this.yaw = v.heading + Math.PI; this.idle = 0.5; }
       else if (this.idle > 0.9 && v.speed > 1.5) {
-        const goal = v.heading + (v.fwd < -2 ? Math.PI : 0);
+        const goal = v.heading + (v.fwd < -2 ? Math.PI : 0) - this.slide * 0.45;
         this.yaw += wrapAngle(goal - this.yaw) * Math.min(1, dt * 3.2);
         this.pitch += (0.2 - this.pitch) * Math.min(1, dt * 2);
       }
-      fovT = 62 + clamp(v.speed / 60, 0, 1) * 16 + (v.boosting ? 9 : 0);
+      fovT = 62 + clamp(v.speed / 60, 0, 1) * 16 + (v.boosting ? 9 : 0) + Math.min(Math.abs(this.slide), 0.8) * 9;
       dist += clamp(v.speed / 60, 0, 1) * 1.6;
     } else {
+      this.slide = 0;
       const aiming = p.aiming && p.state === 'foot';
       dist = (aiming ? 2.3 : 4.8) * (aiming ? 1 : this.zoom);
       height = aiming ? 1.62 : 1.55;
