@@ -45,20 +45,26 @@ Sound starts after your first click or tap. Progress saves to the browser automa
 
 ### Touch
 
+Phones and tablets get on-screen controls with drawn icons. Only the buttons that do something
+right now are shown.
+
 | Control | On foot | In a vehicle |
 | --- | --- | --- |
-| Left thumb (anywhere on the left) | Move; push all the way to sprint | Steer |
+| Thumb stick (bottom left; it recentres under your thumb) | Move; push all the way to sprint | Steer |
 | Drag anywhere else | Look | Look |
-| `◎` | Punch / fire / use gadget (drag while held to aim) | Fire |
-| `⌖` | Aim, tap again to lower | — |
-| `⤒` | Jump | — |
-| `▲` `▼` | — | Gas, brake / reverse |
-| `◐` `»` | — | Handbrake drift, nitro |
-| `F` | Get in or steal a vehicle | Get out |
-| `E` | Appears when there is something to use | Same |
-| `⟳` | Next weapon | Next weapon |
-| `R` `H` `G` | — | Radio, horn / siren, police scanner |
-| `CAM` `MAP` `II` | Camera distance, map (tap to set a waypoint, pinch to zoom), pause | Same |
+| Action button (bottom right) | Shows what is in your hand: punch, strike, fire, throw or hack. Drag while holding it to aim | Fire, when holding a pistol, EMP or hack tool |
+| Aim | With the pistol or EMP; tap again to lower | — |
+| Jump | Jump | — |
+| Gas, brake | — | Accelerate, brake / reverse |
+| Drift, nitro | — | Handbrake, nitro |
+| Get in / get out | Appears when a vehicle is in reach | Get out |
+| Use (amber, pulsing) | Appears when there is something to use | Same |
+| Weapon | Next weapon | Next weapon |
+| Radio, horn, behind, scan | — | Next station, horn or siren, look behind, police scanner |
+| Camera, map, pause (top right) | Camera distance, map, pause. Tapping the minimap opens the map too | Same |
+
+On the map, tap to set a waypoint, drag to pan and pinch to zoom. *Settings* has a button-size
+option (S / M / L) and look sensitivity. Turning the phone upright pauses the game.
 
 Add `?touch=1` to the address to force touch controls on, `?touch=0` to keep them off.
 

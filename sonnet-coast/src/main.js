@@ -76,6 +76,7 @@ async function boot() {
   };
 
   G.hooks = { applySettings };
+  Touch.hooks.pause = pause;
   G.audio = new AudioSystem();
   G.radio = new Radio(G.audio);
   G.menus = new Menus(ui, { resume, startNew: () => start(true), startContinue: () => start(false), applySettings, quit: () => location.reload() });
@@ -85,7 +86,12 @@ async function boot() {
   world = await buildWorld(R.scene, R.renderer, G.settings.quality, progress);
   progress('Drawing the map', 0.93); await tick();
   G.hud = new HUD(ui);
-  G.radio.onChange = (np) => { if (G.hud && G.player && G.player.vehicle) G.hud.radioPopup(np); };
+  G.radio.onChange = (np) => {
+    if (!G.hud || !G.player || !G.player.vehicle) return;
+    G.hud.radioPopup(np);
+    // the phone layout has no room for the radio card, so the station shows as a toast
+    if (Touch.on) G.hud.toast(np ? `♪ ${np.station} ${np.freq} · ${np.track}` : '♪ Radio off', np ? np.color : '');
+  };
   progress('Waking the city', 0.97); await tick();
   game = new Game(R, world);
   R.applyQuality();
@@ -124,7 +130,7 @@ async function boot() {
     let dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (window.__dbg.fixedDt) dt = window.__dbg.fixedDt;
     handleKeys();
-    Touch.update();
+    Touch.update(dt);
     Input.setEnabled(G.mode === 'play');
     if (!window.__dbg.freeze) {
       if (G.mode === 'play') { t += dt; game.update(dt, t); }

@@ -1,5 +1,6 @@
 // Heads-up display: minimap, health/armor, Safety Flag stars, Tokens, weapon, speedo, objectives.
 import { G } from '../state.js';
+import { touchKeys } from '../touch.js';
 import { MapRenderer } from './minimap.js';
 import { WEAPONS } from '../entities/weapons.js';
 import { districtAt } from '../world/cityplan.js';
@@ -71,7 +72,7 @@ export class HUD {
 
   // ---- messages ------------------------------------------------------------------
   prompt(text) { this.promptNext = text; }
-  objective(text) { this.set('obj', text || '', (v) => { this.el.objective.innerHTML = v; this.el.objective.classList.toggle('on', !!v); }); }
+  objective(text) { this.set('obj', text || '', (v) => { this.el.objective.innerHTML = touchKeys(v); this.el.objective.classList.toggle('on', !!v); }); }
   say(speaker, text, seconds) { this.subQueue.push({ speaker, text, t: seconds || clamp(1.6 + text.length * 0.055, 2.4, 7.5) }); }
   clearSpeech() { this.subQueue.length = 0; this.subT = 0; this.el.subtitle.classList.remove('on'); }
   toast(text, color = '') {
@@ -213,7 +214,7 @@ export class HUD {
     const drive = v && w && (w.current.id === 'pistol' || w.current.id === 'hack' || w.current.id === 'emp') && G.input?.mouse.locked;
     this.set('cross', aim || hack || drive ? (w.target && (w.target.kind === 'ped' || w.target.kind === 'vehicle' || w.target.kind === 'drone') ? 2 : 1) : 0, (x) => { E.cross.className = x === 2 ? 'on hot' : x === 1 ? 'on' : ''; });
     // prompt
-    this.set('prompt', this.promptNext, (x) => { E.prompt.innerHTML = x; E.prompt.classList.toggle('on', !!x); });
+    this.set('prompt', this.promptNext, (x) => { E.prompt.innerHTML = touchKeys(x); E.prompt.classList.toggle('on', !!x); });
     this.promptNext = '';
     // subtitles
     if (this.subT > 0) { this.subT -= dt; if (this.subT <= 0) E.subtitle.classList.remove('on'); }

@@ -1,16 +1,18 @@
 // Title, pause, settings, map, wardrobe, shops and the "flatlined / contained" overlays.
 import { G, emit } from '../state.js';
 import { Input } from '../input.js';
+import { Touch } from '../touch.js';
 import { OUTFITS } from '../entities/player.js';
 import { BLIP_STYLES } from './minimap.js';
 import { writeSave, addTokens } from '../save.js';
 import { clamp, formatTokens } from '../util/math.js';
 
 const TOUCH_CONTROLS = [
-  ['Left thumb', 'Move / steer (push all the way to sprint)'], ['Drag', 'Look around'], ['▲ ▼', 'Gas and brake / reverse'], ['◐ »', 'Handbrake drift and nitro'],
-  ['F', 'Enter, steal or leave a vehicle'], ['E', 'Interact (shown when there is something to use)'], ['◎', 'Punch / fire / use gadget'], ['⌖', 'Aim (tap again to lower)'],
-  ['⟳', 'Next weapon'], ['⤒', 'Jump'], ['R', 'Next radio station'], ['H', 'Horn / siren'],
-  ['G', 'Police scanner (in a cruiser)'], ['CAM', 'Camera distance'], ['MAP', 'Map and waypoint'], ['II', 'Pause'],
+  ['stick', 'Move / steer — push all the way to sprint'], ['drag', 'Drag anywhere else to look around'], ['gas', 'Gas'], ['brake', 'Brake / reverse'],
+  ['drift', 'Handbrake drift'], ['nitro', 'Nitro'], ['car', 'Get in or steal a vehicle (shows when one is close)'], ['exit', 'Get out'],
+  ['use', 'Use — shows when there is something to use'], ['fists', 'Action: punch, strike, fire, throw or hack'], ['aim', 'Aim (tap again to lower)'], ['swap', 'Next weapon'],
+  ['jump', 'Jump'], ['radio', 'Next radio station'], ['horn', 'Horn, or siren in a police vehicle'], ['back', 'Look behind'],
+  ['scan', 'Police scanner (in a cruiser)'], ['cam', 'Camera distance'], ['map', 'Map — or tap the minimap'], ['pause', 'Pause'],
 ];
 const CONTROLS = [
   ['W A S D', 'Move / drive'], ['Mouse', 'Look around'], ['Shift', 'Sprint / nitro'], ['Space', 'Jump / handbrake (drift)'],
@@ -80,7 +82,7 @@ export class Menus {
 
   // ---- pause -------------------------------------------------------------------
   pause() {
-    const d = this.mount(`<div class="panel"><h2>PAUSED</h2><p>${G.hud.placeName(G.player.worldPos.x, G.player.worldPos.z)} · ${G.env.clockText()}</p>
+    const d = this.mount(`<div class="panel grid2"><h2>PAUSED</h2><p>${G.hud.placeName(G.player.worldPos.x, G.player.worldPos.z)} · ${G.env.clockText()}</p>
       <button class="btn primary" id="res">RESUME</button>
       <button class="btn" id="map">MAP <small>M</small></button>
       <button class="btn" id="log">JOBS &amp; STATS</button>
@@ -100,7 +102,7 @@ export class Menus {
     });
   }
   controls(back) {
-    const d = this.mount(`<div class="panel"><h2>CONTROLS</h2><div class="keys">${(Input.touch.on ? TOUCH_CONTROLS : CONTROLS).map(([k, v]) => `<kbd>${k}</kbd><span>${v}</span>`).join('')}</div>
+    const d = this.mount(`<div class="panel"><h2>CONTROLS</h2><div class="keys">${Input.touch.on ? TOUCH_CONTROLS.map(([k, v]) => `<kbd>${k === 'stick' ? '◉' : k === 'drag' ? '↔' : Touch.icon(k)}</kbd><span>${v}</span>`).join('') : CONTROLS.map(([k, v]) => `<kbd>${k}</kbd><span>${v}</span>`).join('')}</div>
       <button class="btn" id="back" style="margin-top:18px">BACK</button></div>`);
     this.kind = 'sub'; this.back = back;
     this.bind(d, { '#back': back });
@@ -113,7 +115,8 @@ export class Menus {
       <p style="margin:2px 0 0;font-size:12px">High adds 4× anti-aliasing, sharper shadows and longer draw distance. Low drops bloom, shadows and street-lamp lighting.</p>
       <div class="row"><label>Show frame rate</label><input type="checkbox" id="fps" ${s.showFps ? 'checked' : ''}></div>
       <h3>Controls</h3>
-      <div class="row"><label>Mouse sensitivity</label><input type="range" id="sens" min="0.3" max="2.5" step="0.05" value="${s.sensitivity}"></div>
+      <div class="row"><label>${Input.touch.on ? 'Look sensitivity' : 'Mouse sensitivity'}</label><input type="range" id="sens" min="0.3" max="2.5" step="0.05" value="${s.sensitivity}"></div>
+      ${Input.touch.on ? `<div class="row"><label>Button size</label><div class="seg" id="tsz">${[['S', 0.85], ['M', 1], ['L', 1.15]].map(([n, z]) => `<button data-z="${z}" class="${(s.touchSize || 1) === z ? 'on' : ''}">${n}</button>`).join('')}</div></div>` : ''}
       <div class="row"><label>Invert vertical look</label><input type="checkbox" id="inv" ${s.invertY ? 'checked' : ''}></div>
       <h3>Audio</h3>
       <div class="row"><label>Master volume</label><input type="range" id="vol" min="0" max="1" step="0.02" value="${s.volume}"></div>
@@ -124,6 +127,11 @@ export class Menus {
       s.quality = b.dataset.q; s.qualityChosen = true;
       d.querySelectorAll('#q button').forEach((x) => x.classList.toggle('on', x === b));
       this.hooks.applySettings(true); this.ui('uiSelect');
+    }));
+    d.querySelectorAll('#tsz button').forEach((b) => b.addEventListener('click', () => {
+      s.touchSize = parseFloat(b.dataset.z);
+      d.querySelectorAll('#tsz button').forEach((x) => x.classList.toggle('on', x === b));
+      this.ui('uiSelect');
     }));
     const on = (id, fn) => d.querySelector(id).addEventListener('input', (e) => { fn(e.target); this.hooks.applySettings(false); });
     on('#sens', (e) => { s.sensitivity = parseFloat(e.value); });

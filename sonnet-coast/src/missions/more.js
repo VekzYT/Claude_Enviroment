@@ -108,7 +108,7 @@ export class SignalLoss extends Job {
       .map(([x, z, y, r]) => G.police.spawnTargetDrone(x, z, y, r));
     this.left = 250;
     G.weapons.select(4);
-    G.hud.toast('Prompt Injector selected — aim at a drone and click');
+    G.hud.toast(Input.touch.on ? 'Prompt Injector selected — put the crosshair on a drone and press the action button' : 'Prompt Injector selected — aim at a drone and click');
   }
   update(dt) {
     const pp = G.player.worldPos;

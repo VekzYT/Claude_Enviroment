@@ -23,6 +23,7 @@ export const G = {
     quality: 'high', // low | medium | high
     qualityChosen: false, // true once the player picks a preset; stops the automatic fallback
     sensitivity: 1,
+    touchSize: 1, // scale of the on-screen buttons (phones)
     invertY: false,
     volume: 0.8,
     musicVolume: 0.6,

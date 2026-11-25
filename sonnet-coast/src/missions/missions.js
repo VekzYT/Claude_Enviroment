@@ -36,7 +36,7 @@ class Intro extends Job {
     if (this.step === 'car') {
       const ok = this.car && !this.car.removed && !this.car.destroyed;
       this.obj(ok ? 'Get in the <em>Haiku GT</em> outside the safehouse' : 'Find <em>any vehicle</em>', ok ? this.car.pos : null, ok ? [{ x: this.car.pos.x, z: this.car.pos.z, type: 'vehicle' }] : null);
-      if (pl.vehicle) { this.step = 'drive'; this.dest = this.ring(POI.tower.stop.x, POI.tower.stop.z, 6); G.hud.toast('W A S D to drive · Space to drift · Shift for nitro'); }
+      if (pl.vehicle) { this.step = 'drive'; this.dest = this.ring(POI.tower.stop.x, POI.tower.stop.z, 6); G.hud.toast(Input.touch.on ? 'Steer with your left thumb · pedals are on the right' : 'W A S D to drive · Space to drift · Shift for nitro'); }
     } else if (this.step === 'drive') {
       this.obj('Drive to <em>Claude Tower</em> downtown', this.dest);
       this.t += dt;
