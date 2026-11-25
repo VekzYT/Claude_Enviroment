@@ -337,7 +337,9 @@ export class Peds {
     }
     return false;
   }
-  civ(x, z, look, mode) {
+  civ(x, z, look, mode, seated = false) {
+    // never inside a wall, a planter or a vending machine (a bench seat is meant to be in its bench)
+    if (!seated && resolveCircle(x, z, 0.3, groundHeight(x, z, 9999), out, 1.6)) return null;
     const p = this.spawn(x, z, look);
     if (p) p.mode = mode;
     return p;
@@ -373,7 +375,7 @@ export class Peds {
     }
     if (r < 0.92) {
       const s = this.freeSeat(sx, sz, 40);
-      if (s && !this.visible(s.s.x, 2, s.s.z, 2)) return !!this.seat(this.civ(s.s.x, s.s.z, undefined, 'sit'), s.s, s.b, true);
+      if (s && !this.visible(s.s.x, 2, s.s.z, 2)) return !!this.seat(this.civ(s.s.x, s.s.z, undefined, 'sit', true), s.s, s.b, true);
     }
     // waiting at the kerb, facing the street
     const inX = Math.abs(B.x - A.x) > Math.abs(B.z - A.z);
@@ -417,7 +419,7 @@ export class Peds {
     }
     if (r < 0.86) {
       const s = this.freeSeat(x, z, 45);
-      if (s && !this.visible(s.s.x, 2, s.s.z, 2)) return !!this.seat(this.civ(s.s.x, s.s.z, looks ? pick(looks) : undefined, 'sit'), s.s, s.b, true);
+      if (s && !this.visible(s.s.x, 2, s.s.z, 2)) return !!this.seat(this.civ(s.s.x, s.s.z, looks ? pick(looks) : undefined, 'sit', true), s.s, s.b, true);
     }
     if (rg.kind === 'park' && night < 0.5) {
       const p = this.civ(x, z, undefined, 'beach');
@@ -468,14 +470,15 @@ export class Peds {
     }
     return g.members.length > 0;
   }
+  // Sit p on seat s: at once (spawned out of sight) or by settling in from where they stand.
   seat(p, s, bench, snap) {
     if (!p) return null;
     s.occ = p; p.seat = s; p.bench = bench;
-    p.mode = 'sit'; p.act = 'sit'; p.heading = s.h; p.seatH = 0.46;
-    p.pos.x = s.x; p.pos.z = s.z;
+    p.mode = 'sit'; p.act = 'sit'; p.seatH = 0.46;
     p.modeT = rand(30, 120);
     p.habit = chance(0.35) ? 'phone' : null;
-    if (snap) p.j.set(this.target(p, 0, T));
+    p.dest = null; p.path.length = 0;
+    if (snap) { p.heading = s.h; p.pos.x = s.x; p.pos.z = s.z; p.j.set(this.target(p, 0, T)); }
     return p;
   }
 
@@ -485,7 +488,7 @@ export class Peds {
       if (p.role !== 'civ' || p.state === 'ragdoll' || p.state === 'down') continue;
       const d = Math.hypot(p.pos.x - x, p.pos.z - z);
       if (d >= radius) continue;
-      if (p.mode === 'sit' || p.mode === 'chat' || p.mode === 'follow' || p.mode === 'beach' || p.mode === 'wait') this.wander(p);
+      if (p.mode !== 'route' && p.mode !== 'region') this.wander(p);
       p.talkT = 0;
       p.fleeFrom = { x, z };
       p.panic = chance(0.45);
@@ -762,12 +765,29 @@ export class Peds {
         if (g && g.kind === 'walk') this.groupChatter(p, g, dt);
         if (!p.dest) { if (!p.path.length) this.nextLeg(p); p.dest = p.path.shift() || null; }
         if (!p.dest) return 0;
-        // strollers stop now and then to look around
-        if (p.mode === 'region' && !g && p.habit !== 'jog') {
-          if (p.pauseT > 0) { p.pauseT -= dt; return 0; }
-          if (chance(dt * 0.02)) p.pauseT = rand(2, 7);
+        if (!g && p.habit !== 'jog') {
+          // strollers stop now and then to look around
+          if (p.mode === 'region') {
+            if (p.pauseT > 0) { p.pauseT -= dt; return 0; }
+            if (chance(dt * 0.02)) p.pauseT = rand(2, 7);
+          }
+          // and anyone passing a free bench may take a seat
+          if (p.near && chance(dt * 0.025)) {
+            const f = this.freeSeat(p.pos.x, p.pos.z, 9);
+            if (f) {
+              f.s.occ = p; p.seat = f.s; p.bench = f.b; p.mode = 'toSeat';
+              p.path.length = 0; p.dest = p._d; p._d.x = f.s.x + Math.sin(f.s.h) * 1.05; p._d.z = f.s.z + Math.cos(f.s.h) * 1.05;
+            }
+          }
         }
         return p.speedWant;
+      }
+      case 'toSeat': {
+        const s = p.seat;
+        if (!s || (p.bench.b && p.bench.b.broken)) { this.wander(p); return 0; }
+        if (Math.hypot(p._d.x - p.pos.x, p._d.z - p.pos.z) < 0.45) { this.seat(p, s, p.bench, false); return 0; }
+        p.dest = p._d;
+        return p.speedWant * 0.9;
       }
       case 'follow': {
         const L = g && g.members[0];
@@ -797,7 +817,12 @@ export class Peds {
         return 0;
       }
       case 'sit': {
-        if (!p.seat || (p.bench && p.bench.b && p.bench.b.broken)) { this.wander(p); return 0; }
+        const s = p.seat;
+        if (!s || (p.bench && p.bench.b && p.bench.b.broken)) { this.wander(p); return 0; }
+        // turn round and settle back onto the seat
+        p.heading += clamp(wrapAngle(s.h - p.heading), -dt * 5, dt * 5);
+        const kk = Math.min(1, dt * 3);
+        p.pos.x += (s.x - p.pos.x) * kk; p.pos.z += (s.z - p.pos.z) * kk;
         p.act = p.habit === 'phone' ? 'sitPhone' : 'sit';
         p.dest = null;
         if (p.modeT <= 0) { this.wander(p); if (p.mode === 'idle') p.mode = 'route'; }
@@ -874,8 +899,9 @@ export class Peds {
         o[LFT] = o[RFT] = 0.12 - (p.seed - 0.5) * 0.2;
         if (p.seed > 0.5) { o[RTP] = -1.42; o[RTR] = -0.08; o[RKN] = 1.05; o[RFT] = 0.4; }
         o[SP] = -0.08 + Math.sin(t * 1.5 + sd) * 0.01; o[HP] = act === 'sitPhone' ? 0.45 : 0.05; o[HY] = act === 'sitPhone' ? 0 : p.lookH * 0.7;
-        if (act !== 'sitPhone') { o[RAP] = -0.55; o[REL] = -0.75; o[RAR] = 0.05; o[RAY] = 0.2; }
-        o[LAP] = -0.55; o[LEL] = -0.75; o[LAR] = 0.05; o[LAY] = 0.2;
+        // hands resting on the thighs
+        if (act !== 'sitPhone') { o[RAP] = -0.2; o[REL] = -0.8; o[RAR] = -0.02; o[RAY] = 0.35; }
+        o[LAP] = -0.2; o[LEL] = -0.8; o[LAR] = -0.02; o[LAY] = 0.35;
         o[SWL] = o[SWR] = 0;
         break;
       }
