@@ -16,22 +16,22 @@ const GY = CITY.y + 0.16;
 
 function poleGeo() {
   const b = new Batch();
-  b.add(new THREE.CylinderGeometry(0.09, 0.15, 7.2, 6), 0x33343a, 0, 3.6, 0);
-  b.cbox(0.3, 0.5, 0.3, 0, 0.25, 0, 0x2a2b30);
-  b.cbox(0.12, 0.12, 2.2, 0, 7.12, 1.0, 0x33343a);
-  b.cbox(0.52, 0.16, 1.05, 0, 7.06, 2.0, 0x26272b);
+  b.add(new THREE.CylinderGeometry(0.07, 0.13, 7.2, 8), 0xe8e9eb, 0, 3.6, 0);
+  b.cbox(0.26, 0.4, 0.26, 0, 0.2, 0, 0xcfd1d4);
+  b.cbox(0.1, 0.1, 2.3, 0, 7.14, 1.05, 0xe8e9eb);
+  b.cbox(0.5, 0.1, 1.15, 0, 7.08, 2.0, 0xf2f3f4);
   return b.merged();
 }
 function parkLampGeo() {
   const b = new Batch();
-  b.add(new THREE.CylinderGeometry(0.06, 0.09, 3.6, 6), 0x2c2d32, 0, 1.8, 0);
-  b.cbox(0.5, 0.06, 0.5, 0, 3.92, 0, 0x2c2d32);
+  b.add(new THREE.CylinderGeometry(0.05, 0.08, 3.6, 6), 0xe8e9eb, 0, 1.8, 0);
+  b.cbox(0.5, 0.06, 0.5, 0, 3.92, 0, 0xe8e9eb);
   return b.merged();
 }
 function signalGeo() {
   const b = new Batch();
-  b.add(new THREE.CylinderGeometry(0.1, 0.15, 6.0, 6), 0x2c2d32, 0, 3.0, 0);
-  b.cbox(4.0, 0.12, 0.12, -2.0, 5.9, 0, 0x2c2d32);          // mast arm over the lane
+  b.add(new THREE.CylinderGeometry(0.09, 0.14, 6.0, 8), 0xdfe1e4, 0, 3.0, 0);
+  b.cbox(4.0, 0.12, 0.12, -2.0, 5.9, 0, 0xdfe1e4);          // mast arm over the lane
   b.cbox(0.42, 1.25, 0.3, -3.6, 5.4, 0, 0x17181b);          // head on the arm
   b.cbox(0.42, 1.25, 0.3, 0.0, 3.6, 0.2, 0x17181b);         // repeater on the pole
   b.cbox(0.5, 0.06, 0.4, -3.6, 6.05, 0.05, 0x17181b);       // visor
@@ -47,7 +47,7 @@ function benchGeo() {
   const b = new Batch();
   b.cbox(1.9, 0.08, 0.5, 0, 0.46, 0, 0x8a5a36);
   b.cbox(1.9, 0.5, 0.07, 0, 0.82, -0.24, 0x8a5a36, 0, -0.18);
-  for (const sx of [-0.8, 0.8]) b.cbox(0.08, 0.46, 0.46, sx, 0.23, 0, 0x26272b);
+  for (const sx of [-0.8, 0.8]) b.cbox(0.08, 0.46, 0.46, sx, 0.23, 0, 0xdfe1e4);
   return b.merged();
 }
 function binGeo() {
@@ -65,14 +65,14 @@ function hydrantGeo() {
 }
 function vendingGeo() {
   const b = new Batch();
-  b.box(1.1, 1.95, 0.8, 0, 0, 0, 0x1d1e22);
-  b.cbox(0.3, 0.5, 0.05, 0.3, 0.9, 0.41, 0x0e0e10);
+  b.box(1.1, 1.95, 0.8, 0, 0, 0, 0xeceef0);
+  b.cbox(0.3, 0.5, 0.05, 0.3, 0.9, 0.41, 0x3a3c40);
   return b.merged();
 }
 function shelterGeo() {
   const b = new Batch();
-  for (const sx of [-2.2, 2.2]) b.cbox(0.1, 2.5, 0.1, sx, 1.25, -0.7, 0x2c2d32);
-  b.cbox(4.8, 0.1, 1.9, 0, 2.55, 0, 0x2c2d32);
+  for (const sx of [-2.2, 2.2]) b.cbox(0.1, 2.5, 0.1, sx, 1.25, -0.7, 0xe8e9eb);
+  b.cbox(4.8, 0.1, 1.9, 0, 2.55, 0, 0xf2f3f4);
   b.cbox(4.4, 1.9, 0.05, 0, 1.3, -0.72, 0x6f8793);
   b.cbox(3.0, 0.08, 0.45, 0, 0.5, -0.4, 0x8a5a36);
   return b.merged();
@@ -97,15 +97,15 @@ export function buildProps(scene, env, quality) {
 
   // ---- street lamps ---------------------------------------------------------
   const poles = new ChunkedInstances(poleGeo(), metal, { chunk: 300, maxDist: 520 });
-  const lampBase = new THREE.Color(1.0, 0.8, 0.52);
+  const lampBase = new THREE.Color(1.0, 0.96, 0.9);
   const lampMat = new THREE.MeshBasicMaterial({ color: lampBase.clone(), toneMapped: false });
-  for (const ch of ['r', 'g', 'b']) env.nightLerp(lampMat.color, ch, lampBase[ch] * 0.45, lampBase[ch] * 3.4);
+  for (const ch of ['r', 'g', 'b']) env.nightLerp(lampMat.color, ch, lampBase[ch] * 0.6, lampBase[ch] * 2.4);
   const lamps = new ChunkedInstances(new THREE.BoxGeometry(0.4, 0.07, 0.92), lampMat, { chunk: 300, maxDist: 1300 });
   const poolGeo = new THREE.PlaneGeometry(1, 1);
   poolGeo.rotateX(-Math.PI / 2);
   const mkPool = (opacity) => {
     const m = new THREE.MeshBasicMaterial({
-      map: glowTex, color: 0xffc98a, transparent: true, opacity: 0, depthWrite: false,
+      map: glowTex, color: 0xfff0dc, transparent: true, opacity: 0, depthWrite: false,
       blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
     });
     env.nightLerp(m, 'opacity', 0, opacity);
@@ -157,7 +157,7 @@ export function buildProps(scene, env, quality) {
 
   // ---- park / plaza / car-park lamps -------------------------------------------
   const pLamps = new ChunkedInstances(parkLampGeo(), metal, { chunk: 400, maxDist: 350 });
-  const bulbBase = new THREE.Color(1.0, 0.86, 0.62);
+  const bulbBase = new THREE.Color(1.0, 0.96, 0.9);
   const bulbMat = new THREE.MeshBasicMaterial({ color: bulbBase.clone(), toneMapped: false });
   for (const ch of ['r', 'g', 'b']) env.nightLerp(bulbMat.color, ch, bulbBase[ch] * 0.5, bulbBase[ch] * 3);
   const bulbs = new ChunkedInstances(new THREE.SphereGeometry(0.2, 8, 6), bulbMat, { chunk: 400, maxDist: 800 });
@@ -216,7 +216,7 @@ export function buildProps(scene, env, quality) {
   const vendGlow = new ChunkedInstances(new THREE.PlaneGeometry(0.62, 1.5), new THREE.MeshBasicMaterial({ toneMapped: false }), { chunk: 200, colors: true, maxDist: 420 });
   const shelters = new ChunkedInstances(shelterGeo(), metal, { chunk: 200, maxDist: 320 });
   const shelterAds = new ChunkedInstances(new THREE.PlaneGeometry(1.5, 1.9), new THREE.MeshBasicMaterial({ toneMapped: false, side: THREE.DoubleSide }), { chunk: 200, colors: true, maxDist: 420 });
-  const neonCols = Object.values(NEON).map((h) => new THREE.Color(h).multiplyScalar(1.7));
+  const neonCols = Object.values(NEON).map((h) => new THREE.Color(h).multiplyScalar(1.15));
 
   const place = (ci, x, z, heading, r, kind, minSpeed, extra = [], y = GY) => {
     const ref = ci.add(tmpMatrix(x, y, z, heading, 1));

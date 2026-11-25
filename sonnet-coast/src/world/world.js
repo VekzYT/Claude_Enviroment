@@ -12,6 +12,7 @@ import { buildProps } from './props.js';
 import { updateBreakables } from './breakables.js';
 import { cullChunks } from './geom.js';
 import { buildWildlife } from './wildlife.js';
+import { buildMonorail } from './monorail.js';
 
 export async function buildWorld(scene, renderer, quality, progress) {
   const step = async (label, frac, fn) => {
@@ -27,6 +28,7 @@ export async function buildWorld(scene, renderer, quality, progress) {
   const roads = await step('Paving Sonnet City', 0.36, () => buildRoads(scene));
   const city = await step('Raising glass towers', 0.46, () => buildCity(scene, env));
   const landmarks = await step('Wiring up data centres', 0.62, () => buildLandmarks(scene, env));
+  const monorail = await step('Laying monorail track', 0.66, () => buildMonorail(scene, env));
   const nature = await step('Growing the Glowwood', 0.7, () => buildNature(scene, env, quality));
   const props = await step('Switching on the street lights', 0.88, () => buildProps(scene, env, quality));
   const wildlife = buildWildlife(scene, env);
@@ -35,7 +37,7 @@ export async function buildWorld(scene, renderer, quality, progress) {
   let cullTimer = 0;
   const drawScale = { low: 0.55, medium: 0.85, high: 1 };
   return {
-    env, city, nature, water, props, roads, landmarks, terrain, wildlife,
+    env, city, nature, water, props, roads, landmarks, terrain, wildlife, monorail,
     quality,
     update(dt, t, focus) {
       cullTimer -= dt;
@@ -47,6 +49,7 @@ export async function buildWorld(scene, renderer, quality, progress) {
       env.update(dt, focus);
       city.update(dt, t);
       landmarks.update(dt, t);
+      monorail.update(dt);
       nature.update(dt, t, focus);
       props.update(dt, t);
       if (G.player) wildlife.update(dt, t);

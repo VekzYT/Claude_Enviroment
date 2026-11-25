@@ -11,13 +11,13 @@ export const SURFACES = {
   water: { grip: 0.3, speed: 0.22, roll: 4.0 },
 };
 
-const civPaint = [PAL.terracotta, PAL.cream, PAL.slateLight, 0x2f5d73, 0x8a3b2a, 0xd9b26a, 0x1f2a33, 0x5c7f6b, PAL.terracottaLight, 0xe8e2d4];
+const civPaint = [0xf2f3f4, 0xe8e2d4, 0xc9ccd0, 0x8fb7c9, PAL.terracotta, 0x9aa3ab, 0x1f2a33, 0x5c7f6b, PAL.terracottaLight, 0xdfe6ea];
 
 export const VEHICLES = {
   sport: {
     name: 'Haiku GT', cls: 'car', shape: 'sport', len: 4.5, wid: 1.95, hgt: 1.2, wheelR: 0.36, wheelbase: 2.7,
     mass: 1250, maxSpeed: 62, accel: 21, brake: 34, grip: 9.5, steer: 0.62, offroad: 0.18, health: 100,
-    paints: [PAL.neonCoral, 0xf2e8d5, 0x1b1b1f, PAL.teal, 0xffc145, 0x7b3fe4], glow: PAL.neonCyan, traffic: 2, value: 900,
+    paints: [0xf2f3f4, 0xd97757, 0x1b1b1f, 0x8fb7c9, 0xc9ccd0, 0x2f5d73], traffic: 2, value: 900,
   },
   sedan: {
     name: 'Opus Cruiser', cls: 'car', shape: 'sedan', len: 4.7, wid: 1.9, hgt: 1.45, wheelR: 0.36, wheelbase: 2.8,
@@ -47,12 +47,12 @@ export const VEHICLES = {
   prototype: {
     name: 'Vanta X-1', cls: 'car', shape: 'prototype', len: 4.7, wid: 2.05, hgt: 1.1, wheelR: 0.37, wheelbase: 2.8,
     mass: 1150, maxSpeed: 72, accel: 27, brake: 38, grip: 10.5, steer: 0.64, offroad: 0.12, health: 120,
-    paints: [0x0c0c10], glow: PAL.neonMagenta, traffic: 0, value: 6000,
+    paints: [0x0c0c10], glow: 0xdff2ff, traffic: 0, value: 6000,
   },
   hoverbike: {
     name: 'Glide-7', cls: 'hover', shape: 'hoverbike', len: 2.6, wid: 0.9, hgt: 1.2, wheelR: 0, wheelbase: 1.6,
     mass: 300, maxSpeed: 58, accel: 24, brake: 22, grip: 4.2, steer: 0.75, offroad: 1.0, health: 70, open: true, hover: 0.75,
-    paints: [PAL.cream, PAL.neonCoral, 0x1b1b1f], glow: PAL.neonCyan, traffic: 0, value: 1200,
+    paints: [0xf2f3f4, 0xd97757, 0x1b1b1f], glow: 0xcfe9ff, traffic: 0, value: 1200,
   },
   boat: {
     name: 'Wave Sonnet', cls: 'boat', shape: 'boat', len: 6.4, wid: 2.3, hgt: 1.4, wheelR: 0, wheelbase: 3.2,

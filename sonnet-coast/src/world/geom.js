@@ -84,6 +84,56 @@ export class FacadeBatch {
     face([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [0, 0, 1], x1 - x0);
     face([[x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0]], [0, 0, -1], x1 - x0);
   }
+  // Box whose top is inset by `ins` metres on every side (a tapering tower).
+  wallFrustum(x0, y0, z0, x1, y1, z1, ins, color, uOff = 0) {
+    const T = this.tile, h = y1 - y0;
+    const a0 = x0 + ins, a1 = x1 - ins, b0 = z0 + ins, b1 = z1 - ins;
+    const k = ins / Math.hypot(ins, h), m = h / Math.hypot(ins, h); // outward normal tilts up by the lean
+    const face = (pts, n, w) => {
+      const us = [0, w / T, (w - ins) / T, ins / T], vs = [y0 / T, y0 / T, y1 / T, y1 / T];
+      for (const q of [0, 1, 2, 0, 2, 3]) {
+        const p = pts[q];
+        this.pos.push(p[0], p[1], p[2]);
+        this.nor.push(n[0] * m, k, n[2] * m);
+        this.uv.push(us[q] + uOff, vs[q]);
+        this.col.push(color[0], color[1], color[2]);
+      }
+    };
+    face([[x1, y0, z1], [x1, y0, z0], [a1, y1, b0], [a1, y1, b1]], [1, 0, 0], z1 - z0);
+    face([[x0, y0, z0], [x0, y0, z1], [a0, y1, b1], [a0, y1, b0]], [-1, 0, 0], z1 - z0);
+    face([[x0, y0, z1], [x1, y0, z1], [a1, y1, b1], [a0, y1, b1]], [0, 0, 1], x1 - x0);
+    face([[x1, y0, z0], [x0, y0, z0], [a0, y1, b0], [a1, y1, b0]], [0, 0, -1], x1 - x0);
+  }
+  // Surface of revolution around a vertical axis. profile = [[radius, y], ...] going up.
+  // The texture wraps a whole number of times so the seam never shows.
+  revolve(cx, cz, profile, color, uOff = 0, seg = 28) {
+    const T = this.tile;
+    let rAvg = 0;
+    for (const p of profile) rAvg += p[0];
+    rAvg /= profile.length;
+    const reps = Math.max(1, Math.round((2 * Math.PI * rAvg) / T));
+    for (let j = 0; j < profile.length - 1; j++) {
+      const [r0, y0] = profile[j], [r1, y1] = profile[j + 1];
+      const dr = r1 - r0, dy = y1 - y0, l = Math.hypot(dr, dy) || 1;
+      const nr = dy / l, ny = -dr / l;
+      for (let i = 0; i < seg; i++) {
+        const a0 = (i / seg) * Math.PI * 2, a1 = ((i + 1) / seg) * Math.PI * 2;
+        const c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
+        const u0 = (i / seg) * reps + uOff, u1 = ((i + 1) / seg) * reps + uOff;
+        const v = [
+          [cx + c0 * r0, y0, cz + s0 * r0, c0, s0, u0, y0 / T], [cx + c0 * r1, y1, cz + s0 * r1, c0, s0, u0, y1 / T],
+          [cx + c1 * r1, y1, cz + s1 * r1, c1, s1, u1, y1 / T], [cx + c1 * r0, y0, cz + s1 * r0, c1, s1, u1, y0 / T],
+        ];
+        for (const q of [0, 1, 2, 0, 2, 3]) {
+          const p = v[q];
+          this.pos.push(p[0], p[1], p[2]);
+          this.nor.push(p[3] * nr, ny, p[4] * nr);
+          this.uv.push(p[5], p[6]);
+          this.col.push(color[0], color[1], color[2]);
+        }
+      }
+    }
+  }
   geometry() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));

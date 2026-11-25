@@ -31,12 +31,13 @@ export function buildLandmarks(scene, env) {
   const rng = new RNG(5150);
   const solid = new Batch();
   const glow = { cyan: new Batch(), coral: new Batch(), amber: new Batch(), lime: new Batch(), magenta: new Batch() };
-  const glowCols = { cyan: PAL.neonCyan, coral: PAL.neonCoral, amber: PAL.neonAmber, lime: PAL.neonLime, magenta: PAL.neonMagenta };
+  // soft accents rather than neon: pale ice, warm white, a muted coral
+  const glowCols = { cyan: 0xcfe9ff, coral: 0xff9a78, amber: 0xffe6c4, lime: 0xd9f2c4, magenta: 0xf2e2ee };
   const glowMats = {};
   for (const k of Object.keys(glow)) {
     const base = new THREE.Color(glowCols[k]);
     const mat = new THREE.MeshBasicMaterial({ color: base.clone(), toneMapped: false });
-    for (const ch of ['r', 'g', 'b']) env.nightLerp(mat.color, ch, base[ch] * 0.95, base[ch] * 2.3);
+    for (const ch of ['r', 'g', 'b']) env.nightLerp(mat.color, ch, base[ch] * 0.92, base[ch] * 1.5);
     glowMats[k] = mat;
   }
   const updaters = [];
@@ -52,7 +53,7 @@ export function buildLandmarks(scene, env) {
     glow.amber.box(x1 - x0, 0.3, 0.3, (x0 + x1) / 2, PY + h - 1.2, z0 - 0.2, 0xffffff);
     addBox(x0, z0, x1, z1, 0, PY + h, {});
   });
-  addSign(group, 'PORT OF SONNET', 650, PY + 11, 1039.5, Math.PI, 30, '#5ff3ff', 'restricted hardware terminal');
+  addSign(group, 'PORT OF SONNET', 650, PY + 11, 1039.5, Math.PI, 30, '#2f7d8f', 'restricted hardware terminal');
 
   const contGeo = new THREE.BoxGeometry(12, 2.8, 2.6);
   const contMat = new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.35 });
@@ -119,7 +120,7 @@ export function buildLandmarks(scene, env) {
   solid.cyl(0.3, 1.0, 60, 730, RY, -700, PAL.slateLight, 6);
   glow.coral.sphere(1.4, 730, RY + 61, -700, 0xffffff);
   addCircle(730, -700, 1, 0, 60, {});
-  addSign(group, 'COMPUTE RIDGE', 380, RY + 9, -672, 0, 40, '#ff8a5c', 'anthropic inference campus');
+  addSign(group, 'COMPUTE RIDGE', 380, RY + 9, -672, 0, 40, '#c8643b', 'anthropic inference campus');
   solid.box(1, 7, 1, 362, RY, -672, PAL.slate); solid.box(1, 7, 1, 398, RY, -672, PAL.slate);
 
   // ---- Gator Garage (chop shop) -------------------------------------------
@@ -131,7 +132,7 @@ export function buildLandmarks(scene, env) {
     solid.cbox(19.5, 0.4, 7.2, g.x + 2, y + 7.6, g.z - 16.8, tin, 0, -0.32);
     solid.box(9, 5, 0.3, g.x + 2, y, g.z - 13.9, 0x33373a);
     addBox(g.x - 7, g.z - 26, g.x + 11, g.z - 14, 0, y + 9, {});
-    addSign(group, 'GATOR GARAGE', g.x + 2, y + 8.6, g.z - 13.6, 0, 12, '#b4ff5c', 'no questions · no receipts');
+    addSign(group, 'GATOR GARAGE', g.x + 2, y + 8.6, g.z - 13.6, 0, 12, '#4f8f3f', 'no questions · no receipts');
     for (let i = 0; i < 6; i++) {
       const a = rng.float(0, 6.28), d = rng.float(16, 30);
       const x = g.x + Math.cos(a) * d, z = g.z + Math.sin(a) * d;
@@ -159,7 +160,7 @@ export function buildLandmarks(scene, env) {
     }
     pier(solid, c.x + 6, c.z - 2.2, c.x + 40, c.z + 2.2, 1.2);
     boatSpawns.push({ x: c.x + 44, z: c.z + 8, heading: Math.PI });
-    addSign(group, 'MOONSHINE HOLLOW', c.x - 6, y + 4.5, c.z + 12, 0, 9, '#ffb347');
+    addSign(group, 'MOONSHINE HOLLOW', c.x - 6, y + 4.5, c.z + 12, 0, 9, '#b07a2a');
   }
 
   // ---- Heron Jetty ----------------------------------------------------
@@ -172,7 +173,7 @@ export function buildLandmarks(scene, env) {
     solid.box(5, 3.4, 4, j.x - 10, y, j.z - 6, 0x5b4630);
     solid.cbox(6.4, 0.3, 5.2, j.x - 10, y + 3.8, j.z - 6, 0x6f7a72, 0, 0.1);
     addBox(j.x - 12.5, j.z - 8, j.x - 7.5, j.z - 4, 0, y + 4, {});
-    addSign(group, 'HERON JETTY', j.x - 10, y + 4.8, j.z - 3.8, 0, 6, '#5ff3ff');
+    addSign(group, 'HERON JETTY', j.x - 10, y + 4.8, j.z - 3.8, 0, 6, '#2f7d8f');
     glow.cyan.sphere(0.3, j.x + 2.6, y + 2.4, j.z + 4, 0xffffff);
     solid.cyl(0.1, 0.1, 2.6, j.x + 2.6, y - 0.2, j.z + 4, 0x3d2e20, 5);
   }
@@ -189,7 +190,7 @@ export function buildLandmarks(scene, env) {
     solid.box(16, 6, 12, endX - 30, PIER.y, -15, PAL.cream);
     solid.cbox(17, 0.4, 13, endX - 30, PIER.y + 6.3, -15, PAL.terracotta);
     addBox(endX - 38, -21, endX - 22, -9, 0, PIER.y + 7, {});
-    addSign(group, 'ATTENTION SPAN ARCADE', endX - 30, PIER.y + 4.6, -8.8, 0, 13, '#ff5fd8');
+    addSign(group, 'ATTENTION SPAN ARCADE', endX - 30, PIER.y + 4.6, -8.8, 0, 13, '#7a5a9a');
     for (let x = PIER.x0 + 8; x < endX - 46; x += 14) {
       for (const z of [-7.6, 7.6]) { solid.cyl(0.07, 0.07, 3.2, x, PIER.y, z, 0x2c2d32, 5); glow.amber.sphere(0.24, x, PIER.y + 3.3, z, 0xffffff); }
     }
@@ -282,7 +283,7 @@ export function buildLandmarks(scene, env) {
     solid.cbox(7.8, 0.3, 5.8, x + 9, y + 3.6, z, PAL.slate);
     addBox(x + 5.5, z - 2.5, x + 12.5, z + 2.5, 0, y + 4, {});
     addCircle(x, z, 2.2, 0, y + H, {});
-    addSign(group, 'CLAUDE FM 88.2', x + 9, y + 5, z + 2.7, 0, 7, '#ff5fd8', 'the long context');
+    addSign(group, 'CLAUDE FM 88.2', x + 9, y + 5, z + 2.7, 0, 7, '#7a5a9a', 'the long context');
   }
 
   // ---- Stunt ramps -------------------------------------------------------

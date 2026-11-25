@@ -72,7 +72,7 @@ export const ROADS = [
 // Points of interest. x/z = where the player stands to interact. block = [column, row] in the grid.
 export const POI = {
   safehouse: { name: 'Context Window Lofts', x: -350, z: 112, block: [1, 6] },
-  tower: { name: 'Claude Tower', x: 150, z: -8, block: [6, 4] },
+  tower: { name: 'Claude Tower', x: 150, z: -13.3, block: [6, 4], stop: { x: 132, z: -7 } },
   vanta: { name: 'Vantablack Labs', x: 450, z: -350, block: [9, 1] },
   police: { name: 'Safety Center', x: -50, z: 208, block: [4, 7] },
   clinic: { name: 'Constitutional Care Clinic', x: 350, z: -208, block: [8, 2] },

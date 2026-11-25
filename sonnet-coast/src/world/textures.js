@@ -42,8 +42,9 @@ class Layers {
   }
 }
 
-const WARM = ['#ffd9a0', '#ffc27a', '#ffe8c4', '#ffb36b', '#fff1d6'];
-const COOL = ['#a8f4ff', '#d4f7ff', '#8fe1ff', '#e8f6ff'];
+// interior light: soft whites, a little warm, a little cool — no saturated colour
+const WARM = ['#fff0d8', '#ffe6c4', '#fff6e8', '#ffecd0', '#fffaf0'];
+const COOL = ['#eef8ff', '#e2f2ff', '#f4fbff', '#dcefff'];
 
 function windowPane(L, rng, x, y, w, h, litChance, opts = {}) {
   const { frame = 3, glassTone = 1 } = opts;
@@ -114,7 +115,11 @@ export function makeFacade(style, seed) {
           for (let k = 0; k < 5; k++) L.rect(fx * c + 12, y0 + 16 + k * 20, c - 24, 8, '#22242a', 0.6, 0.5); // louvres
         }
       }
-      if (fy % 2 === 0) { L.rect(0, y0 + c - 4, S, 4, '#dfe9ee', 0.4, 0.5); L.glow(0, y0 + c - 4, S, 4, '#9fefff', 0.85); }
+      if (fy % 2 === 0) L.rect(0, y0 + c - 4, S, 4, '#eef1f3', 0.35, 0.6);
+    } else if (style === 'diagrid') {
+      // all glass, floor by floor; the lattice is painted over the top afterwards
+      for (let fx = 0; fx < N; fx++) windowPane(L, rng, fx * c, y0 + 2, c, c - 6, floorLit * 0.75, { frame: 1 });
+      L.rect(0, y0 + c - 5, S, 5, '#cfd6dc', 0.3, 0.8);
     } else if (style === 'brick') {
       // courses
       L.g.fillStyle = 'rgba(120,90,70,0.16)';
@@ -132,9 +137,26 @@ export function makeFacade(style, seed) {
     }
   }
   if (style === 'glass') { for (let fx = 0; fx <= N; fx++) L.rect(fx * c - 2, 0, 4, S, '#e9edf0', 0.3, 0.9); }
+  if (style === 'diagrid') {
+    // structural lattice: diamonds two bays wide and four floors tall, in warm bronze
+    const strut = (ctx, color, w) => {
+      ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = 'butt';
+      ctx.beginPath();
+      for (let k = -4; k <= 8; k++) {
+        ctx.moveTo(k * 256, 0); ctx.lineTo(k * 256 + 512, S);
+        ctx.moveTo(k * 256, 0); ctx.lineTo(k * 256 - 512, S);
+      }
+      ctx.stroke();
+    };
+    strut(L.g, '#b9825a', 20);
+    strut(L.g, '#d6a47c', 7);
+    strut(L.go, Layers.rm(0.38, 0.75), 20);
+    strut(L.ge, '#000000', 20);
+    for (const y of [0, S / 2]) L.rect(0, y - 6, S, 12, '#c79068', 0.4, 0.7);
+  }
   return L.textures();
 }
-export const FACADE_STYLES = ['grid', 'glass', 'bands', 'fins', 'panel', 'brick'];
+export const FACADE_STYLES = ['grid', 'glass', 'bands', 'fins', 'panel', 'brick', 'diagrid'];
 
 export const SHOP_NAMES = [
   ['TOKEN TACOS', '#ffb347'], ['CONTEXT CAFÉ', '#ffd9a0'], ['LATENT SPACE BAR', '#ff5fd8'], ['FINE-TUNE BARBER', '#5ff3ff'],
@@ -153,9 +175,9 @@ export function makeStorefronts(seed = 7) {
   const nextName = () => names.splice(rng.int(0, names.length - 1), 1)[0] || rng.pick(SHOP_NAMES);
   for (let row = 0; row < 4; row++) {
     const y0 = row * RH;
-    const wall = ['#e6dfd2', '#d9c3ae', '#dfe2e6', '#b5b0a8'][row];
+    const wall = ['#f1efea', '#ece6dc', '#eef1f4', '#c9c9cb'][row];
     L.rect(0, y0, W, RH, wall, 0.85, 0);
-    L.rect(0, y0 + RH - 22, W, 22, '#6f6a62', 0.9, 0);                 // plinth
+    L.rect(0, y0 + RH - 22, W, 22, '#9a9892', 0.9, 0);                 // plinth
     const bays = row === 2 ? 4 : 6;
     const bw = W / bays;
     for (let b = 0; b < bays; b++) {
@@ -195,23 +217,27 @@ export function makeStorefronts(seed = 7) {
       L.rect(dx + 6, wy + 16, ww * 0.22 - 12, wh - 30, '#7f939c', 0.08, 1);
       L.glow(dx + 6, wy + 16, ww * 0.22 - 12, wh - 30, interior, 0.6);
       if (!lobby) {
-        // sign band with glowing lettering
-        L.rect(wx - 6, y0 + 14, ww + 12, 48, '#17181b', 0.6, 0.2);
-        let size = 34;
-        const fit = (ctx) => { ctx.font = `900 ${size}px ${FONT}`; while (ctx.measureText(name).width > ww - 12 && size > 14) { size -= 2; ctx.font = `900 ${size}px ${FONT}`; } };
-        fit(L.g);
+        // lightbox sign: a softly lit white band with dark lettering and one small colour mark
+        L.rect(wx - 6, y0 + 14, ww + 12, 48, '#f6f4ef', 0.5, 0.1);
+        L.glow(wx - 6, y0 + 14, ww + 12, 48, '#fff8ec', 0.55);
+        let size = 32;
+        L.g.font = `800 ${size}px ${FONT}`;
+        while (L.g.measureText(name).width > ww - 60 && size > 14) { size -= 2; L.g.font = `800 ${size}px ${FONT}`; }
         for (const ctx of [L.g, L.ge]) {
-          ctx.font = `900 ${size}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
-          ctx.fillText(name, wx + ww / 2, y0 + 39);
+          ctx.font = `800 ${size}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = ctx === L.g ? '#2b2d31' : '#1a1a1a';
+          ctx.fillText(name, wx + ww / 2 + 10, y0 + 39);
+          ctx.fillStyle = color;
+          ctx.beginPath(); ctx.arc(wx + ww / 2 - ctx.measureText(name).width / 2 - 12, y0 + 38, 8, 0, Math.PI * 2); ctx.fill();
         }
         // awning on some shops
         if (rng.next() < 0.45) {
-          const ac = rng.pick(['#c8643b', '#d97757', '#2f5d73', '#e8e0d0']);
+          const ac = rng.pick(['#e8e0d0', '#d97757', '#cfd6dc', '#f4f2ee']);
           for (let k = 0; k < ww; k += 26) L.rect(wx + k, wy - 8, 13, 16, ac, 0.9, 0);
         }
       } else {
-        L.rect(wx - 6, y0 + 8, ww + 12, 14, '#c8643b', 0.6, 0.1);
-        L.glow(wx - 6, y0 + 18, ww + 12, 3, '#ffb38a', 0.9);
+        L.rect(wx - 6, y0 + 8, ww + 12, 14, '#e4e7ea', 0.4, 0.5);
+        L.glow(wx - 6, y0 + 18, ww + 12, 3, '#ffffff', 0.7);
       }
     }
   }
@@ -327,7 +353,7 @@ export function makeRoadTexture(type) {
     line(m(-1.5), '#d8d2c4', false, 5); line(m(1.5), '#d8d2c4', false, 5);
     for (const s of [-1, 1]) {
       line(m(s * 5.25), '#d8d2c4', true, 4);
-      line(m(s * 8.75), '#e07a4f', false, 4);
+      line(m(s * 8.75), '#e9e4d8', false, 4);
       g.fillStyle = 'rgba(46,196,182,0.22)';
       g.fillRect(Math.min(m(s * 8.75), m(s * 10.8)) * W, 0, (2.05 / 22) * W, H);   // cycle lane tint
       line(m(s * 10.8), '#e8e2d4', false, 4);
@@ -336,7 +362,7 @@ export function makeRoadTexture(type) {
     return { map: tex(c), rough: tex(r, { srgb: false }) };
   }
   line(0.03, '#e8e2d4', false, 4); line(0.97, '#e8e2d4', false, 4);
-  line(0.49, '#e07a4f', false, 3); line(0.51, '#e07a4f', false, 3);
+  line(0.49, '#e9e4d8', false, 3); line(0.51, '#e9e4d8', false, 3);
   line(0.25, '#d8d2c4', true, 4); line(0.75, '#d8d2c4', true, 4);
   for (const u of [0.08, 0.19, 0.31, 0.43, 0.57, 0.69, 0.81, 0.92]) track(u, 0.03);
   return { map: tex(c), rough: tex(r, { srgb: false }) };

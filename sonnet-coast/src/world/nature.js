@@ -7,7 +7,7 @@ import { blockAt } from './cityplan.js';
 import { CITY } from './layout.js';
 import { Batch, ChunkedInstances, tmpMatrix } from './geom.js';
 import { addCircle } from './colliders.js';
-import { parkSpots } from './city.js';
+import { parkSpots, roofTrees } from './city.js';
 import { registerBreakable } from './breakables.js';
 import { RNG, hash2 } from '../util/rng.js';
 import { PAL } from './palette.js';
@@ -176,7 +176,7 @@ export function buildNature(scene, env, quality) {
   const white = () => { const m = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }); for (const ch of ['r', 'g', 'b']) env.nightLerp(m.color, ch, 0.75, 2.6); return m; };
   const pineGlowAll = new ChunkedInstances(pineGlowGeo(), white(), gl);
   const pineGlow = [0, 1, 2].map((k) => ({ add: (m) => pineGlowAll.add(m, glowCols[k]) }));
-  const broad = new ChunkedInstances(broadleafGeo(), solidMat, { shadow: sh, chunk: 250, maxDist: 800 });
+  const broad = new ChunkedInstances(broadleafGeo(), solidMat, { shadow: sh, chunk: 250, maxDist: 1100 });
   const cypress = new ChunkedInstances(cypressGeo(), leafMat, { shadow: sh, maxDist: 950 });
   const mangrove = new ChunkedInstances(mangroveGeo(), leafMat, { shadow: false, maxDist: 600 });
   const mg = mushroomGeo();
@@ -280,9 +280,15 @@ export function buildNature(scene, env, quality) {
   const placeBroad = (x, z, y, sc) => { broad.add(tmpMatrix(x, y - 0.15, z, rng.float(0, 6.28), sc)); addCircle(x, z, 0.4 * sc, 0, y + 5, {}); };
   for (const p of parkSpots) {
     const y = p.planter ? GY + 0.7 : GY;
-    if (rng.chance(p.planter ? 0.5 : 0.45)) placePalm(p.x, p.z, y, !p.planter);
+    if (p.inside) {
+      // under glass: no collisions, nobody can get in there
+      if (rng.chance(0.55)) palms.add(tmpMatrix(p.x, y - 0.1, p.z, rng.float(0, 6.28), rng.float(0.9, 1.3)));
+      else broad.add(tmpMatrix(p.x, y - 0.15, p.z, rng.float(0, 6.28), rng.float(0.7, 1.1)));
+    } else if (rng.chance(p.planter ? 0.5 : 0.45)) placePalm(p.x, p.z, y, !p.planter);
     else placeBroad(p.x, p.z, y, rng.float(0.75, 1.15));
   }
+  // trees on roofs, terraces and sky bridges
+  for (const t of roofTrees) broad.add(tmpMatrix(t.x, t.y - 0.1, t.z, rng.float(0, 6.28), t.s));
   // Street trees along every kerb, palms down the boulevard medians and the boardwalk
   const P = {};
   const palmy = { ocean: 1, strip: 0.9, downtown: 0.55, midtown: 0.4, uptown: 0.25, riverside: 0.2, oldtown: 0.15 };
@@ -301,7 +307,8 @@ export function buildNature(scene, env, quality) {
       }
     }
     if (e.type === 'blvd') {
-      for (let s = 22; s <= 78; s += 11) { edgePoint(e, s, 0, P); placePalm(P.x, P.z, CITY.y + 0.03, true); }
+      // (the monorail pylons stand at 14, 50 and 86 m along each block)
+      for (const s of [24, 34, 66, 76]) { edgePoint(e, s, 0, P); placePalm(P.x, P.z, CITY.y + 0.03, true); }
     }
   }
   for (let z = CITY.promenade.z0 + 12; z < CITY.promenade.z1 - 8; z += 15) {

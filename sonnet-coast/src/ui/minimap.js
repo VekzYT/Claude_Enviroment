@@ -5,6 +5,7 @@ import { rawHeight, forestMask, swampMask, landDist } from '../world/terrain.js'
 import { edges, nodes, nearestNode, findPath } from '../world/roads.js';
 import { blocks, buildings } from '../world/cityplan.js';
 import { PIER } from '../world/landmarks.js';
+import { MONORAIL_LINES } from '../world/monorail.js';
 import { clamp } from '../util/math.js';
 
 const SIZE = WORLD_MAX - WORLD_MIN;
@@ -88,6 +89,10 @@ export class MapRenderer {
     for (const e of edges) if (e.type === 'dirt') stroke(e, '#a08258', 3.2, [5, 5]);
     for (const e of edges) if (e.type !== 'dirt') stroke(e, '#1c1c1e', e.spec.hw * 2 * S + 2.5);
     for (const e of edges) if (e.type !== 'dirt') stroke(e, e.type === 'highway' ? '#c9a87c' : e.type === 'blvd' ? '#b7b2a8' : '#8f8b83', Math.max(2.2, e.spec.hw * 2 * S));
+    g.setLineDash([]);
+    // monorail
+    g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 2; g.setLineDash([7, 4]);
+    for (const L of MONORAIL_LINES) { g.beginPath(); g.moveTo(mx(L.ax), mx(L.az)); g.lineTo(mx(L.ax + L.ux * L.len), mx(L.az + L.uz * L.len)); g.stroke(); }
     g.setLineDash([]);
   }
 

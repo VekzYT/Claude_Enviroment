@@ -27,7 +27,7 @@ function sharedMats() {
 }
 function glowMat(hex) {
   const s = sharedMats();
-  if (!s.glow.has(hex)) s.glow.set(hex, new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(2.4), toneMapped: false }));
+  if (!s.glow.has(hex)) s.glow.set(hex, new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(1.4), toneMapped: false }));
   return s.glow.get(hex);
 }
 
@@ -329,7 +329,7 @@ export function buildVehicleMesh(T, paintHex) {
   body.add(paint);
   if (D.glass) body.add(new THREE.Mesh(D.glass, M.glass));
   if (D.trim) { const t = new THREE.Mesh(D.trim, M.trim); t.castShadow = true; body.add(t); }
-  const glowHex = T.police ? PAL.neonCyan : T.glow || (T.shape === 'van' ? PAL.neonCoral : null);
+  const glowHex = T.police ? 0xbfdcff : T.glow || (T.shape === 'van' ? 0xffe6c4 : null);
   let glow = null;
   if (D.glow && glowHex) { glow = new THREE.Mesh(D.glow, glowMat(glowHex)); body.add(glow); }
   const head = new THREE.Mesh(D.head, M.headOff);
@@ -353,7 +353,7 @@ export function buildVehicleMesh(T, paintHex) {
   let under = null;
   if (T.glow && T.cls === 'car') {
     under = new THREE.Mesh(new THREE.PlaneGeometry(T.wid * 1.5, T.len * 1.25), new THREE.MeshBasicMaterial({
-      map: M.flareTex, color: T.glow, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending,
+      map: M.flareTex, color: T.glow, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending,
       polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8,
     }));
     under.rotation.x = -Math.PI / 2;

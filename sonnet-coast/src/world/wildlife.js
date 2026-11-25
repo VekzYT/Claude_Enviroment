@@ -56,20 +56,32 @@ export function buildWildlife(scene, env) {
     }
   }
 
-  // ---- air traffic over the boulevards -----------------------------------------
+  // ---- air traffic: small white aircraft on lanes above the boulevards -------------
   const lanes = [
-    { ax: 100, az: CITY.z0 - 300, bx: 100, bz: CITY.z1 + 300, y: 150 }, { ax: 112, az: CITY.z1 + 300, bx: 112, bz: CITY.z0 - 300, y: 168 },
-    { ax: CITY.x0 - 300, az: 0, bx: CITY.x1 + 500, bz: 0, y: 186 }, { ax: CITY.x1 + 500, az: 12, bx: CITY.x0 - 300, bz: 12, y: 132 },
-    { ax: CITY.x0, az: CITY.z0, bx: CITY.x1, bz: CITY.z1, y: 215 },
+    { ax: 100, az: CITY.z0 - 300, bx: 100, bz: CITY.z1 + 300, y: 96 }, { ax: 124, az: CITY.z1 + 300, bx: 124, bz: CITY.z0 - 300, y: 118 },
+    { ax: CITY.x0 - 300, az: 0, bx: CITY.x1 + 500, bz: 0, y: 132 }, { ax: CITY.x1 + 500, az: 26, bx: CITY.x0 - 300, bz: 26, y: 84 },
+    { ax: CITY.x0, az: CITY.z0, bx: CITY.x1, bz: CITY.z1, y: 150 }, { ax: CITY.x1, az: CITY.z0 + 80, bx: CITY.x0, bz: CITY.z1 - 80, y: 170 },
   ];
-  const N = 46;
-  const flyers = new THREE.InstancedMesh(new THREE.BoxGeometry(0.9, 0.5, 4.2), new THREE.MeshBasicMaterial({ toneMapped: false }), N);
+  const N = 34;
+  const cb = new Batch();
+  const hull = new THREE.CapsuleGeometry(0.9, 3.2, 4, 10);
+  hull.rotateX(Math.PI / 2);
+  cb.add(hull, 0xf4f5f6, 0, 0, 0, 0, 0, 0, 1, 0.8, 1);
+  cb.cbox(7.4, 0.16, 0.7, 0, 0.5, 0.9, 0xe9eaec);       // front rotor boom
+  cb.cbox(6.0, 0.16, 0.6, 0, 0.5, -1.7, 0xe9eaec);      // rear rotor boom
+  for (const [x, z, r] of [[-3.5, 0.9, 1.25], [3.5, 0.9, 1.25], [-2.8, -1.7, 1.05], [2.8, -1.7, 1.05]]) cb.cyl(r, r, 0.07, x, 0.62, z, 0xcfd3d7, 12);
+  cb.cbox(1.5, 0.5, 1.6, 0, 0.25, 1.0, 0x2a3640);        // canopy
+  cb.cbox(0.12, 1.1, 1.0, 0, 0.7, -2.6, 0xe9eaec);       // tail fin
+  const flyers = new THREE.InstancedMesh(cb.merged(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.3 }), N);
   flyers.frustumCulled = false;
   scene.add(flyers);
-  const cols = [0xffe8c0, 0x5ff3ff, 0xff7a59, 0xffffff];
+  const navMat = new THREE.MeshBasicMaterial({ color: 0xfff2dc, toneMapped: false });
+  for (const ch of ['r', 'g', 'b']) env.nightLerp(navMat.color, ch, 0.9, 1.7);
+  const navs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.16, 0.3), navMat, N);
+  navs.frustumCulled = false;
+  scene.add(navs);
   const fl = [];
-  for (let i = 0; i < N; i++) { fl.push({ lane: lanes[i % lanes.length], s: rng.float(0, 1), v: rng.float(34, 58), wob: rng.float(0, 6) }); flyers.setColorAt(i, _c.set(cols[i % cols.length]).multiplyScalar(2.2)); }
-  flyers.instanceColor.needsUpdate = true;
+  for (let i = 0; i < N; i++) fl.push({ lane: lanes[i % lanes.length], s: rng.float(0, 1), v: rng.float(26, 44), wob: rng.float(0, 6), size: rng.float(1.1, 1.7) });
 
   return {
     gators,
@@ -113,19 +125,23 @@ export function buildWildlife(scene, env) {
         g.mesh.rotation.y = g.heading + Math.sin(t * (hunting ? 9 : 3) + g.z) * 0.12;
       }
 
-      // flyers
-      const k = 0.75 + env.night * 0.6;
+      // aircraft: fly the lane, bank a little, bob gently
       for (let j = 0; j < N; j++) {
         const f = fl[j], L = f.lane;
         const len = Math.hypot(L.bx - L.ax, L.bz - L.az);
         f.s += (f.v * dt) / len;
         if (f.s > 1) f.s -= 1;
-        _e.set(0, Math.atan2(L.bx - L.ax, L.bz - L.az), 0);
+        _e.set(0, Math.atan2(L.bx - L.ax, L.bz - L.az), Math.sin(t * 0.5 + f.wob) * 0.08);
         _q.setFromEuler(_e);
-        _m.compose(_p.set(L.ax + (L.bx - L.ax) * f.s, L.y + Math.sin(t * 0.6 + f.wob) * 4, L.az + (L.bz - L.az) * f.s), _q, _s.set(k, k, 1.6));
+        _p.set(L.ax + (L.bx - L.ax) * f.s + Math.sin(t * 0.21 + f.wob) * 5, L.y + Math.sin(t * 0.6 + f.wob) * 3, L.az + (L.bz - L.az) * f.s + Math.cos(t * 0.17 + f.wob) * 5);
+        _m.compose(_p, _q, _s.set(f.size, f.size, f.size));
         flyers.setMatrixAt(j, _m);
+        _p.y -= 0.6 * f.size;
+        _m.compose(_p, _q, _s.set(f.size, f.size, f.size));
+        navs.setMatrixAt(j, _m);
       }
       flyers.instanceMatrix.needsUpdate = true;
+      navs.instanceMatrix.needsUpdate = true;
     },
   };
 }

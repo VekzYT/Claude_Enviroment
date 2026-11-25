@@ -14,8 +14,8 @@ const KEYS = [
   [7.2, 0x4590dc, 0xffdcb4, 0xfff0d8, 2.3, 0.62],
   [12, 0x2c7bd8, 0xa9d8f2, 0xffffff, 2.9, 0.72],
   [16.5, 0x356fc4, 0xffd3a0, 0xffe2b8, 2.6, 0.66],
-  [18.6, 0x2c2f72, 0xff7b47, 0xff8c52, 1.7, 0.52],
-  [19.8, 0x151540, 0x7a2f6e, 0xb070c0, 0.5, 0.34],
+  [18.6, 0x33407e, 0xff9a62, 0xffa468, 1.7, 0.52],
+  [19.8, 0x18204a, 0x8a5a66, 0xc09aa0, 0.5, 0.34],
   [21.2, 0x050918, 0x141a40, 0x8fa8ff, 0.34, 0.26],
   [24, 0x040716, 0x10173a, 0x8fa8ff, 0.34, 0.26],
 ];
@@ -80,7 +80,7 @@ export class Environment {
   constructor(scene, renderer) {
     this.scene = scene;
     this.renderer = renderer;
-    this.hour = 18.3;
+    this.hour = 16.6;
     this.rate = 24 / (24 * 60); // game hours per real second: a full day in 24 minutes
     this.night = 0;
     this.sunDir = new THREE.Vector3(0, 1, 0);
@@ -148,7 +148,7 @@ export class Environment {
     {
       // patchy warm / cyan / magenta lights around the horizon
       const g = this.glowBand.geometry, p = g.getAttribute('position'), col = new Float32Array(p.count * 3);
-      const pal = [[1.0, 0.62, 0.3], [0.3, 0.9, 1.0], [1.0, 0.35, 0.8], [1.0, 0.8, 0.5]];
+      const pal = [[1.0, 0.9, 0.75], [0.8, 0.92, 1.0], [1.0, 0.95, 0.9], [1.0, 0.86, 0.68]];
       for (let i = 0; i < p.count; i++) {
         const a = Math.atan2(p.getZ(i), p.getX(i));
         const c = pal[Math.abs(Math.round(a * 3.3)) % 4];
@@ -197,10 +197,10 @@ export class Environment {
     const fog = this.scene.fog;
     fog.color.copy(this.horizon).lerp(this.zenith, 0.35);
     // city haze glows a little at night
-    if (this.night > 0) fog.color.lerp(cA.setRGB(0.16, 0.1, 0.17), this.night * this.cityK * 0.45);
+    if (this.night > 0) fog.color.lerp(cA.setRGB(0.12, 0.12, 0.15), this.night * this.cityK * 0.4);
     this.exposure = lerp(0.86, 1.08, this.night);
-    this.bloomThreshold = lerp(1.2, 0.86, this.night);
-    this.bloomStrength = lerp(0.28, 0.6, this.night);
+    this.bloomThreshold = lerp(1.25, 0.98, this.night);
+    this.bloomStrength = lerp(0.22, 0.36, this.night);
 
     const u = this.skyUniforms;
     u.uZenith.value.copy(this.zenith);
@@ -209,14 +209,14 @@ export class Environment {
     u.uSunColor.value.copy(this.sunColor);
     u.uNight.value = this.night;
     u.uTime.value += dt;
-    u.uCityGlow.value.setRGB(0.5, 0.26, 0.32).multiplyScalar(this.night * (0.35 + 0.65 * this.cityK));
+    u.uCityGlow.value.setRGB(0.4, 0.36, 0.33).multiplyScalar(this.night * (0.3 + 0.5 * this.cityK));
 
     for (const m of this.nightMaterials) m.mat[m.key] = lerp(m.day, m.night, this.night);
 
     // analytic lamps and neon
     const on = this.cityLights ? 1 : 0;
-    cityUniforms.uLampColor.value.setRGB(1.0, 0.76, 0.48).multiplyScalar(8.5 * this.night * on);
-    cityUniforms.uNeonK.value = (0.06 + 0.94 * this.night) * on;
+    cityUniforms.uLampColor.value.setRGB(1.0, 0.95, 0.87).multiplyScalar(7 * this.night * on);
+    cityUniforms.uNeonK.value = (0.04 + 0.66 * this.night) * on;
     cityUniforms.uWet.value = this.wet;
     cityUniforms.uFogHeight.value.set(1.5, lerp(0.018, 0.03, this.cityK), (1 - this.cityK) * this.night * 0.22, 0);
     this.scene.environmentIntensity = lerp(0.85, 0.55, this.night);
