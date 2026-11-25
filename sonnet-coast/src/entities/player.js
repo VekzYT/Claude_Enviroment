@@ -166,8 +166,8 @@ export class Player {
     this.mv = null; this.standOn = null;
     if (v.T.open) {
       v.m.body.add(this.model);
-      // hip joints just above the cushion
-      this.model.position.set(v.m.seat[0], v.m.seat[1] + 0.12 - (RIG.HIP_Y + RIG.THIGH_Y), v.m.seat[2]);
+      // hip joints just above the cushion (a rider sits a little forward, towards the bars)
+      this.model.position.set(v.m.seat[0], v.m.seat[1] + 0.12 - (RIG.HIP_Y + RIG.THIGH_Y), v.m.seat[2] + (v.T.bike || v.cls === 'hover' ? 0.1 : 0));
       this.model.rotation.set(0, 0, 0);
       this.model.scale.set(1, 1, 1);
       this.model.visible = true;

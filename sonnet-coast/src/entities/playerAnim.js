@@ -46,7 +46,7 @@ export class PlayerAnim {
     this.lead = 0;
     this.scale = 1;
     // hands that IK places this frame (world space), and how firmly
-    this.ikL = 0; this.ikR = 0;
+    this.ikL = 0; this.ikR = 0; this.ikSpace = 'world';
     this.support = 0;   // > 0: the left hand holds the right one (a two-handed aim)
   }
 
@@ -68,7 +68,7 @@ export class PlayerAnim {
     this.guardT = Math.max(0, this.guardT - dt);
     if (pl.landSeq !== this.landSeq) { this.landSeq = pl.landSeq; this.landT = 1; this.landAmp = clamp((pl.landImpact - 3) / 10, 0.18, 1); }
     this.landT = Math.max(0, this.landT - dt * 3.4);
-    this.ikL = this.ikR = 0; this.support = 0;
+    this.ikL = this.ikR = 0; this.ikSpace = 'world'; this.support = 0;
 
     const rate = this.target(T, dt, t);
     const k = 1 - Math.exp(-dt * rate);
@@ -154,18 +154,19 @@ export class PlayerAnim {
     o[PITCH] = clamp(this.acc * 0.013, -0.1, 0.13);
     // what the hands are doing
     if (aim) {
+      // the gun arm follows the camera's pitch, whatever the torso is doing
       const pitch = clamp(G.cam.pitch, -0.9, 0.7);
-      o[SP] += pitch * 0.22; o[HP] += pitch * 0.3;
-      const ap = pitch * 0.72;
+      crouch(o, 0.035); o[LTP] -= 0.12; o[RTP] += 0.1; o[RFT] -= 0.1;
+      o[SP] += pitch * 0.2; o[HP] += pitch * 0.3;
+      const ap = pitch - o[SP];
       if (held === 'emp') {
         o[RAP] = -2.3 + ap * 0.5; o[RAR] = 0.25; o[REL] = -1.7; o[LAP] = -1.35 + ap; o[LEL] = -0.2; o[LAR] = 0.1; o[SY] = -0.2;
       } else {
-        // square to the target, gun arm straight, the other hand cupping the grip (see apply)
-        o[RAP] = -1.52 + ap; o[RAR] = -0.04; o[RAY] = 0; o[REL] = -0.05;
-        o[LAP] = -1.3 + ap; o[LAR] = 0.05; o[LAY] = 0.62; o[LEL] = -0.6; o[SY] = 0.05;
+        // a slight turn of the shoulders brings the gun to the middle; the other hand cups the grip (see apply)
+        o[RAP] = -Math.PI / 2 + ap; o[RAR] = -0.04; o[RAY] = 0; o[REL] = -0.05;
+        o[LAP] = -1.35 + ap; o[LAR] = 0.05; o[LAY] = 0.62; o[LEL] = -0.6; o[SY] = 0.16; o[HY] = -0.14;
         if (!(W && W.reloadT > 0)) this.support = 1;
       }
-      crouch(o, 0.035); o[LTP] -= 0.12; o[RTP] += 0.1; o[RFT] -= 0.1;
       o[SWL] = o[SWR] = 0;
       if (W && W.reloadT > 0) { o[LAP] = -1.0; o[LAY] = 0.75; o[LEL] = -1.7; o[RAP] = -0.8; o[REL] = -1.3; o[HP] += 0.25; }
     } else if (held === 'pistol') {
@@ -356,13 +357,16 @@ export class PlayerAnim {
     o[LOCO] = 0; o[SWL] = o[SWR] = 0;
     const st = v.cls === 'car' ? clamp(v.steer / Math.max(0.3, v.T.steer), -1, 1) : clamp(v.steer, -1, 1);
     if (v.T.bike || v.cls === 'hover') {
-      // astride: knees hugging the tank, low over the bars, leaning into turns
+      // astride: knees hugging the tank, feet back on the pegs, low over the bars, leaning into turns
       const tuck = clamp(v.speed / 40, 0, 1);
-      o[LTP] = o[RTP] = -1.05; o[LTR] = o[RTR] = 0.2; o[LKN] = o[RKN] = 1.75; o[LFT] = o[RFT] = -0.35;
-      o[SP] = 0.42 + tuck * 0.22; o[HP] = -0.35 - tuck * 0.2;
+      o[LTP] = o[RTP] = -0.5; o[LTR] = o[RTR] = 0.24; o[LKN] = o[RKN] = 2.1; o[LFT] = o[RFT] = -0.55;
+      o[SP] = 0.8 + tuck * 0.15; o[HP] = -0.7 - tuck * 0.15;
       o[BANK] = -st * 0.22; o[HY] = -st * 0.18;
-      // grips on the bars (torso space), the bars turning with the steering
-      _tL.set(0.27, 0.18 - tuck * 0.06, 0.5 + st * 0.05); _tR.set(-0.27, 0.18 - tuck * 0.06, 0.5 - st * 0.05);
+      // grips on the bars (model space: about 0.9 m ahead of the saddle and 0.28 m above it), turning
+      // with the steering
+      _tL.set(0.38, 0.98 - tuck * 0.04, 0.8 + st * 0.05); _tR.set(-0.38, 0.98 - tuck * 0.04, 0.8 - st * 0.05);
+      this.ikL = this.ikR = 1; this.ikSpace = 'model';
+      return 10;
     } else {
       // hands on the wheel at ten to two, turning it; head looking into the turn
       o[LTP] = o[RTP] = -1.45; o[LKN] = o[RKN] = 1.35; o[LFT] = o[RFT] = -0.1; o[LTR] = 0.08; o[RTR] = 0.05;
@@ -371,8 +375,7 @@ export class PlayerAnim {
       _tL.set(Math.cos(0.5 + a) * R, 0.24 + Math.sin(0.5 + a) * R, 0.44 - Math.sin(0.5 + a) * R * 0.35);
       _tR.set(Math.cos(Math.PI - 0.5 + a) * R, 0.24 + Math.sin(Math.PI - 0.5 + a) * R, 0.44 - Math.sin(Math.PI - 0.5 + a) * R * 0.35);
     }
-    // these targets are in torso space
-    this.ikL = this.ikR = -1;
+    this.ikL = this.ikR = 1; this.ikSpace = 'torso';
     return 10;
   }
 
@@ -519,16 +522,17 @@ export class PlayerAnim {
     P.thL.rotation.set(F[LTP], 0, F[LTR]); P.thR.rotation.set(F[RTP], 0, -F[RTR]);
     P.shL.rotation.x = F[LKN]; P.shR.rotation.x = F[RKN];
     P.ftL.rotation.x = F[LFT]; P.ftR.rotation.x = F[RFT];
-    // hands placed by IK where they must touch something (negative weight: targets already in torso space)
+    // hands placed by IK where they must touch something; targets are in world, model (a rider's
+    // grips, which move with the vehicle) or torso space
     if (this.ikL || this.ikR) {
-      const local = this.ikL < 0;
-      if (!local) m.updateMatrixWorld();
+      const sp = this.ikSpace;
+      if (sp !== 'torso') m.updateMatrixWorld();
       for (let k = 0; k < 2; k++) {
-        const w = Math.abs(k ? this.ikR : this.ikL);
+        const w = k ? this.ikR : this.ikL;
         if (w < 0.001) continue;
-        const tg = k ? _tR : _tL;
-        _v.copy(tg);
-        if (!local) P.torso.worldToLocal(_v);
+        _v.copy(k ? _tR : _tL);
+        if (sp === 'model') m.localToWorld(_v);
+        if (sp !== 'torso') P.torso.worldToLocal(_v);
         const sx = (k ? -1 : 1) * Math.abs(P.uaL.position.x);
         solveArm(_v.x - sx, _v.y - RIG.SHOULDER_Y, _v.z + 0.008, k ? -1 : 1);
         const ap = k ? RAP : LAP, ar = k ? RAR : LAR, ay = k ? RAY : LAY, el = k ? REL : LEL;
