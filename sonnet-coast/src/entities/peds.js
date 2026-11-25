@@ -283,6 +283,7 @@ export class Peds {
       const entry = (p.corner - p.cw + 4) % 4;
       p.block = nb;
       p.path.push(this.loopPt(nb, entry, p.lane), this.loopPt(nb, p.corner, p.lane));
+      p.waitCross = 8;
       return;
     }
     p.corner = (p.corner + p.cw + 4) % 4;
@@ -737,6 +738,14 @@ export class Peds {
     }
   }
 
+  carNear(x, z, r) {
+    const V = G.vehicles, vb = this.vbuf;
+    for (let k = 0; k < V.length; k++) {
+      const o = k * 4, dx = x - vb[o], dz = z - vb[o + 1];
+      if (dx * dx + dz * dz < r * r && V[k].speed > 2) return true;
+    }
+    return false;
+  }
   separate(p, idx) {
     const list = this.list, head = this.cellHead, next = this.cellNext;
     const cx = Math.floor(p.pos.x * 0.5), cz = Math.floor(p.pos.z * 0.5);
@@ -765,6 +774,11 @@ export class Peds {
         if (g && g.kind === 'walk') this.groupChatter(p, g, dt);
         if (!p.dest) { if (!p.path.length) this.nextLeg(p); p.dest = p.path.shift() || null; }
         if (!p.dest) return 0;
+        // at the kerb: wait for a gap in the traffic before crossing (for a while, anyway)
+        if (p.waitCross > 0) {
+          if (this.carNear(p.pos.x, p.pos.z, 24)) { p.waitCross -= dt; return 0; }
+          p.waitCross = 0;
+        }
         if (!g && p.habit !== 'jog') {
           // strollers stop now and then to look around
           if (p.mode === 'region') {
