@@ -62,7 +62,7 @@ export class Vehicle {
     this.slip = 0; this.surface = 'asphalt'; this.speed = 0; this.fwd = 0; this.latAccel = 0;
     // player handling states (see handling()): slide angle, drift, donut/burnout, weight on the front axle
     this.slideAngle = 0; this.drift = false; this.driftDir = 1; this.driftSm = 0; this.driftK = 2.6; this.driftInto = 0; this.driftAge = 0;
-    this.coastT = 0; this.powerT = 0; this.liftT = 9; this.burn = false; this.burnT = 0; this.launchT = 0; this.load = 0; this.airPitch = 0; this.wheelYaw = 0;
+    this.coastT = 0; this.powerT = 0; this.pushT = 0; this.trailT = 0; this.liftT = 9; this.brakeT = 9; this.burn = false; this.burnT = 0; this.launchT = 0; this.load = 0; this.airPitch = 0; this.wheelYaw = 0;
     this.fireT = 0; this.smokeT = 0;
     this.paint = opts.paint ?? pick(T.paints);
     this.m = buildVehicleMesh(T, this.paint);
@@ -249,8 +249,10 @@ export class Vehicle {
       if (this.onGround) {
         this.steer += (steerIn - this.steer) * Math.min(1, dt * (this.cls === 'hover' ? 5 : 8));
         aLat = T.grip * 1.9 * gripK;
-        // weight transfer: braking loads the front tyres and sharpens the turn-in
-        this.load += (clamp(-(this.accelLong || 0) / 14, 0, 1) - this.load) * Math.min(1, dt * 6);
+        // weight transfer: braking loads the front tyres and sharpens the player's turn-in
+        // (AI drivers keep the grip limit their lines were tuned for)
+        if (this.driver === 'player') this.load += (clamp(-(this.accelLong || 0) / 14, 0, 1) - this.load) * Math.min(1, dt * 6);
+        else this.load = 0;
         const sp0 = Math.abs(vF);
         const yawLock = (sp0 * Math.tan(T.steer)) / T.wheelbase;
         const yawGrip = (aLat * 1.15 * (1 + 0.3 * this.load)) / Math.max(sp0, 1);
@@ -358,22 +360,30 @@ export class Vehicle {
     const looseK = loose ? T.looseSlide : 0;
     const s = Math.atan2(vR, Math.max(vF, 0.5));
     this.liftT = throttle > 0.7 ? 0 : this.liftT + dt;
+    this.brakeT = throttle < -0.3 ? 0 : this.brakeT + dt;
     if (!this.drift) {
-      if (vF < 8) { this.powerT = 0; return; }
+      if (vF < 8) { this.powerT = this.pushT = this.trailT = 0; return; }
       const dir = Math.abs(steer) > 0.25 ? -Math.sign(steer) : 0;   // +1 = into a left-hand slide
+      const hard = dir && atLimit && Math.abs(steer) > 0.6;
       let enter = 0;
       if (hb && (dir || Math.abs(this.angVel) > 0.3)) enter = dir || Math.sign(this.angVel);
-      else if (dir && atLimit && Math.abs(steer) > 0.6) {
-        // only when pushing hard: ordinary turns at junction speeds stay on the grip model
+      else if (hard) {
+        // only when pushing hard: ordinary turns at junction speeds, and plain braking, stay on the grip model
         const power = T.powerSlide + looseK, fast = loose ? 10 : 20;
         if (throttle > 0.85 && vF > fast && vF < maxSpeed * 0.85) this.powerT += dt * power;
-        else if (throttle < -0.3 && vF > 16) this.powerT += dt * (power + T.liftOff) * 1.4;   // trail-braking rotates the car
         else this.powerT = Math.max(0, this.powerT - dt);
+        // time at the limit under power, for a lift-off; a stab of the brake at the limit, for a trail-brake entry
+        if (throttle > 0.7) this.pushT += dt;
+        if (throttle < -0.3 && vF > 14) this.trailT += dt * (power + T.liftOff);
+        else if (this.brakeT > 0.4) this.trailT = 0;
         if (this.powerT > 0.5) enter = dir;
-        else if (throttle <= 0.05 && this.liftT < 0.25 && vF > 19 && T.liftOff > 0) { enter = dir; this.angVel += dir * 0.6 * T.liftOff; }
-      } else this.powerT = Math.max(0, this.powerT - dt * 2);
+        // lift off after a while on the limit: light cars tuck in and the tail steps out
+        else if (throttle >= 0 && throttle <= 0.05 && this.liftT < 0.3 && vF > 19 && T.liftOff > 0 && this.pushT > 0.3 / T.liftOff) enter = dir;
+        // brake into the turn, then back on the power while still turning: the loaded nose bites and the rear lets go
+        else if (throttle > 0.7 && this.brakeT < 0.4 && this.trailT > 0.2 && vF > 15) enter = dir;
+      } else { this.powerT = Math.max(0, this.powerT - dt * 2); this.pushT = Math.max(0, this.pushT - dt * 2); this.trailT = 0; }
       if (!enter) return;
-      this.drift = true; this.driftDir = enter; this.driftAge = 0; this.coastT = 0; this.powerT = 0; this.driftSm = s;
+      this.drift = true; this.driftDir = enter; this.driftAge = 0; this.coastT = 0; this.powerT = this.pushT = this.trailT = 0; this.driftSm = s;
     }
     // in the slide: throttle and steering into the turn set the angle, steering out of it catches the car;
     // with the wheel straight it settles at a holdable angle (a little countersteer assist for keyboards)
@@ -384,12 +394,15 @@ export class Vehicle {
     this.coastT = thr > 0.1 || hb ? 0 : this.coastT + dt;
     const A = T.driftAngle * (1 + 0.3 * looseK);
     let mag = A * ((0.3 + 0.55 * thr) * (1 + 0.5 * into) + Math.min(0, into) * 0.6 + (hb ? 0.35 : 0));
-    if (this.driftAge > 0.5) mag *= Math.max(0, 1 - this.coastT / 0.9);   // off the throttle the slide dies away
+    if (this.driftAge > 0.5) mag *= Math.max(0, 1 - this.coastT / (throttle < -0.3 ? 0.5 : 0.75));   // off the throttle the slide dies away
     mag = clamp(mag, -0.3 * A, Math.min(1.05, 1.5 * A));
     this.driftSm += (d * mag - this.driftSm) * Math.min(1, dt * 4);
     this.driftInto = into;
     this.driftK = (hb ? 4 : into < -0.3 ? 3.6 : 2.6) * clamp(Math.sqrt(1500 / T.mass), 0.7, 1.15);
-    if (vF < 6 || (this.driftAge > 0.35 && Math.abs(s) < 0.09 && Math.abs(this.driftSm) < 0.15) || Math.abs(s) > 1.9) this.drift = false;
+    // once a coasting slide has mostly straightened, hand the car back to grip so the wheel steers it again
+    // (sooner with the wheel turned into the corner: the front bites and the car turns in)
+    const coasting = thr < 0.1 && !hb && this.driftAge > 0.3 && Math.abs(s) < 0.18 + 0.14 * Math.max(0, into);
+    if (vF < 6 || coasting || (this.driftAge > 0.35 && Math.abs(s) < 0.09 && Math.abs(this.driftSm) < 0.15) || Math.abs(s) > 1.9) this.drift = false;
   }
 
   collideStatic() {

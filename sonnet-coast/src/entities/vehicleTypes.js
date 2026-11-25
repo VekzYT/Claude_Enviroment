@@ -1,7 +1,8 @@
 // Vehicle roster. Speeds in m/s, accelerations in m/s^2.
 // Handling in a slide (player only, see Vehicle.handling): driftAngle is the held slide angle (rad), driftGrip the
 // side grip left while sliding, driftPower the drive left, powerSlide how readily throttle kicks the tail out,
-// liftOff how much lifting off or trail-braking rotates the car, looseSlide the extra tail-happiness on dirt.
+// liftOff how readily lifting off at the limit (and, with powerSlide, a trail-brake) rotates the car, looseSlide
+// the extra tail-happiness on dirt.
 import { PAL } from '../world/palette.js';
 
 export const SURFACES = {
@@ -26,7 +27,7 @@ export const VEHICLES = {
   sedan: {
     name: 'Opus Cruiser', cls: 'car', shape: 'sedan', len: 4.7, wid: 1.9, hgt: 1.45, wheelR: 0.36, wheelbase: 2.8,
     mass: 1500, maxSpeed: 46, accel: 13, brake: 28, grip: 8.5, steer: 0.58, offroad: 0.3, health: 110,
-    driftAngle: 0.45, driftGrip: 0.78, driftPower: 0.6, powerSlide: 0.12, liftOff: 0.15, looseSlide: 0.3,
+    driftAngle: 0.45, driftGrip: 0.78, driftPower: 0.6, powerSlide: 0.12, liftOff: 0, looseSlide: 0.3,
     paints: civPaint, traffic: 6, value: 350,
   },
   compact: {
@@ -73,7 +74,7 @@ export const VEHICLES = {
   police: {
     name: 'Safety Interceptor', cls: 'car', shape: 'police', len: 4.9, wid: 2.0, hgt: 1.5, wheelR: 0.38, wheelbase: 2.9,
     mass: 1900, maxSpeed: 60, accel: 20, brake: 34, grip: 10, steer: 0.6, offroad: 0.45, health: 190,
-    driftAngle: 0.48, driftGrip: 0.82, driftPower: 0.68, powerSlide: 0.3, liftOff: 0.1, looseSlide: 0.3,
+    driftAngle: 0.48, driftGrip: 0.82, driftPower: 0.68, powerSlide: 0.3, liftOff: 0, looseSlide: 0.3,
     paints: [0x2b2d33], police: true, traffic: 0, value: 0,
   },
   policeOffroad: {
