@@ -21,6 +21,7 @@ export class GameCamera {
     this.first = true;
     this.cinematic = null;
     this.slide = 0;      // smoothed drift angle of the player's vehicle
+    this.low = 0;        // how far the on-foot view has dropped for a slide or roll
   }
   forward(out = new THREE.Vector3()) { return this.cam.getWorldDirection(out); }
 
@@ -60,18 +61,26 @@ export class GameCamera {
       dist = (aiming ? 2.3 : 4.8) * (aiming ? 1 : this.zoom);
       height = aiming ? 1.62 : 1.55;
       side = aiming ? 0.55 : 0;
-      fovT = aiming ? 46 : 62;
-      _t.set(p.pos.x, p.pos.y + height + (p.swimming ? 0.5 : 0), p.pos.z);
+      // a little life on foot: wider when sprinting or sliding, lower through rolls and slides
+      fovT = aiming ? 46 : 62 + (p.sprinting ? 6 : 0) + (p.state === 'slide' ? 8 : 0);
+      this.low += ((p.state === 'slide' ? 0.6 : p.state === 'roll' ? 0.4 : 0) - this.low) * Math.min(1, dt * 7);
+      _t.set(p.pos.x, p.pos.y + height - this.low + (p.swimming ? 0.5 : 0), p.pos.z);
       if (p.state === 'dead' || p.state === 'busted') { this.yaw += dt * 0.25; this.pitch += (0.55 - this.pitch) * Math.min(1, dt); dist = 6 + Math.min(p.stateT, 4); }
     }
     if (this.first) { this.target.copy(_t); this.first = false; }
-    this.target.lerp(_t, 1 - Math.exp(-dt * (v ? 14 : 18)));
+    if (v || (p.aiming && p.state === 'foot')) this.target.lerp(_t, 1 - Math.exp(-dt * (v ? 14 : 18)));
+    else {
+      // on foot the view trails the body a touch, and lags more vertically so jumps and climbs stay smooth
+      const kh = 1 - Math.exp(-dt * 11), kv = 1 - Math.exp(-dt * 8);
+      this.target.x += (_t.x - this.target.x) * kh; this.target.z += (_t.z - this.target.z) * kh; this.target.y += (_t.y - this.target.y) * kv;
+    }
     this.dist += (dist - this.dist) * Math.min(1, dt * 6);
 
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
     // unit vector from the target back towards the camera
     _d.set(-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp);
-    const ox = this.target.x + -Math.cos(this.yaw) * side, oy = this.target.y, oz = this.target.z + Math.sin(this.yaw) * side;
+    // landings dip the view (the player's landing squash sets camDip)
+    const ox = this.target.x + -Math.cos(this.yaw) * side, oy = this.target.y - (v ? 0 : p.camDip), oz = this.target.z + Math.sin(this.yaw) * side;
     let d = this.dist;
     const hit = rayBoxes(ox, oy, oz, _d.x, _d.y, _d.z, d + 0.4);
     if (hit < d + 0.4) d = Math.max(0.6, hit - 0.4);
