@@ -12,7 +12,9 @@ const START = { x: 670, z: 1027, h: Math.PI / 2 };
 const ZONES = [[742, 1006], [700, 972], [744, 970], [698, 1008], [720, 990]];
 const ZONE_R = 13, ZONE_HOLD = 2, ZONE_BONUS = 400;   // seconds of sliding in the zone (they add up) to clear it
 const TIME = 75;
-const MEDALS = [24000, 14000, 6000];   // gold, silver, bronze (a tidy but choppy test driver scores about 6.5k)
+// gold, silver, bronze: test drivers scored about 6.5k with short, choppy chains and 10-15.5k just holding a
+// circle and heading back to the zone; silver asks for more than that, gold for x4-x5 chains through the zones
+const MEDALS = [24000, 16000, 6000];
 const PAY = [2500, 1500, 800, 200];
 
 export class DriftTrial extends Job {
