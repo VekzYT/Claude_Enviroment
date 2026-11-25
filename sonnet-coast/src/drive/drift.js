@@ -15,25 +15,32 @@ const REF_SPEED = 16;       // faster slides score more than slow circles (x0.6 
 const LEVEL_T = 2.5;        // seconds of sliding per multiplier step
 const MAX_MULT = 5;
 const CRASH = 6;            // impact speed (m/s) that ends a chain
-const PER_TOKEN = 40, TOKEN_CAP = 300, MIN_BANK = 200;
+const PER_TOKEN = 50, TOKEN_CAP = 300, MIN_BANK = 200;
+// Tokens paid recently cool off at HEAT_COOL per second; while warm, chains pay less (down to a quarter), so
+// circling one car park for an hour is not the best job in town
+const HEAT_K = 250, HEAT_COOL = 2;
 const NEAR_GAP = 1.5, NEAR_PTS = 250, NEAR_COOL = 4;
 const DEG = 180 / Math.PI;
 
 // Shared scorer state. Jobs read it and may set zoneK (a points multiplier) and event (no Tokens paid per drift).
 export const Drift = {
   active: false, points: 0, mult: 1, chainT: 0, graceT: 0, angle: 0, sliding: false,
-  zoneK: 1, event: false,
+  zoneK: 1, event: false, heat: 0, car: null,
   near: new Map(),          // vehicle id -> time of its last near-miss
   // Close the chain: pay out, unless it ended badly. Returns the points banked.
   end(clean, reason = '') {
     if (!this.active) return 0;
     const pts = Math.round(this.points);
-    this.active = false; this.points = 0; this.mult = 1; this.chainT = 0; this.graceT = 0;
+    this.active = false; this.car = null; this.points = 0; this.mult = 1; this.chainT = 0; this.graceT = 0;
     if (!clean) { emit('driftLost', pts, reason); widget.result(pts, reason || 'LOST', 'lost'); return 0; }
     const best = G.save.best;
     const record = pts > (best.drift ?? 0) && pts >= MIN_BANK;
     if (record) best.drift = pts;
-    if (pts >= MIN_BANK && !this.event) addTokens(Math.min(TOKEN_CAP, Math.floor(pts / PER_TOKEN)), 'drift');
+    if (pts >= MIN_BANK && !this.event) {
+      const pay = Math.max(1, Math.floor(Math.min(TOKEN_CAP, pts / PER_TOKEN) * clamp(1 - this.heat / HEAT_K, 0.25, 1)));
+      this.heat += pay;
+      addTokens(pay, 'drift');
+    }
     if (pts >= MIN_BANK) emit('sfx', record ? 'checkpoint' : 'token');
     emit('driftBanked', pts);
     widget.result(pts, record ? 'NEW BEST' : 'BANKED', 'banked');
@@ -154,7 +161,6 @@ addPlugin({
     G.drift = Drift;
     widget.build();
     on('vehicleImpact', (v, speed) => { if (v === G.player.vehicle && speed > CRASH) Drift.end(false, 'CRASHED'); });
-    on('leftVehicle', () => Drift.end(false, 'BAILED'));
     on('playerDied', () => Drift.end(false, 'WRECKED'));
     on('playerBusted', () => Drift.end(false, 'CONTAINED'));
     addControls([['Space + W', 'Standing start: burnout · add A / D for donuts'], ['In the air', 'A / D yaw · W / S pitch the nose']],
@@ -162,12 +168,16 @@ addPlugin({
   },
   update(dt, t) {
     const S = Drift, v = G.player.vehicle;
+    S.heat = Math.max(0, S.heat - HEAT_COOL * dt);
+    // getting out ends the chain here rather than on leftVehicle: death and arrest leave the car first and then
+    // emit their own event, which names the reason
+    if (S.active && v !== S.car) S.end(false, S.car.destroyed ? 'WRECKED' : 'BAILED');
     if (!v || v.destroyed || (v.cls !== 'car' && v.cls !== 'hover')) { S.angle = 0; S.sliding = false; if (S.active) S.end(false, 'WRECKED'); return; }
     const ang = Math.abs(v.slideAngle);
     S.angle += ((v.onGround ? ang : 0) - S.angle) * Math.min(1, dt * 10);
     S.sliding = v.onGround && v.fwd > 0 && v.speed > MIN_SPEED && ang > (v.drift ? MIN_ANGLE : BIG_ANGLE) && ang < MAX_ANGLE;
     if (S.sliding) {
-      if (!S.active) { S.active = true; S.points = 0; S.chainT = 0; S.mult = 1; }
+      if (!S.active) { S.active = true; S.car = v; S.points = 0; S.chainT = 0; S.mult = 1; }
       S.graceT = 0;
       S.chainT += dt;
       const mult = Math.min(MAX_MULT, 1 + Math.floor(S.chainT / LEVEL_T));
