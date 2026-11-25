@@ -9,6 +9,7 @@ export const defaultSave = () => ({
   missions: {},       // id -> times completed
   best: {},           // race id -> best time
   weights: [],        // collected Lost Weight ids
+  stunts: [],         // stunt ramps landed
   stats: { jacked: 0, distance: 0, busted: 0, flatlined: 0, evaded: 0, earned: 0, contracts: 0, maxStars: 0 },
   ammo: { reserve: 60, emps: 3 },
   armor: 0,

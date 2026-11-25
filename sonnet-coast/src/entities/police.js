@@ -390,13 +390,23 @@ export class Police {
   damageDrone(d, amount) {
     if (d.state === 'falling') return;
     d.health -= amount;
-    this.raise(Math.max(this.stars, 3), 'Firing on a drone');
+    if (!d.outlaw) this.raise(Math.max(this.stars, 3), 'Firing on a drone');
     if (d.health <= 0) { d.state = 'falling'; d.vel.y = 2; this.crime('droneDown', d.pos.x, d.pos.z, d); emit('droneDown', d); }
+  }
+  // A drone that is nobody's police: it just circles a point (jobs use these as targets).
+  spawnTargetDrone(x, z, y, r = 10) {
+    const d = this.spawnDrone();
+    d.state = 'target'; d.outlaw = true; d.health = 30;
+    d.anchor = { x, z, y, r };
+    d.pos.set(x + r, y, z);
+    d.l1.scale.setScalar(0); d.l2.scale.setScalar(0);
+    d.cone.visible = false; d.spot.visible = false;
+    return d;
   }
   hackDrone(d) { if (d.state !== 'falling') { d.state = 'falling'; G.fx.zap(d.pos.x, d.pos.y, d.pos.z, 30, 1.2); emit('droneDown', d); } }
   empDrones(x, y, z, r) {
     let n = 0;
-    for (const d of this.drones) if (d.state !== 'falling' && Math.hypot(d.pos.x - x, d.pos.z - z) < r && Math.abs(d.pos.y - y) < 40) { d.state = 'falling'; n++; emit('droneDown', d); }
+    for (const d of this.drones) if (d.state !== 'falling' && Math.hypot(d.pos.x - x, d.pos.z - z) < r && Math.abs(d.pos.y - y) < 40) { d.state = 'falling'; if (!d.outlaw) n++; emit('droneDown', d); }
     return n;
   }
   rayDrones(ox, oy, oz, dx, dy, dz, maxD) {
@@ -427,6 +437,16 @@ export class Police {
         const g = Math.max(groundHeight(d.pos.x, d.pos.z, d.pos.y + 1), WATER_Y);
         if (d.pos.y <= g + 0.4) { G.fx.explosion(d.pos.x, g, d.pos.z, 0.55); emit('sfx', 'explosion', d.pos.x, d.pos.z); this.removeDrone(d); continue; }
         d.mesh.position.copy(d.pos);
+        continue;
+      }
+      if (d.state === 'target') {
+        const a = t * 0.4 + d.id, A = d.anchor;
+        const k = Math.min(1, dt * 1.6);
+        d.pos.x += (A.x + Math.cos(a) * A.r - d.pos.x) * k; d.pos.z += (A.z + Math.sin(a) * A.r - d.pos.z) * k;
+        d.pos.y += (A.y + Math.sin(t * 0.7 + d.id) * 1.5 - d.pos.y) * k;
+        d.mesh.position.copy(d.pos);
+        d.mesh.rotation.set(0, -a, 0);
+        d.sees = false;
         continue;
       }
       // where to hover

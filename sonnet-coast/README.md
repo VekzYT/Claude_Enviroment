@@ -1,8 +1,8 @@
 # Sonnet Coast
 
 An open-world driving and action game that runs in a browser tab. You play Kestrel, an
-off-the-books field operative, in a neon coastal city ringed by beaches, a glowing forest and a
-bayou. Steal cars, outrun the Anthropic Police, run jobs for your handler, and find what is hidden
+off-the-books field operative, in a clean futuristic coastal city of glass towers, roof gardens
+and monorails, ringed by beaches, a glowing forest and a bayou. Steal cars, outrun the Anthropic Police, run jobs for your handler, and find what is hidden
 out in the wilds.
 
 It is a fan-made parody. It is not affiliated with or endorsed by Anthropic, and everything in it
@@ -10,11 +10,17 @@ is fictional.
 
 ## Play
 
-Open **`play.html`** in a desktop browser (Chrome, Edge or Firefox). That one file is the whole
+**On a computer:** open **`play.html`** in Chrome, Edge or Firefox. That one file is the whole
 game: no install, no server, no network. Click **New Game**, then click the view once so the game
 can capture your mouse.
 
-Sound starts after your first click. Progress saves to the browser automatically.
+**On a phone or tablet:** the same file, opened in the phone's browser, turned sideways. Touch
+controls appear by themselves. A phone browser needs a web address rather than a file on disk, so
+host `play.html` somewhere (GitHub Pages works: Settings → Pages → deploy from this branch, then
+open `…/sonnet-coast/play.html`) or serve the folder from a computer on the same Wi-Fi
+(`npx serve .` and open the address it prints).
+
+Sound starts after your first click or tap. Progress saves to the browser automatically.
 
 ## Controls
 
@@ -37,11 +43,30 @@ Sound starts after your first click. Progress saves to the browser automatically
 | `M` | Map — click to set a waypoint | Same |
 | `Esc` or `P` | Pause, settings | Same |
 
+### Touch
+
+| Control | On foot | In a vehicle |
+| --- | --- | --- |
+| Left thumb (anywhere on the left) | Move; push all the way to sprint | Steer |
+| Drag anywhere else | Look | Look |
+| `◎` | Punch / fire / use gadget (drag while held to aim) | Fire |
+| `⌖` | Aim, tap again to lower | — |
+| `⤒` | Jump | — |
+| `▲` `▼` | — | Gas, brake / reverse |
+| `◐` `»` | — | Handbrake drift, nitro |
+| `F` | Get in or steal a vehicle | Get out |
+| `E` | Appears when there is something to use | Same |
+| `⟳` | Next weapon | Next weapon |
+| `R` `H` `G` | — | Radio, horn / siren, police scanner |
+| `CAM` `MAP` `II` | Camera distance, map (tap to set a waypoint, pinch to zoom), pause | Same |
+
+Add `?touch=1` to the address to force touch controls on, `?touch=0` to keep them off.
+
 ## What is in it
 
 **The map.** Sonnet City is a 143-block grid with eight districts — Downtown, Token Row, the
 Oceanfront, Old Town, Docklands, Uptown Tech Park, Riverside and Midtown — plus Claude Tower, the
-Token Dome and a pier with a big wheel. Around it: Token Beach, the Glowwood (a forest that lights
+Token Dome, glass conservatories, two monorail lines and a pier with a big wheel. Around it: Token Beach, the Glowwood (a forest that lights
 up at night), Opus Bayou with its channels and gators, Compute Ridge's data centres and the Port of
 Sonnet. A highway loops the lot, with dirt trails through the forest and swamp.
 
@@ -66,11 +91,19 @@ there is nobody to report the small stuff.
 | Badge Swap | Claude Tower | Steal a police interceptor, use its scanner to find a data convoy, stop it and take the core |
 | Bayou Run | Port of Sonnet | Smuggle GPUs by buggy along the trails and by boat up the river, round the checkpoints |
 | Heat Check | Token Row | Take three stars on purpose, survive, then shake them |
+| Tail Lights | Vantablack Labs | Follow a courier across the city without being noticed, then tag the stash |
+| Signal Loss | Alignment Park | Bring down four survey drones before they finish mapping the district |
+| Hot Pursuit | Sonnet Boulevard West | Run down a fleeing sports car and take the drive from it |
+| Wake Up Call | Sonnet Pier | Boat chase down the coast; stop the smuggler and take the cargo back |
+| The Weights Job | Claude Tower | The finale: pick up your safecracker, hold off security while she works, then get the hauler out through a three-star alarm. Opens after Grand Theft Prototype, Badge Swap, Bayou Run and Tail Lights |
 | Neon Sprint | Sonnet Boulevard | Street race, two laps of downtown |
 | Glowwood Rally | Glowwood Lookout | Dirt race, two laps of the forest loop |
+| Courier Rush | Midtown | Six timed parcel drops; faster drops pay more |
+| Glide Path | Sonnet Pier | Hover-bike time trial over the bay, with medal times |
 
 After the prototype job, Gator Garage hands out repeatable chop-shop contracts. Twenty-four Lost
-Weights are scattered around the wilds.
+Weights are scattered around the wilds, and seven stunt ramps pay out the first time you land each
+one.
 
 **Also:** a weapon wheel (fists, shock baton, pulse pistol, EMP charges, a hack tool), a wardrobe
 at the safehouse, a gadget shop, five radio stations of generated music, a day-night cycle, and a
@@ -78,8 +111,8 @@ full map with GPS routing.
 
 ## Graphics settings
 
-The game starts on **High** and steps down by itself if the frame rate is poor. You can pick a
-preset in *Settings*; once you do, it stays where you put it.
+The game starts on **High** (**Medium** on phones) and steps down by itself if the frame rate is
+poor. You can pick a preset in *Settings*; once you do, it stays where you put it.
 
 | Preset | What changes |
 | --- | --- |
@@ -101,7 +134,8 @@ npm run watch      # rebuild on change
 | --- | --- |
 | `src/world` | Terrain, road graph, city plan and meshes, vegetation, landmarks, sky, lighting |
 | `src/entities` | Vehicles, player, pedestrians, traffic, police, weapons |
-| `src/missions` | Jobs, races, markers, contracts, collectibles |
+| `src/missions` | Jobs, races, markers, contracts, collectibles, stunt jumps |
+| `src/touch.js` | Touch controls (they press the same keys the keyboard does) |
 | `src/ui` | HUD, minimap and full map, menus, stylesheet |
 | `src/audio` | Sound effects, engine, sirens, ambience, radio sequencer |
 | `src/fx`, `src/ai`, `src/util` | Particles, AI driving, maths and noise helpers |
@@ -120,6 +154,7 @@ Two things worth knowing if you read the code:
 ## Limits
 
 This was built and tested in a headless browser with software rendering. Game logic is covered by
-scripted playthroughs of every job, but frame rate on real graphics hardware and how the music
-actually sounds have not been checked by a person. Interiors, a story beyond the jobs above, and
-gamepad or touch controls are not included.
+scripted playthroughs of every job, and the touch controls by an emulated phone, but nobody has
+played it on a real phone or a real graphics card: frame rate, how the music sounds, how the
+touch layout feels under actual thumbs, and whether the medal times and fights are fair are all
+unchecked. Interiors, a story beyond the jobs above, and gamepad support are not included.

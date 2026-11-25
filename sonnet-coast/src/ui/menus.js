@@ -6,6 +6,12 @@ import { BLIP_STYLES } from './minimap.js';
 import { writeSave, addTokens } from '../save.js';
 import { clamp, formatTokens } from '../util/math.js';
 
+const TOUCH_CONTROLS = [
+  ['Left thumb', 'Move / steer (push all the way to sprint)'], ['Drag', 'Look around'], ['▲ ▼', 'Gas and brake / reverse'], ['◐ »', 'Handbrake drift and nitro'],
+  ['F', 'Enter, steal or leave a vehicle'], ['E', 'Interact (shown when there is something to use)'], ['◎', 'Punch / fire / use gadget'], ['⌖', 'Aim (tap again to lower)'],
+  ['⟳', 'Next weapon'], ['⤒', 'Jump'], ['R', 'Next radio station'], ['H', 'Horn / siren'],
+  ['G', 'Police scanner (in a cruiser)'], ['CAM', 'Camera distance'], ['MAP', 'Map and waypoint'], ['II', 'Pause'],
+];
 const CONTROLS = [
   ['W A S D', 'Move / drive'], ['Mouse', 'Look around'], ['Shift', 'Sprint / nitro'], ['Space', 'Jump / handbrake (drift)'],
   ['F', 'Enter, steal or leave a vehicle'], ['E', 'Interact (or enter a vehicle)'], ['Left click', 'Punch / fire / use gadget'], ['Right click', 'Aim'],
@@ -94,7 +100,7 @@ export class Menus {
     });
   }
   controls(back) {
-    const d = this.mount(`<div class="panel"><h2>CONTROLS</h2><div class="keys">${CONTROLS.map(([k, v]) => `<kbd>${k}</kbd><span>${v}</span>`).join('')}</div>
+    const d = this.mount(`<div class="panel"><h2>CONTROLS</h2><div class="keys">${(Input.touch.on ? TOUCH_CONTROLS : CONTROLS).map(([k, v]) => `<kbd>${k}</kbd><span>${v}</span>`).join('')}</div>
       <button class="btn" id="back" style="margin-top:18px">BACK</button></div>`);
     this.kind = 'sub'; this.back = back;
     this.bind(d, { '#back': back });
@@ -129,10 +135,11 @@ export class Menus {
   }
   log() {
     const M = G.missions, st = G.save.stats;
-    const rows = M ? M.catalog().map((m) => `<div class="miss ${m.done ? 'done' : ''}"><span>${m.title}<br><small style="opacity:.7">${m.where}</small></span><b>${m.done ? '✓ ' + (m.times > 1 ? '×' + m.times : 'done') : m.locked ? 'locked' : formatTokens(m.reward) + ' ◈'}</b></div>`).join('') : '';
+    const rows = M ? M.catalog().map((m) => `<div class="miss ${m.done ? 'done' : ''}"><span>${m.title}<br><small style="opacity:.7">${m.where}</small></span><b>${m.done ? '✓ ' + (m.times > 1 ? '×' + m.times : 'done') : m.locked ? (m.needs ? `<small style="opacity:.7">after ${m.needs}</small>` : 'locked') : formatTokens(m.reward) + ' ◈'}</b></div>`).join('') : '';
     const d = this.mount(`<div class="panel"><h2>JOBS &amp; STATS</h2><h3>Jobs</h3><div class="list">${rows}</div>
       <h3>Record</h3><div class="stats">
       <span>Lost Weights recovered</span><b>${G.save.weights.length} / ${M ? M.weightTotal : 24}</b>
+      <span>Stunt jumps landed</span><b>${(G.save.stunts || []).length} / ${M ? M.stuntTotal : 7}</b>
       <span>Tokens earned</span><b>${formatTokens(st.earned)}</b>
       <span>Vehicles taken</span><b>${st.jacked}</b>
       <span>Chop-shop contracts</span><b>${st.contracts}</b>
@@ -150,7 +157,10 @@ export class Menus {
     this.close(true);
     const el = document.createElement('div');
     el.id = 'mapscreen';
-    el.innerHTML = `<canvas></canvas><div class="maphelp"><kbd>Click</kbd>set waypoint &nbsp; <kbd>Right click</kbd>clear &nbsp; <kbd>Drag</kbd>pan &nbsp; <kbd>Wheel</kbd>zoom &nbsp; <kbd>M</kbd>close</div>
+    const help = Input.touch.on
+      ? '<div class="maphelp mapbtns"><button id="mclose">CLOSE</button><button id="mclear">CLEAR WAYPOINT</button><span>Tap to set a waypoint · drag to pan · pinch to zoom</span></div>'
+      : '<div class="maphelp"><kbd>Click</kbd>set waypoint &nbsp; <kbd>Right click</kbd>clear &nbsp; <kbd>Drag</kbd>pan &nbsp; <kbd>Wheel</kbd>zoom &nbsp; <kbd>M</kbd>close</div>';
+    el.innerHTML = `<canvas></canvas>${help}
       <div class="legend">${[['mission', 'Job'], ['objective', 'Objective'], ['safehouse', 'Safehouse'], ['garage', 'Chop shop'], ['retune', 'Re-Tune garage'], ['shop', 'Prompt Supply'], ['race', 'Race'], ['activity', 'Activity'], ['police', 'Police']].map(([k, n]) => `<div><i style="background:${BLIP_STYLES[k].color}"></i>${n}</div>`).join('')}</div>`;
     this.root.appendChild(el);
     this.mapEl = el; this.kind = 'map'; this.current = el;
@@ -175,6 +185,37 @@ export class Menus {
       }
       drag = null;
     });
+    if (Input.touch.on) {
+      // one finger pans (a tap sets the waypoint), two fingers zoom
+      let pinch = 0, pscale = 1;
+      const gap = (e) => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      cv.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (e.touches.length === 2) { pinch = gap(e); pscale = this.mapView.scale; drag = null; }
+        else { const t = e.touches[0]; drag = { x: t.clientX, y: t.clientY, vx: this.mapView.x, vz: this.mapView.z }; moved = 0; }
+      }, { passive: false });
+      cv.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (e.touches.length === 2 && pinch) { this.mapView.scale = clamp(pscale * gap(e) / pinch, 0.35, 3.2); return; }
+        if (!drag) return;
+        const t = e.touches[0], dx = t.clientX - drag.x, dy = t.clientY - drag.y;
+        moved = Math.max(moved, Math.abs(dx) + Math.abs(dy));
+        const k = this.mapView.scale * (1536 / 3000);
+        this.mapView.x = clamp(drag.vx - dx / k, -1500, 1500); this.mapView.z = clamp(drag.vz - dy / k, -1500, 1500);
+      }, { passive: false });
+      cv.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (e.touches.length < 2) pinch = 0;
+        if (drag && moved < 9 && e.touches.length === 0) {
+          const r = cv.getBoundingClientRect(), t = e.changedTouches[0];
+          emit('waypoint', G.hud.map.fullToWorld(t.clientX - r.left, t.clientY - r.top, r.width, r.height, this.mapView));
+          this.ui('uiSelect');
+        }
+        if (e.touches.length === 0) drag = null;
+      }, { passive: false });
+      el.querySelector('#mclose').addEventListener('click', () => this.hooks.resume());
+      el.querySelector('#mclear').addEventListener('click', () => { emit('waypoint', null); this.ui('uiSelect'); });
+    }
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
     cv.addEventListener('wheel', (e) => { this.mapView.scale = clamp(this.mapView.scale * (e.deltaY < 0 ? 1.18 : 0.85), 0.35, 3.2); }, { passive: true });
     this.drawMap();

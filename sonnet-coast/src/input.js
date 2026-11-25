@@ -6,11 +6,14 @@ const pressed = new Set();
 const mouse = { dx: 0, dy: 0, wheel: 0, left: false, right: false, leftPressed: false, rightPressed: false, locked: false, x: 0, y: 0 };
 let canvas = null;
 let enabled = true;
+// Filled in by the touch layer: an analog stick that adds to the keyboard axes.
+const touch = { on: false, mx: 0, mz: 0 };
 
 const GAME_KEYS = new Set(['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyF', 'Slash', 'Quote']);
 
 export const Input = {
   mouse,
+  touch,
   init(el) {
     canvas = el;
     window.addEventListener('keydown', (e) => {
@@ -28,7 +31,7 @@ export const Input = {
       mouse.dy += e.movementY || 0;
     });
     canvas.addEventListener('mousedown', (e) => {
-      if (!mouse.locked) return;
+      if (!mouse.locked || touch.on) return;
       if (e.button === 0) { mouse.left = true; mouse.leftPressed = true; }
       if (e.button === 2) { mouse.right = true; mouse.rightPressed = true; }
     });
@@ -39,15 +42,20 @@ export const Input = {
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('wheel', (e) => { if (mouse.locked) mouse.wheel += Math.sign(e.deltaY); }, { passive: true });
     document.addEventListener('pointerlockchange', () => {
+      if (touch.on) return;
       mouse.locked = document.pointerLockElement === canvas;
       if (!mouse.locked) { mouse.left = mouse.right = false; if (Input.onUnlock) Input.onUnlock(); }
     });
   },
   lock() {
+    if (touch.on) { mouse.locked = true; return; }   // no pointer to lock on a touch screen
     if (!canvas || mouse.locked) return;
     try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ }
   },
-  unlock() { if (mouse.locked) document.exitPointerLock(); },
+  unlock() {
+    if (touch.on) { mouse.locked = false; mouse.left = mouse.right = false; return; }
+    if (mouse.locked) document.exitPointerLock();
+  },
   setEnabled(v) { enabled = v; },
   key(code) { return enabled && down.has(code); },
   any(...codes) { if (!enabled) return false; for (const c of codes) if (down.has(c)) return true; return false; },
@@ -57,7 +65,9 @@ export const Input = {
   rawKey(code) { return down.has(code); },
   axis(neg, pos, neg2, pos2) {
     if (!enabled) return 0;
-    return (down.has(pos) || down.has(pos2) ? 1 : 0) - (down.has(neg) || down.has(neg2) ? 1 : 0);
+    let v = (down.has(pos) || down.has(pos2) ? 1 : 0) - (down.has(neg) || down.has(neg2) ? 1 : 0);
+    if (touch.on) v = Math.max(-1, Math.min(1, v + (neg === 'KeyA' ? touch.mx : neg === 'KeyS' ? touch.mz : 0)));
+    return v;
   },
   // Call at the end of each frame.
   endFrame() {

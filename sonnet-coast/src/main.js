@@ -12,6 +12,7 @@ import { loadSave, writeSave, hasSave, clearSave, defaultSave } from './save.js'
 import { Vehicle } from './entities/vehicle.js';
 import { groundHeight } from './world/roads.js';
 import { POI } from './world/layout.js';
+import { Touch } from './touch.js';
 
 async function boot() {
   const canvas = document.getElementById('game');
@@ -22,6 +23,9 @@ async function boot() {
   if (G.save.settings) Object.assign(G.settings, G.save.settings);
   if (params.get('q')) { G.settings.quality = params.get('q'); G.settings.qualityChosen = true; }
 
+  Touch.init(ui, params);
+  // phones start one preset down; the automatic fallback can still drop it further
+  if (Touch.on && !G.settings.qualityChosen && !hadSave) G.settings.quality = 'medium';
   const R = createRenderer(canvas);
   Input.init(canvas);
   let game = null, world = null;
@@ -37,6 +41,7 @@ async function boot() {
     G.mode = 'play';
     G.audio.resume();
     lock();
+    Touch.fullscreen();
   };
   const start = (fresh) => {
     if (fresh) {
@@ -57,6 +62,7 @@ async function boot() {
     R.camera.fov = 62; R.camera.updateProjectionMatrix();
     G.cam.first = true; G.cam.yaw = Math.PI / 2;
     lock();
+    Touch.fullscreen();
     if (!G.missions.done('intro')) game.introT = 1.2;
     else G.hud.toast('Welcome back, Kestrel. Jobs are marked on your map.');
     writeSave();
@@ -102,7 +108,7 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (document.hidden && G.mode === 'play') pause(); });
 
   R.renderer.info.autoReset = false;
-  window.__dbg = { G, R, world, game, THREE, Input, Vehicle, groundHeight, POI, emit, freeze: false, fixedDt: 0, noRender: false, noAutoPause: false };
+  window.__dbg = { G, R, world, game, THREE, Input, Touch, Vehicle, groundHeight, POI, emit, freeze: false, fixedDt: 0, noRender: false, noAutoPause: false };
   let last = performance.now(), t = 0;
   const handleKeys = () => {
     if (G.mode === 'play') {
@@ -118,6 +124,7 @@ async function boot() {
     let dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (window.__dbg.fixedDt) dt = window.__dbg.fixedDt;
     handleKeys();
+    Touch.update();
     Input.setEnabled(G.mode === 'play');
     if (!window.__dbg.freeze) {
       if (G.mode === 'play') { t += dt; game.update(dt, t); }

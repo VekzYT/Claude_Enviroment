@@ -15,29 +15,11 @@ import { clamp, formatTokens, catmullRom } from '../util/math.js';
 import { RNG, rand, pick } from '../util/rng.js';
 import { PAL } from '../world/palette.js';
 import { PED_LOOKS } from '../entities/pedlooks.js';
+import { Job, fmtTime } from './job.js';
+import { TailLights, SignalLoss, HotPursuit, WakeUpCall, CourierRush, GlidePath, WeightsJob } from './more.js';
+import { ramps } from '../world/roads.js';
 
 const P = {};
-const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-
-// ------------------------------------------------------------------ base class
-class Job {
-  constructor(M) { this.M = M; this.vehicles = []; this.rings = []; this.step = ''; this.t = 0; this.offs = []; }
-  obj(text, dest = null, blips = null) { this.M.setObjective(text, dest, blips); }
-  say(who, text) { G.hud.say(who, text); }
-  spawn(type, x, z, heading, opts = {}) { const v = new Vehicle(type, x, z, heading, { ...opts, mission: true }); this.vehicles.push(v); return v; }
-  ring(x, z, r = 6, color = PAL.neonAmber, y = null) { const m = this.M.makeRing(x, z, r, color, y); this.rings.push(m); return m; }
-  dropRing(m) { if (!m) return; G.scene.remove(m.mesh); const i = this.rings.indexOf(m); if (i >= 0) this.rings.splice(i, 1); }
-  inRing(m, pos, extra = 0) { return m && Math.hypot(pos.x - m.x, pos.z - m.z) < m.r + extra && Math.abs(pos.y - m.y) < 6; }
-  listen(name, fn) { on(name, fn); this.offs.push([name, fn]); }
-  pass(reward, sub = '') { this.M.finish(true, reward, sub); }
-  fail(reason) { this.M.finish(false, 0, reason); }
-  cleanup() {
-    for (const r of this.rings.slice()) this.dropRing(r);
-    for (const v of this.vehicles) { v.mission = false; v.keep = false; if (v !== G.player.vehicle) v.lastUsed = -999; }
-    for (const [name, fn] of this.offs) { const l = G.events.get(name); if (l) { const i = l.indexOf(fn); if (i >= 0) l.splice(i, 1); } }
-  }
-  update() {}
-}
 
 // ------------------------------------------------------------------ intro
 class Intro extends Job {
@@ -45,7 +27,7 @@ class Intro extends Job {
     this.say('MERIDIAN', 'Kestrel. Officially this call is not happening, and neither are you.');
     this.say('MERIDIAN', 'Field Ops has problems that cannot go in an incident report. You are how they get solved.');
     this.say('MERIDIAN', 'There is a Haiku GT outside your building. Bring it to Claude Tower. Try to arrive with all four wheels.');
-    this.car = G.game.starterCar && !G.game.starterCar.removed && !G.game.starterCar.destroyed ? G.game.starterCar : this.spawn('sport', POI.safehouse.x + 15, POI.safehouse.z + 5.5, Math.PI / 2, { paint: 0xff7a59 });
+    this.car = G.game.starterCar && !G.game.starterCar.removed && !G.game.starterCar.destroyed ? G.game.starterCar : this.spawn('sport', POI.safehouse.x + 15, POI.safehouse.z + 5.5, Math.PI / 2, { paint: 0xd97757 });
     this.step = 'car';
     this.tips = 0;
   }
@@ -54,7 +36,7 @@ class Intro extends Job {
     if (this.step === 'car') {
       const ok = this.car && !this.car.removed && !this.car.destroyed;
       this.obj(ok ? 'Get in the <em>Haiku GT</em> outside the safehouse' : 'Find <em>any vehicle</em>', ok ? this.car.pos : null, ok ? [{ x: this.car.pos.x, z: this.car.pos.z, type: 'vehicle' }] : null);
-      if (pl.vehicle) { this.step = 'drive'; this.dest = this.ring(POI.tower.x, POI.tower.z + 14, 7); G.hud.toast('W A S D to drive · Space to drift · Shift for nitro'); }
+      if (pl.vehicle) { this.step = 'drive'; this.dest = this.ring(POI.tower.stop.x, POI.tower.stop.z, 6); G.hud.toast('W A S D to drive · Space to drift · Shift for nitro'); }
     } else if (this.step === 'drive') {
       this.obj('Drive to <em>Claude Tower</em> downtown', this.dest);
       this.t += dt;
@@ -210,7 +192,7 @@ class Heist extends Job {
         this.M.interacting = true;
         G.hud.prompt('<kbd>E</kbd>Hold to pull the data core');
         if (Input.key('KeyE')) { this.grab += dt; G.hud.progress(this.grab / 2.2, 'EXTRACTING'); } else { this.grab = Math.max(0, this.grab - dt); G.hud.progress(this.grab > 0 ? this.grab / 2.2 : null); }
-        if (this.grab >= 2.2) { G.hud.progress(null); emit('sfx', 'pickup'); this.step = 'return'; this.hot = false; this.dest = this.ring(POI.tower.x, POI.tower.z + 14, 7); this.say('MERIDIAN', 'Got it. Bring it home to the tower.'); }
+        if (this.grab >= 2.2) { G.hud.progress(null); emit('sfx', 'pickup'); this.step = 'return'; this.hot = false; this.dest = this.ring(POI.tower.stop.x, POI.tower.stop.z, 6); this.say('MERIDIAN', 'Got it. Bring it home to the tower.'); }
       } else if (this.grab > 0) { this.grab = 0; G.hud.progress(null); }
       return;
     }
@@ -453,7 +435,7 @@ const RACES = {
   neon: {
     id: 'neon', title: 'Neon Sprint', laps: 2, pace: 0.86, prize: 1600, loan: 'sport', gridW: 2.6,
     allow: ['sport', 'sedan', 'compact', 'prototype', 'police', 'truck'], rivals: ['sport', 'sport', 'sport'],
-    start: [150, 5.5], points: [[440, 5.5], [794, 8], [794, 294], [440, 303.5], [108, 296], [105, 10]],
+    start: [150, 5.5], points: [[440, 5.5], [794, 8], [794, 294], [440, 296.5], [106, 292], [105, 10]],
     intro: 'Two laps: Sonnet Boulevard to the shore, down Shoreline, back on Eighth and up Constitution. Traffic is your problem.',
   },
   rally: {
@@ -468,13 +450,21 @@ const RACES = {
 // ------------------------------------------------------------------ manager
 const JOBS = [
   { id: 'intro', title: 'Off the Books', where: 'Context Window Lofts', cls: Intro, reward: 500, at: () => ({ x: POI.safehouse.x - 7, z: POI.safehouse.z + 4 }), type: 'mission', foot: false },
-  { id: 'prototype', title: 'Grand Theft Prototype', where: 'Claude Tower', cls: Prototype, reward: 4000, req: 'intro', at: () => ({ x: POI.tower.x - 12, z: POI.tower.z + 4 }), type: 'mission' },
-  { id: 'heist', title: 'Badge Swap', where: 'Claude Tower', cls: Heist, reward: 4000, req: 'intro', at: () => ({ x: POI.tower.x + 12, z: POI.tower.z + 4 }), type: 'mission' },
+  { id: 'prototype', title: 'Grand Theft Prototype', where: 'Claude Tower', cls: Prototype, reward: 4000, req: 'intro', at: () => ({ x: POI.tower.x - 24, z: POI.tower.z }), type: 'mission' },
+  { id: 'heist', title: 'Badge Swap', where: 'Claude Tower', cls: Heist, reward: 4000, req: 'intro', at: () => ({ x: POI.tower.x + 24, z: POI.tower.z }), type: 'mission' },
   { id: 'bayou', title: 'Bayou Run', where: 'Port of Sonnet', cls: BayouRun, reward: 3500, req: 'intro', at: () => ({ x: POI.port.x, z: POI.port.z - 52 }), type: 'mission' },
-  { id: 'heat', title: 'Heat Check', where: 'Token Row', cls: HeatCheck, reward: 2500, req: 'intro', at: () => ({ x: 470, z: 16 }), type: 'activity' },
-  { id: 'neon', title: 'Neon Sprint (street race)', where: 'Sonnet Boulevard', cls: Race, def: RACES.neon, reward: 1600, req: 'intro', at: () => ({ x: 134, z: 15.5 }), type: 'race', cleanOnly: true },
+  { id: 'heat', title: 'Heat Check', where: 'Token Row', cls: HeatCheck, reward: 2500, req: 'intro', at: () => ({ x: 470, z: 13.2 }), type: 'activity' },
+  { id: 'neon', title: 'Neon Sprint (street race)', where: 'Sonnet Boulevard', cls: Race, def: RACES.neon, reward: 1600, req: 'intro', at: () => ({ x: 168, z: 12.6 }), type: 'race', cleanOnly: true },
   { id: 'rally', title: 'Glowwood Rally (dirt race)', where: 'Glowwood Lookout', cls: Race, def: RACES.rally, reward: 1900, req: 'intro', at: () => ({ x: -252, z: -708 }), type: 'race', cleanOnly: true },
+  { id: 'tail', title: 'Tail Lights', where: 'Vantablack Labs', cls: TailLights, reward: 2200, req: 'intro', at: () => ({ x: 430, z: -309.2 }), type: 'mission', cleanOnly: true },
+  { id: 'signal', title: 'Signal Loss', where: 'Alignment Park', cls: SignalLoss, reward: 2400, req: 'intro', at: () => ({ x: 30, z: 13.2 }), type: 'mission' },
+  { id: 'pursuit', title: 'Hot Pursuit', where: 'Sonnet Boulevard West', cls: HotPursuit, reward: 2600, req: 'intro', at: () => ({ x: -130, z: 13.2 }), type: 'mission' },
+  { id: 'wake', title: 'Wake Up Call', where: 'Sonnet Pier', cls: WakeUpCall, reward: 2800, req: 'intro', at: () => ({ x: PIER.x1 - 100, z: 5.5 }), type: 'mission' },
+  { id: 'courier', title: 'Courier Rush (deliveries)', where: 'Haiku Express', cls: CourierRush, reward: 900, req: 'intro', at: () => ({ x: 250, z: 209.2 }), type: 'activity' },
+  { id: 'glide', title: 'Glide Path (hover-bike trial)', where: 'Sonnet Pier', cls: GlidePath, reward: 1600, req: 'intro', at: () => ({ x: PIER.x0 + 11, z: -4.5 }), type: 'activity', cleanOnly: true },
+  { id: 'weights', title: 'The Weights Job', where: 'Claude Tower', cls: WeightsJob, reward: 9000, reqAll: ['prototype', 'heist', 'bayou', 'tail'], at: () => ({ x: POI.tower.x, z: POI.tower.z }), type: 'mission', finale: true, cleanOnly: true },
 ];
+const STUNT_PAY = 400, STUNT_ALL = 3000;
 const CONTRACT_TYPES = ['sport', 'sedan', 'compact', 'truck', 'hoverbike', 'van', 'buggy'];
 
 export class Missions {
@@ -501,8 +491,13 @@ export class Missions {
   jobById(id) { return JOBS.find((j) => j.id === id); }
   resetWeights() { for (const w of this.weights) { w.got = G.save.weights.includes(w.id); w.mesh.visible = !w.got; } }
   get weightTotal() { return this.weights.length; }
+  unlocked(j) { return (!j.req || this.done(j.req)) && (!j.reqAll || j.reqAll.every((id) => this.done(id))); }
+  get stuntTotal() { return ramps.length; }
   catalog() {
-    return JOBS.map((j) => ({ title: j.title, where: j.where, reward: j.reward, done: this.done(j.id), times: G.save.missions[j.id] || 0, locked: !!j.req && !this.done(j.req) }));
+    return JOBS.map((j) => ({
+      title: j.title, where: j.where, reward: j.reward, done: this.done(j.id), times: G.save.missions[j.id] || 0, locked: !this.unlocked(j),
+      needs: j.reqAll && !this.unlocked(j) ? j.reqAll.filter((id) => !this.done(id)).map((id) => this.jobById(id).title).join(', ') : '',
+    }));
   }
 
   // ---- markers -------------------------------------------------------------------
@@ -534,8 +529,8 @@ export class Missions {
     this.addMarker({ id: 'chop', x: POI.gator.x + 2, z: POI.gator.z - 8, r: 6, color: PAL.neonLime, label: '', blip: 'garage', name: 'Gator Garage', show: () => !!G.save.chopUnlocked, chop: true, use: () => this.chopUse() });
     for (const j of JOBS) {
       const p = j.at();
-      this.addMarker({ id: 'job:' + j.id, job: j, x: p.x, z: p.z, r: j.type === 'race' ? 5 : 2.4, color: j.type === 'race' ? PAL.neonMagenta : j.type === 'activity' ? 0xc77dff : PAL.neonAmber,
-        label: `Start: ${j.title}`, blip: j.type, name: j.title, show: () => !this.active && (!j.req || this.done(j.req)) && (j.id !== 'intro' || !this.done('intro')), use: () => this.begin(j) });
+      this.addMarker({ id: 'job:' + j.id, job: j, x: p.x, z: p.z, r: j.type === 'race' ? 5 : 2.4, color: j.finale ? 0xff6b4a : j.type === 'race' ? PAL.neonMagenta : j.type === 'activity' ? 0xc77dff : PAL.neonAmber,
+        label: `Start: ${j.title}`, blip: j.type, name: j.title, show: () => !this.active && this.unlocked(j) && (j.id !== 'intro' || !this.done('intro')), use: () => this.begin(j) });
     }
     void M;
   }
@@ -613,7 +608,10 @@ export class Missions {
     this.timerText = '';
     G.hud.progress(null);
     if (pass) {
+      const fin = JOBS.find((q) => q.finale);
+      const wasOpen = this.unlocked(fin);
       G.save.missions[j.id] = (G.save.missions[j.id] || 0) + 1;
+      if (!wasOpen && this.unlocked(fin)) G.hud.say('MERIDIAN', 'The crew is ready for the big one. Come and see me at Claude Tower.');
       G.save.started = true;
       addTokens(reward, 'job');
       G.hud.banner('JOB DONE', `${j.title} · +${formatTokens(reward)} ◈${sub ? ' · ' + sub : ''}`, '', 5);
@@ -706,8 +704,38 @@ export class Missions {
         writeSave();
       }
     }
+    this.stunts(dt);
     this.blipT -= dt;
     if (this.blipT <= 0) { this.blipT = 0.5; this.refreshBlips(); }
+  }
+  // Stunt jumps: leave the ground off one of the ramps, stay up, come down in one piece.
+  stunts(dt) {
+    const v = G.player.vehicle;
+    if (!v || v.cls === 'boat' || v.destroyed && !v.sunk) { this.jump = null; return; }
+    const wet = v.sinkT > 0 || v.sunk;
+    if (!v.onGround && !wet) {
+      if (!this.jump) {
+        let ri = -1;
+        ramps.forEach((r, i) => { if (Math.hypot(r.x - v.pos.x, r.z - v.pos.z) < r.len / 2 + 10) ri = i; });
+        this.jump = { ri, x: v.pos.x, z: v.pos.z, t: 0 };
+      }
+      this.jump.t += dt;
+      return;
+    }
+    const j = this.jump;
+    if (!j) return;
+    this.jump = null;
+    const far = Math.hypot(v.pos.x - j.x, v.pos.z - j.z);
+    if (j.ri < 0 || j.t < 0.7 || far < 10) return;
+    const list = G.save.stunts || (G.save.stunts = []);
+    if (list.includes(j.ri)) { G.hud.toast(`${far.toFixed(0)} m jump · ${j.t.toFixed(1)} s in the air`); return; }
+    list.push(j.ri);
+    const all = list.length === ramps.length;
+    addTokens(STUNT_PAY + (all ? STUNT_ALL : 0), 'stunt jump');
+    G.hud.toast(`Stunt jump ${list.length}/${ramps.length} — ${far.toFixed(0)} m, ${j.t.toFixed(1)} s`, '#ffb347');
+    if (all) G.hud.banner('ALL STUNT JUMPS LANDED', 'Gravity sends its regards', 'cool', 5);
+    emit('sfx', 'collectible');
+    writeSave();
   }
   setTimer() {
     const el = G.hud.el;

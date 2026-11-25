@@ -295,7 +295,7 @@ export class Weapons {
         if (this.hackCool > 0 || !tg || (tg.kind !== 'vehicle' && tg.kind !== 'drone')) { emit('sfx', 'hackFail'); return; }
         this.hackCool = 5; this.facingT = 0.6;
         emit('sfx', 'hack');
-        if (tg.kind === 'drone') { G.police.hackDrone(tg.obj); emit('crime', 'hackPolice', tg.x, tg.z); }
+        if (tg.kind === 'drone') { G.police.hackDrone(tg.obj); emit('crime', 'hackPolice', tg.x, tg.z, tg.obj); }
         else {
           const v = tg.obj;
           v.emp(9); v.locked = false; v.sirenOn = false;

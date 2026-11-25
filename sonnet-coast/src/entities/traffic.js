@@ -31,6 +31,8 @@ export class LaneDriver {
   remaining() { return this.dir > 0 ? this.edge.len - this.s : this.s; }
   endNode() { return this.dir > 0 ? this.edge.b : this.edge.a; }
   chooseNext() {
+    // a planned route (jobs use this) takes priority over wandering
+    if (this.route && this.route.length) { this.next = this.route.shift(); return; }
     const node = this.endNode();
     let opts = node.edges.filter((e) => e !== this.edge && e.type !== 'dirt');
     if (this.only) { const f = opts.filter(this.only); if (f.length) opts = f; }
