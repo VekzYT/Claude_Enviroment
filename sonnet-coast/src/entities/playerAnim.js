@@ -95,7 +95,7 @@ export class PlayerAnim {
       case 'busted':
         // kneeling, hands behind the head
         o[DROP] = -0.36; o[LTP] = o[RTP] = 0.02; o[LKN] = o[RKN] = 1.62; o[LFT] = o[RFT] = 0.5; o[LTR] = o[RTR] = 0.12;
-        o[LAP] = o[RAP] = -2.55; o[LAR] = o[RAR] = 0.95; o[LEL] = o[REL] = -2.25; o[HP] = 0.25; o[SP] = 0.05;
+        o[LAP] = o[RAP] = 0.25; o[LAR] = o[RAR] = 2.1; o[LAY] = o[RAY] = 1.5; o[LEL] = o[REL] = -2.1; o[HP] = 0.25; o[SP] = 0.05;
         o[LOCO] = 0; o[SWL] = o[SWR] = 0;
         return 7;
       case 'ragdoll': case 'dead': {
@@ -225,7 +225,8 @@ export class PlayerAnim {
     const pl = this.pl, s = pl.speed;
     const crawl = smoothstep(0.6, 1.8, s);
     o[LOCO] = 0; o[SWL] = o[SWR] = 0;
-    o[PIVY] = RIG.HIP_Y;
+    // treading water sits low, shoulders at the surface; the crawl lies flat along it
+    o[PIVY] = RIG.HIP_Y; o[DROP] = lerp(-0.42, 0, crawl);
     o[PITCH] = lerp(0.22, 1.32, crawl);
     o[SP] = lerp(0.05, -0.12, crawl); o[HP] = lerp(0.0, -0.55, crawl);
     // treading water: sculling hands, slow egg-beater legs (the crawl itself is an overlay)
@@ -367,15 +368,19 @@ export class PlayerAnim {
       _tL.set(0.38, 0.98 - tuck * 0.04, 0.8 + st * 0.05); _tR.set(-0.38, 0.98 - tuck * 0.04, 0.8 - st * 0.05);
       this.ikL = this.ikR = 1; this.ikSpace = 'model';
       return 10;
-    } else {
-      // hands on the wheel at ten to two, turning it; head looking into the turn
-      o[LTP] = o[RTP] = -1.45; o[LKN] = o[RKN] = 1.35; o[LFT] = o[RFT] = -0.1; o[LTR] = 0.08; o[RTR] = 0.05;
-      o[SP] = -0.06; o[HY] = -st * 0.28; o[SR] = st * 0.04;
-      const a = st * 1.15, R = 0.17;
-      _tL.set(Math.cos(0.5 + a) * R, 0.24 + Math.sin(0.5 + a) * R, 0.44 - Math.sin(0.5 + a) * R * 0.35);
-      _tR.set(Math.cos(Math.PI - 0.5 + a) * R, 0.24 + Math.sin(Math.PI - 0.5 + a) * R, 0.44 - Math.sin(Math.PI - 0.5 + a) * R * 0.35);
     }
-    this.ikL = this.ikR = 1; this.ikSpace = 'torso';
+    // hands on the wheel at ten to two, turning it, head looking into the turn: seated in a car,
+    // standing at the helm of a boat (wheel positions in model space, see Player.seat)
+    const boat = v.cls === 'boat';
+    if (boat) { crouch(o, 0.05); o[SP] = 0.18; o[LTP] -= 0.1; o[RTP] += 0.12; }
+    else { o[LTP] = o[RTP] = -1.45; o[LKN] = o[RKN] = 1.35; o[LFT] = o[RFT] = -0.1; o[LTR] = 0.08; o[RTR] = 0.05; o[SP] = 0.3; }
+    o[HY] = -st * 0.28; o[SR] = st * 0.04;
+    const cy = boat ? 0.95 : 1.05, cz = boat ? 0.34 : 0.67, tilt = boat ? 0.6 : 0.5, R = 0.16, a = st * 1.15;
+    for (const [tg, a0] of [[_tL, 0.5], [_tR, Math.PI - 0.5]]) {
+      const c = Math.cos(a0 + a) * R, sn = Math.sin(a0 + a) * R;
+      tg.set(c, cy + sn * Math.cos(tilt), cz - sn * Math.sin(tilt));
+    }
+    this.ikL = this.ikR = 1; this.ikSpace = 'model';
     return 10;
   }
 

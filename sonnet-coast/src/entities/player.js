@@ -166,8 +166,11 @@ export class Player {
     this.mv = null; this.standOn = null;
     if (v.T.open) {
       v.m.body.add(this.model);
-      // hip joints just above the cushion (a rider sits a little forward, towards the bars)
-      this.model.position.set(v.m.seat[0], v.m.seat[1] + 0.12 - (RIG.HIP_Y + RIG.THIGH_Y), v.m.seat[2] + (v.T.bike || v.cls === 'hover' ? 0.1 : 0));
+      // hip joints just above the cushion, a little forward of its middle (towards the bars or the
+      // wheel); a boat is driven standing at the helm
+      const S = v.m.seat;
+      if (v.cls === 'boat') this.model.position.set(S[0], S[1] - 0.93, S[2] + 0.28);
+      else this.model.position.set(S[0], S[1] + 0.12 - (RIG.HIP_Y + RIG.THIGH_Y), S[2] + (v.T.bike || v.cls === 'hover' ? 0.1 : 0.12));
       this.model.rotation.set(0, 0, 0);
       this.model.scale.set(1, 1, 1);
       this.model.visible = true;
@@ -289,7 +292,7 @@ export class Player {
     const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
     // C: roll (a sidestep while aiming), or a slide out of a sprint; in the air it readies a break-fall
     if (Input.hit('KeyC') && !this.swimming) {
-      if (!this.onGround) this.rollQueued = 0.45;
+      if (!this.onGround) this.rollQueued = 0.6;
       else if (this.speed > 5.2 && (sprintKey || this.speed > 6.5)) return this.startSlide();
       else return this.startRoll(d.mag > 0.01 ? d.x : this.aiming ? -fx : fx, d.mag > 0.01 ? d.z : this.aiming ? -fz : fz);
     }
