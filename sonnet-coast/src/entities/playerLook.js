@@ -343,7 +343,7 @@ export function dressModel(P, flat, o) {
   if (o.pack === 1) tb |= bits(T.PACK);
   if (o.pack === 2) tb |= bits(T.CROSS);
   setPart(Pp.torso, jacket, tB, skin, bag, tb, fem);
-  setRec(Pp.torsoGear, 0x3a3d44, 0x24262b, jacket, acc, bits(jStyle === 'Tech Shell' && TG.SHELL, jStyle === 'Tech Shell' && TG.HEM, o.vest && TG.VEST, o.pack === 1 && TG.PACKTRIM), fem);
+  setRec(Pp.torsoGear, 0x3a3d44, 0x24262b, jacket, acc, bits(jStyle === 'Tech Shell' && TG.SHELL, jStyle === 'Tech Shell' && TG.HEM, o.vest === 1 && TG.VEST, o.pack === 1 && TG.PACKTRIM), fem);
   // pelvis
   const shorts = tStyle === 'Shorts';
   setPart(Pp.pelvis, trou, 0x1d1e21, jacket, 0, bits((tStyle === 'Cargo' || tStyle === 'Jeans' || tStyle === 'Chinos') && jStyle !== 'Hoodie' && PELVIS.BELT, jStyle === 'Open Overshirt' && PELVIS.HEM), fem);
