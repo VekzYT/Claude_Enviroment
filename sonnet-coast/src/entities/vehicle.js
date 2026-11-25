@@ -60,6 +60,9 @@ export class Vehicle {
     this.stolen = false;
     this.lastUsed = -999;
     this.slip = 0; this.surface = 'asphalt'; this.speed = 0; this.fwd = 0; this.latAccel = 0;
+    // player handling states (see handling()): slide angle, drift, donut/burnout, weight on the front axle
+    this.slideAngle = 0; this.drift = false; this.driftDir = 1; this.driftSm = 0; this.driftK = 2.6; this.driftInto = 0; this.driftAge = 0;
+    this.coastT = 0; this.powerT = 0; this.liftT = 9; this.burn = false; this.burnT = 0; this.launchT = 0; this.load = 0; this.airPitch = 0; this.wheelYaw = 0;
     this.fireT = 0; this.smokeT = 0;
     this.paint = opts.paint ?? pick(T.paints);
     this.m = buildVehicleMesh(T, this.paint);
@@ -207,7 +210,7 @@ export class Vehicle {
     if (this.boosting) this.nitro = Math.max(0, this.nitro - dt / 4.2);
     else this.nitro = Math.min(1, this.nitro + dt / 13 + this.slip * dt * 0.06);
 
-    let aLat = 0, latRate = 10, surf = 'asphalt';
+    let aLat = 0, latRate = 10, surf = 'asphalt', slide0 = 0;
     const prevF = vF;
 
     if (this.cls === 'boat') {
@@ -221,9 +224,11 @@ export class Vehicle {
       vF -= vF * (afloat ? 0.22 : 3.5) * dt;
       if (bowDepth < 0.15 && vF > 1) vF -= vF * 6 * dt; // run aground
       this.steer += (steerIn * T.steer - this.steer) * Math.min(1, dt * 5);
-      const yawTarget = -this.steer * 1.9 * clamp(vF / 9, -1, 1);
+      // the handbrake lets the hull swing out and skate sideways through a turn
+      const skate = live && this.inHandbrake && afloat ? 1 : 0;
+      const yawTarget = -this.steer * 1.9 * (1 + 0.4 * skate) * clamp(vF / 9, -1, 1);
       this.angVel += (yawTarget - this.angVel) * Math.min(1, dt * 3.2);
-      aLat = afloat ? T.grip * 3.6 : 30; latRate = afloat ? 2.4 : 8;
+      aLat = afloat ? T.grip * 3.6 * (1 - 0.55 * skate) : 30; latRate = afloat ? 2.4 - 1.2 * skate : 8;
       this.onGround = true;
     } else {
       // --- cars and hover-bikes ---
@@ -235,37 +240,67 @@ export class Vehicle {
         S = SURFACES[surf];
       }
       const off = T.offroad;
+      const loose = surf === 'dirt' || surf === 'grass' || surf === 'sand' || surf === 'mud';
       const speedK = surf === 'water' ? S.speed : lerp(S.speed, 1, off);
       const gripK = lerp(S.grip, Math.min(1, S.grip + 0.4), off);
       let maxSpeed = T.maxSpeed * speedK * engineK;
       let accel = T.accel * (0.55 + 0.45 * gripK) * engineK;
       if (this.boosting) { maxSpeed *= 1.3; accel *= 1.9; }
       if (this.onGround) {
-        if (throttle > 0) {
-          if (vF < -0.5) vF += T.brake * throttle * dt;
-          else vF += accel * throttle * Math.max(0, 1 - Math.pow(Math.max(vF, 0) / maxSpeed, 2)) * dt;
-        } else if (throttle < 0) {
-          if (vF > 0.5) vF += T.brake * throttle * dt * (0.5 + 0.5 * gripK);
-          else vF += accel * 0.6 * throttle * Math.max(0, 1 - Math.pow(Math.max(-vF, 0) / (T.maxSpeed * 0.28), 2)) * dt;
-        }
-        // rolling resistance, air drag, soft limiter when the surface slows the car
-        const rollK = S.roll * (1 - off * 0.75);
-        vF -= vF * (0.05 + rollK * 0.22) * dt;
-        if (Math.abs(vF) > maxSpeed) vF -= (vF - Math.sign(vF) * maxSpeed) * Math.min(1, 2.2 * dt);
-        if (throttle === 0) vF -= Math.sign(vF) * Math.min(Math.abs(vF), 1.6 * dt);
-        if (handbrake) vF -= Math.sign(vF) * Math.min(Math.abs(vF), T.brake * (this.driver ? 0.5 : 0.9) * dt);
-        // steering: limited by lock at low speed and by grip at high speed
         this.steer += (steerIn - this.steer) * Math.min(1, dt * (this.cls === 'hover' ? 5 : 8));
         aLat = T.grip * 1.9 * gripK;
+        // weight transfer: braking loads the front tyres and sharpens the turn-in
+        this.load += (clamp(-(this.accelLong || 0) / 14, 0, 1) - this.load) * Math.min(1, dt * 6);
+        const sp0 = Math.abs(vF);
+        const yawLock = (sp0 * Math.tan(T.steer)) / T.wheelbase;
+        const yawGrip = (aLat * 1.15 * (1 + 0.3 * this.load)) / Math.max(sp0, 1);
+        if (this.driver === 'player' && live) this.handling(dt, throttle, vF, vR, Math.abs(this.steer) * yawLock > yawGrip, loose, maxSpeed);
+        else { this.drift = false; this.burn = false; }
+        slide0 = Math.atan2(vR, Math.max(vF, 0.5));
+        if (this.drift) accel *= T.driftPower;   // the rear tyres turn power into smoke
+        if (this.launchT > 0) { this.launchT -= dt; accel *= 1.7; }
+        if (!this.burn) {
+          if (throttle > 0) {
+            if (vF < -0.5) vF += T.brake * throttle * dt;
+            else vF += accel * throttle * Math.max(0, 1 - Math.pow(Math.max(vF, 0) / maxSpeed, 2)) * dt;
+          } else if (throttle < 0) {
+            if (vF > 0.5) vF += T.brake * throttle * dt * (0.5 + 0.5 * gripK);
+            else vF += accel * 0.6 * throttle * Math.max(0, 1 - Math.pow(Math.max(-vF, 0) / (T.maxSpeed * 0.28), 2)) * dt;
+          }
+          // rolling resistance, air drag, soft limiter when the surface slows the car
+          const rollK = S.roll * (1 - off * 0.75);
+          vF -= vF * (0.05 + rollK * 0.22) * dt;
+          if (Math.abs(vF) > maxSpeed) vF -= (vF - Math.sign(vF) * maxSpeed) * Math.min(1, 2.2 * dt);
+          if (throttle === 0) vF -= Math.sign(vF) * Math.min(Math.abs(vF), 1.6 * dt);
+          if (handbrake) vF -= Math.sign(vF) * Math.min(Math.abs(vF), T.brake * (this.drift ? 0.1 : this.driver ? 0.5 : 0.9) * dt);
+        }
         const sp = Math.abs(vF);
-        const yawLock = (sp * Math.tan(T.steer)) / T.wheelbase;
-        const yawGrip = (aLat * 1.15) / Math.max(sp, 1);
-        let yawTarget = -this.steer * Math.min(yawLock, yawGrip) * Math.sign(vF || 1);
-        if (this.inHandbrake && sp > 5) { yawTarget *= 1.7; aLat *= 0.34; latRate = 2.6; }
-        if (this.cls === 'hover') latRate = 3.2;
-        this.angVel += (yawTarget - this.angVel) * Math.min(1, dt * (this.inHandbrake ? 5 : 9));
+        if (this.burn) {
+          // donut (steering) or burnout (straight): the rear steps round the front wheels
+          const dir = Math.abs(this.steer) > 0.3 ? -Math.sign(this.steer) : 0;
+          this.angVel += (dir * (2.4 + T.powerSlide * 1.5) - this.angVel) * Math.min(1, dt * 2.5);
+          vF += ((dir ? 2.4 : 0) - vF) * Math.min(1, dt * 3);
+          vR += (T.wheelbase * 0.5 * this.angVel - vR) * Math.min(1, dt * 6);
+          aLat = 0;
+        } else if (this.drift) {
+          // the yaw itself is set after the lateral friction below, which bends the path
+          aLat *= T.driftGrip * (1 + 0.2 * this.driftInto) * (loose ? 1.15 : 1);
+          latRate = 2.6;
+        } else {
+          // steering: limited by lock at low speed and by grip at high speed; a hover-bike carves past its grip and slides
+          const yawLock2 = (sp * Math.tan(T.steer)) / T.wheelbase;
+          const yawGrip2 = (aLat * 1.15 * (1 + 0.3 * this.load)) / Math.max(sp, 1);
+          let yawTarget = -this.steer * Math.min(yawLock2, yawGrip2 * (this.cls === 'hover' ? 1.5 : 1)) * Math.sign(vF || 1);
+          if (this.inHandbrake && sp > 5) { yawTarget *= 1.7; aLat *= 0.34; latRate = 2.6; }
+          if (this.cls === 'hover') latRate = Math.min(latRate, 2.4);
+          this.angVel += (yawTarget - this.angVel) * Math.min(1, dt * (this.inHandbrake ? 5 : 9));
+        }
       } else {
-        this.angVel *= Math.max(0, 1 - dt * 0.6);
+        this.drift = this.drift && this.driver === 'player';
+        this.burn = false;
+        // in the air the player can still yaw a little (the pedals pitch the nose, see vertical())
+        const air = this.driver === 'player' && live;
+        this.angVel += ((air ? -steerIn * 1.5 : 0) - this.angVel) * Math.min(1, dt * (air ? 1.8 : 0.6));
         aLat = 0;
       }
     }
@@ -275,9 +310,17 @@ export class Vehicle {
       const cut = Math.min(Math.abs(vR) * latRate * dt, aLat * dt);
       vR -= Math.sign(vR) * cut;
     }
+    if (this.drift && this.onGround && !this.burn) {
+      // hold the slide angle on its target: follow the path as friction and throttle bend it, plus a correction
+      const slide1 = Math.atan2(vR, Math.max(vF, 0.5));
+      const pathRate = (slide0 - slide1) / Math.max(dt, 1e-4);
+      this.angVel = clamp(pathRate + this.driftK * (this.driftSm - slide0), -3.5, 3.5);
+    }
     this.latAccel = vF * this.angVel;
     const slideSpeed = Math.abs(vR);
+    this.slideAngle = this.onGround && vF > 1 ? Math.atan2(vR, vF) : 0;
     this.slip = this.onGround && this.cls === 'car' ? clamp((slideSpeed - 1.6) / 7, 0, 1) : 0;
+    if (this.burn) this.slip = 1;
     if (this.cls === 'car' && this.onGround && throttle !== 0 && Math.abs(vF) < 4 && Math.abs(throttle) > 0.8 && surf !== 'asphalt' && surf !== 'concrete') this.slip = Math.max(this.slip, 0.3);
     this.surface = surf;
 
@@ -299,6 +342,54 @@ export class Vehicle {
     this.vertical(dt, t);
     this.effects(dt, t);
     this.syncMesh(dt, t);
+  }
+
+  // Player-only handling: drifts (handbrake, power-oversteer, lift-off and trail-brake entries), donuts and
+  // burnouts. AI drivers never enter these states, so traffic, police and rivals keep plain grip driving.
+  handling(dt, throttle, vF, vR, atLimit, loose, maxSpeed) {
+    const T = this.T, hb = this.inHandbrake, steer = this.steer;
+    if (this.cls === 'car' && hb && throttle > 0.8 && Math.abs(vF) < (this.burn ? 9 : 6)) {
+      if (!this.burn) this.burnT = 0;
+      this.burn = true; this.drift = false; this.burnT += dt;
+      return;
+    }
+    // let go of the handbrake after a burnout with the throttle pinned: launch
+    if (this.burn) { if (this.burnT > 0.6 && throttle > 0.8) this.launchT = 0.9; this.burn = false; }
+    const looseK = loose ? T.looseSlide : 0;
+    const s = Math.atan2(vR, Math.max(vF, 0.5));
+    this.liftT = throttle > 0.7 ? 0 : this.liftT + dt;
+    if (!this.drift) {
+      if (vF < 8) { this.powerT = 0; return; }
+      const dir = Math.abs(steer) > 0.25 ? -Math.sign(steer) : 0;   // +1 = into a left-hand slide
+      let enter = 0;
+      if (hb && (dir || Math.abs(this.angVel) > 0.3)) enter = dir || Math.sign(this.angVel);
+      else if (dir && atLimit && Math.abs(steer) > 0.6) {
+        // only when pushing hard: ordinary turns at junction speeds stay on the grip model
+        const power = T.powerSlide + looseK, fast = loose ? 10 : 20;
+        if (throttle > 0.85 && vF > fast && vF < maxSpeed * 0.85) this.powerT += dt * power;
+        else if (throttle < -0.3 && vF > 16) this.powerT += dt * (power + T.liftOff) * 1.4;   // trail-braking rotates the car
+        else this.powerT = Math.max(0, this.powerT - dt);
+        if (this.powerT > 0.5) enter = dir;
+        else if (throttle <= 0.05 && this.liftT < 0.25 && vF > 19 && T.liftOff > 0) { enter = dir; this.angVel += dir * 0.6 * T.liftOff; }
+      } else this.powerT = Math.max(0, this.powerT - dt * 2);
+      if (!enter) return;
+      this.drift = true; this.driftDir = enter; this.driftAge = 0; this.coastT = 0; this.powerT = 0; this.driftSm = s;
+    }
+    // in the slide: throttle and steering into the turn set the angle, steering out of it catches the car;
+    // with the wheel straight it settles at a holdable angle (a little countersteer assist for keyboards)
+    this.driftAge += dt;
+    if (Math.abs(s) > 0.12) this.driftDir = Math.sign(s);
+    const d = this.driftDir;
+    const into = clamp(-steer * d, -1, 1), thr = Math.max(0, throttle);
+    this.coastT = thr > 0.1 || hb ? 0 : this.coastT + dt;
+    const A = T.driftAngle * (1 + 0.3 * looseK);
+    let mag = A * ((0.3 + 0.55 * thr) * (1 + 0.5 * into) + Math.min(0, into) * 0.6 + (hb ? 0.35 : 0));
+    if (this.driftAge > 0.5) mag *= Math.max(0, 1 - this.coastT / 0.9);   // off the throttle the slide dies away
+    mag = clamp(mag, -0.3 * A, Math.min(1.05, 1.5 * A));
+    this.driftSm += (d * mag - this.driftSm) * Math.min(1, dt * 4);
+    this.driftInto = into;
+    this.driftK = (hb ? 4 : into < -0.3 ? 3.6 : 2.6) * clamp(Math.sqrt(1500 / T.mass), 0.7, 1.15);
+    if (vF < 6 || (this.driftAge > 0.35 && Math.abs(s) < 0.09 && Math.abs(this.driftSm) < 0.15) || Math.abs(s) > 1.9) this.drift = false;
   }
 
   collideStatic() {
@@ -378,9 +469,13 @@ export class Vehicle {
         tr = Math.atan2(gL - gRt, T.wid);
       }
     } else {
-      tp = clamp(-this.vel.y * 0.02, -0.5, 0.5);
+      // the pedals pitch the nose in the air: throttle dips it, brake lifts it
+      // (gently for the throttle, which most players hold through a jump anyway)
+      if (this.driver === 'player' && this.disabled <= 0 && !this.destroyed) this.airPitch = clamp(this.airPitch + this.inThrottle * dt * (this.inThrottle > 0 ? 0.8 : 1.5), -0.6, 0.6);
+      tp = clamp(-this.vel.y * 0.02 + this.airPitch, -0.9, 0.9);
       tr = this.roll;
     }
+    if (this.onGround) this.airPitch = 0;
     const k = Math.min(1, dt * (this.onGround ? 10 : 2));
     this.pitch += (tp - this.pitch) * k;
     this.roll += (tr - this.roll) * k;
@@ -420,20 +515,20 @@ export class Vehicle {
       return;
     }
     if (this.disabled > 0 && Math.random() < dt * 9) fx.zap(this.pos.x + rand(-1, 1), this.pos.y + T.hgt * 0.6, this.pos.z + rand(-1, 1), 2, 0.6);
-    // tyres
+    // tyres: smoke, dust or spray off the rear wheels while they slide, and rubber laid down through a drift
     if (this.cls === 'car' && this.onGround) {
       const hard = this.surface === 'asphalt' || this.surface === 'concrete';
-      if (this.slip > 0.12) {
+      const burn = this.burn ? 1 : 0;
+      if (this.slip > 0.12 || burn) {
         const rz = -T.wheelbase / 2, hw = T.wid / 2 - 0.12;
-        for (const side of [-1, 1]) {
+        const k = Math.max(this.slip, burn);
+        const rate = (this.drift ? 34 : 12) * k + burn * 30;   // puffs per wheel per second
+        const moving = this.speed > 1;
+        const dx = moving ? this.vel.x / this.speed : s, dz = moving ? this.vel.z / this.speed : c;
+        for (let side = -1; side <= 1; side += 2) {
           const wx = this.pos.x + s * rz + -c * hw * side, wz = this.pos.z + c * rz + s * hw * side;
-          if (hard) {
-            fx.skid(this.id * 2 + (side > 0 ? 1 : 0), wx, this.groundY, wz, this.vel.x / (this.speed + 0.01), this.vel.z / (this.speed + 0.01), 0.26, 0.25 + this.slip * 0.4);
-            if (Math.random() < this.slip * dt * 40) fx.smoke(wx, this.groundY + 0.2, wz, { dark: 0.75, size: 1.5, life: 0.9, up: 0.7, alpha: 0.28 });
-          } else if (Math.random() < dt * 30) {
-            const col = this.surface === 'sand' ? [0.78, 0.68, 0.48] : this.surface === 'mud' ? [0.24, 0.2, 0.13] : this.surface === 'grass' ? [0.36, 0.4, 0.22] : [0.5, 0.4, 0.28];
-            fx.dust(wx, this.groundY + 0.2, wz, col[0], col[1], col[2], 2.2);
-          }
+          if (this.surface !== 'water' && this.surface !== 'grass') fx.skid(this.id * 2 + (side > 0 ? 1 : 0), wx, this.groundY, wz, dx, dz, 0.26, hard ? 0.25 + k * 0.4 : 0.16);
+          for (let n = rate * dt + Math.random(); n >= 1; n--) fx.tyreSmoke(wx, this.groundY + 0.2, wz, this.vel.x * 0.3, this.vel.z * 0.3, this.surface, k);
         }
       } else if (!hard && this.speed > 9 && this.surface !== 'water' && Math.random() < dt * 14) {
         const col = this.surface === 'sand' ? [0.78, 0.68, 0.48] : this.surface === 'mud' ? [0.24, 0.2, 0.13] : this.surface === 'grass' ? [0.36, 0.4, 0.22] : [0.5, 0.4, 0.28];
@@ -441,8 +536,15 @@ export class Vehicle {
       }
       if (this.surface === 'water' && this.speed > 3 && Math.random() < dt * 20) fx.spray(this.pos.x, 0.1, this.pos.z, -this.vel.x * 0.2, -this.vel.z * 0.2, 2);
     }
-    if (this.cls === 'boat' && this.speed > 4 && Math.random() < dt * 40) {
-      fx.spray(this.pos.x - s * T.len * 0.5, 0.1, this.pos.z - c * T.len * 0.5, -this.vel.x * 0.25, -this.vel.z * 0.25, 2);
+    if (this.cls === 'boat' && this.speed > 4) {
+      if (Math.random() < dt * 40) fx.spray(this.pos.x - s * T.len * 0.5, 0.1, this.pos.z - c * T.len * 0.5, -this.vel.x * 0.25, -this.vel.z * 0.25, 2);
+      // carving: a sheet of spray thrown off the outside of the turn
+      const carve = Math.abs(this.angVel) * this.speed + Math.abs(this.slideAngle) * this.speed * 0.5;
+      if (carve > 5 && Math.random() < dt * carve * 3) {
+        const side = this.angVel > 0 ? 1 : -1, out = 3 + carve * 0.35;
+        const ox = -c * side, oz = s * side;
+        fx.spray(this.pos.x + ox * T.wid * 0.5 + s * T.len * 0.1, 0.1, this.pos.z + oz * T.wid * 0.5 + c * T.len * 0.1, ox * out + this.vel.x * 0.4, oz * out + this.vel.z * 0.4, 3);
+      }
     }
     if (this.cls === 'hover' && this.groundY <= WATER_Y + 0.05 && this.speed > 5 && Math.random() < dt * 25) fx.spray(this.pos.x, 0.1, this.pos.z, -this.vel.x * 0.2, -this.vel.z * 0.2, 1);
     if (this.boosting) {
@@ -459,7 +561,7 @@ export class Vehicle {
     const wob = this.wobble ? Math.sin(t * 17 + this.id) * this.wobble * clamp(this.speed / 12, 0, 1) : 0;
     this.mesh.rotation.set(this.pitch, this.heading, this.roll + wob);
     // body lean and squat
-    const rollT = this.cls === 'hover' ? clamp(-this.latAccel * 0.035, -0.5, 0.5) : clamp(this.latAccel * 0.006, -0.09, 0.09);
+    const rollT = this.cls === 'hover' ? clamp(-this.latAccel * 0.035 - this.slideAngle * 0.5, -0.6, 0.6) : clamp(this.latAccel * 0.006, -0.09, 0.09);
     const pitchT = clamp(-(this.accelLong || 0) * 0.0035, -0.07, 0.07);
     const k = Math.min(1, dt * 7);
     this.bodyRoll += (rollT - this.bodyRoll) * k;
@@ -472,9 +574,15 @@ export class Vehicle {
       const c = G.camera.position, near = (c.x - this.pos.x) ** 2 + (c.z - this.pos.z) ** 2 < 55 * 55;
       if (near !== m.wheelShadows) { m.wheelShadows = near; for (const w of m.wheels) w.mesh.castShadow = near; }
     }
-    for (const w of m.wheels) {
-      w.mesh.rotation.x += (this.fwd / T.wheelR) * dt;
-      if (w.front) w.pivot.rotation.y = -this.steer * T.steer * 0.75;
+    if (m.wheels.length) {
+      // in a slide the front wheels point along the direction of travel (opposite lock) and the rears spin up
+      const yawT = this.drift ? clamp(-(this.slideAngle * 0.7 + this.steer * T.steer * 0.3), -T.steer, T.steer) : -this.steer * T.steer * 0.75;
+      this.wheelYaw += (yawT - this.wheelYaw) * Math.min(1, dt * 12);
+      const spin = this.burn ? 40 : this.drift ? 12 : 0;
+      for (const w of m.wheels) {
+        w.mesh.rotation.x += (this.fwd / T.wheelR + (w.front ? 0 : spin)) * dt;
+        if (w.front) w.pivot.rotation.y = this.wheelYaw;
+      }
     }
     // shadow blob stays on the ground
     const gy = this.groundY ?? this.pos.y;

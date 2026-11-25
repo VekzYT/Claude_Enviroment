@@ -3,6 +3,17 @@
 import * as THREE from 'three';
 import { makeGlowTexture } from '../world/textures.js';
 import { rand } from '../util/rng.js';
+import { G } from '../state.js';
+
+// What a sliding tyre throws up, by surface: colour, alpha, start/end size, life, rise, gravity, drag.
+const TYRE = {
+  asphalt: [0.9, 0.9, 0.92, 0.6, 1.3, 4.2, 2.6, 0.85, -0.2, 1.3],
+  concrete: [0.92, 0.91, 0.9, 0.6, 1.3, 4.2, 2.6, 0.85, -0.2, 1.3],
+  dirt: [0.56, 0.45, 0.32, 0.6, 1.4, 5.0, 1.8, 1.0, 0.15, 1.6],
+  sand: [0.8, 0.7, 0.52, 0.58, 1.4, 4.8, 1.7, 1.1, 0.2, 1.6],
+  grass: [0.42, 0.42, 0.28, 0.3, 0.9, 3.6, 1.2, 0.9, 0.4, 1.8],
+  mud: [0.3, 0.24, 0.16, 0.5, 0.6, 2.2, 1.0, 2.6, 9, 0.8],
+};
 
 const VERT = /* glsl */`
   attribute float aSize; attribute vec4 aColor;
@@ -17,12 +28,31 @@ const VERT = /* glsl */`
 const FRAG = /* glsl */`
   uniform sampler2D uMap; varying vec4 vColor;
   void main() {
-    float a = texture2D(uMap, gl_PointCoord).r;
+    float a = texture2D(uMap, gl_PointCoord).a;
     gl_FragColor = vec4(vColor.rgb, vColor.a * a);
     #ifdef PREMULT
       gl_FragColor.rgb *= gl_FragColor.a;
     #endif
   }`;
+
+// A soft, slightly lumpy puff for smoke, dust and spray (white, shape in the alpha channel).
+function makePuffTexture(size = 128) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d'), h = size / 2;
+  const blob = (x, y, r, a) => {
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, `rgba(255,255,255,${a})`);
+    gr.addColorStop(0.45, `rgba(255,255,255,${a * 0.6})`);
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, size, size);
+  };
+  blob(h, h, h, 0.75);
+  for (let i = 0; i < 7; i++) { const a = i * 0.9, d = h * 0.32; blob(h + Math.cos(a) * d, h + Math.sin(a) * d, h * 0.55, 0.22); }
+  const t = new THREE.CanvasTexture(c);
+  t.needsUpdate = true;
+  return t;
+}
 
 class Cloud {
   constructor(scene, cap, additive, tex) {
@@ -89,14 +119,13 @@ class Cloud {
   }
 }
 
-const SKID_MAX = 900;
+const SKID_MAX = 2400;
 
 export class FX {
   constructor(scene) {
     this.scene = scene;
-    const tex = makeGlowTexture();
-    this.add = new Cloud(scene, 1400, true, tex);
-    this.alpha = new Cloud(scene, 1100, false, tex);
+    this.add = new Cloud(scene, 1400, true, makeGlowTexture());
+    this.alpha = new Cloud(scene, 1600, false, makePuffTexture());
     this.flashLight = new THREE.PointLight(0xffaa66, 0, 60, 1.6);
     this.flashLight.position.set(0, -100, 0);
     scene.add(this.flashLight);
@@ -112,6 +141,7 @@ export class FX {
     sg.setAttribute('position', new THREE.BufferAttribute(this.skidPos, 3).setUsage(THREE.DynamicDrawUsage));
     sg.setAttribute('aAlpha', new THREE.BufferAttribute(this.skidAlpha, 1).setUsage(THREE.DynamicDrawUsage));
     sg.setIndex(idx);
+    sg.setDrawRange(0, 0);
     this.skidMesh = new THREE.Mesh(sg, new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -10, side: THREE.DoubleSide,
       vertexShader: 'attribute float aAlpha; varying float vA; void main(){ vA = aAlpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
@@ -120,7 +150,13 @@ export class FX {
     this.skidMesh.frustumCulled = false;
     this.skidMesh.renderOrder = 3;
     scene.add(this.skidMesh);
-    this.skidHead = 0;
+    this.skidHead = 0; this.skidUsed = 0;
+    // quads written since the renderer last uploaded them (several updates can run between two renders)
+    this.skidLo = SKID_MAX; this.skidHi = -1; this.skidUploads = 0;
+    const uploaded = () => { if (++this.skidUploads === 2) { this.skidUploads = 0; this.skidLo = SKID_MAX; this.skidHi = -1; } };
+    sg.attributes.position.onUpload(uploaded);
+    sg.attributes.aAlpha.onUpload(uploaded);
+    this.dim = 1;                               // unlit smoke darkens at night
     this.skidLast = new Map(); // key -> {x,y,z,lx,lz,rx,rz,t}
     this.time = 0;
   }
@@ -128,6 +164,13 @@ export class FX {
   // ---- emitters ---------------------------------------------------------
   smoke(x, y, z, { dark = 0.25, size = 2.2, life = 1.6, up = 1.6, spread = 0.6, alpha = 0.5 } = {}) {
     this.alpha.emit(x, y, z, rand(-spread, spread), up * rand(0.7, 1.3), rand(-spread, spread), life * rand(0.7, 1.2), size * 0.45, size * 2.2, dark, dark, dark * 1.05, alpha, -0.3, 0.6);
+  }
+  // Thick, slow tyre smoke (or dust, or spray) from a sliding wheel; k (0..1) sets how hard it slides.
+  tyreSmoke(x, y, z, vx, vz, surface, k = 1) {
+    if (surface === 'water') return this.spray(x, 0.1, z, vx, vz, 1);
+    const c = TYRE[surface] || TYRE.asphalt, dim = this.dim, f = 0.6 + 0.4 * k;
+    this.alpha.emit(x + rand(-0.25, 0.25), y, z + rand(-0.25, 0.25), vx + rand(-0.9, 0.9), c[7] * rand(0.5, 1.3), vz + rand(-0.9, 0.9),
+      c[6] * rand(0.75, 1.25), c[4] * f, c[5] * f, c[0] * dim, c[1] * dim, c[2] * dim, c[3] * f, c[8], c[9]);
   }
   dust(x, y, z, r = 0.55, g = 0.45, b = 0.32, size = 2.4) {
     this.alpha.emit(x, y, z, rand(-1, 1), rand(0.4, 1.4), rand(-1, 1), rand(0.6, 1.3), size * 0.4, size * 2, r, g, b, 0.38, 0, 1.2);
@@ -196,7 +239,9 @@ export class FX {
         p[o + 6] = cur.lx; p[o + 7] = y + 0.045; p[o + 8] = cur.lz;
         p[o + 9] = cur.rx; p[o + 10] = y + 0.045; p[o + 11] = cur.rz;
         for (let k = 0; k < 4; k++) this.skidAlpha[i * 4 + k] = alpha;
-        this.skidDirty = true;
+        if (i >= this.skidUsed) { this.skidUsed = i + 1; this.skidMesh.geometry.setDrawRange(0, this.skidUsed * 6); }
+        if (i < this.skidLo) this.skidLo = i;
+        if (i > this.skidHi) this.skidHi = i;
       }
     }
     this.skidLast.set(key, cur);
@@ -211,11 +256,14 @@ export class FX {
       this.flashLight.intensity = this.flashI * Math.max(0, this.flashT / this.flashDur);
     } else this.flashLight.intensity = 0;
     this.shake = Math.max(0, this.shake - dt * 2.2);
-    if (this.skidDirty) {
-      this.skidMesh.geometry.attributes.position.needsUpdate = true;
-      this.skidMesh.geometry.attributes.aAlpha.needsUpdate = true;
-      this.skidDirty = false;
+    if (this.skidHi >= 0) {
+      // upload only the stretch of the ring buffer that changed
+      const a = this.skidMesh.geometry.attributes, lo = this.skidLo, n = this.skidHi - lo + 1;
+      a.position.clearUpdateRanges(); a.position.addUpdateRange(lo * 12, n * 12); a.position.needsUpdate = true;
+      a.aAlpha.clearUpdateRanges(); a.aAlpha.addUpdateRange(lo * 4, n * 4); a.aAlpha.needsUpdate = true;
+      this.skidUploads = 0;
     }
+    if (G.env) this.dim = 1 - 0.72 * G.env.night;
     if (this.skidLast.size > 200) this.skidLast.clear();
   }
   setScale(pxHeight) { const s = pxHeight * 0.9; this.add.mat.uniforms.uScale.value = s; this.alpha.mat.uniforms.uScale.value = s; }
