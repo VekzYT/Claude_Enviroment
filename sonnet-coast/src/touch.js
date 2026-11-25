@@ -66,6 +66,12 @@ const BUTTONS = [
   { id: 'scan', icon: 'scan', cap: 'SCAN', key: 'KeyG', on: 'c', when: () => !!G.player.vehicle?.isPolice },
 ];
 
+// Feature modules can add buttons (same shape as above; `on` may use any context letters) and
+// override how the current context letter is chosen. Call before the game boots.
+export function addTouchButtons(list) { BUTTONS.push(...list); }
+let contextOf = (pl) => (pl && pl.vehicle ? 'c' : 'f');
+export function setTouchContext(fn) { contextOf = fn; }
+
 const state = { stickId: null, lookId: null, sx: 0, sy: 0, lx: 0, ly: 0, sprint: false, mag: 0, moved: false, looked: false, hintT: 0 };
 const held = new Map();   // touch identifier -> button
 let root = null, base = null, knob = null, btns = null, hintMove = null, hintLook = null;
@@ -241,7 +247,7 @@ export const Touch = {
     if (!play) return;
     if (portrait.matches && this.hooks.pause) { this.hooks.pause(); return; }   // phone was turned upright
     const pl = G.player, v = pl.vehicle;
-    const c = v ? 'c' : 'f';
+    const c = contextOf(pl);
     const w = G.weapons ? G.weapons.current.id : 'fists';
     if (c !== ctx) {
       ctx = c;

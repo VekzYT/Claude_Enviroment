@@ -3,7 +3,8 @@
 // colour by region. Wheels, lights and fittings are built from rounded primitives.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { Batch } from '../world/geom.js';
+import { Batch, colorize } from '../world/geom.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { PAL } from '../world/palette.js';
 import { makeGlowTexture } from '../world/textures.js';
 
@@ -29,7 +30,35 @@ function sharedMats() {
     glow: new Map(),
     alt: new Map(),
   };
+  // Everything on a vehicle that is neither paint nor glass (chrome, gloss pillars, seams, cladding,
+  // liveries, fittings) is one mesh. Each vertex brings its own colour and its own roughness,
+  // metalness and clear coat in the aPbr attribute, so one material and one draw call cover it.
+  const detail = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.08 });
+  detail.onBeforeCompile = function (shader, renderer) {
+    THREE.Material.prototype.onBeforeCompile.call(this, shader, renderer);
+    shader.vertexShader = shader.vertexShader.replace('void main() {', 'attribute vec3 aPbr;\nvarying vec3 vPbr;\nvoid main() {\n  vPbr = aPbr;');
+    shader.fragmentShader = shader.fragmentShader.replace('void main() {', 'varying vec3 vPbr;\nvoid main() {')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n  roughnessFactor = vPbr.x; metalnessFactor = vPbr.y;')
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  material.clearcoat *= vPbr.z;');
+  };
+  detail.customProgramCacheKey = () => 'vehicle-detail';
+  shared.detail = detail;
   return shared;
+}
+// A copy of a geometry reduced to position / normal / colour plus the per-vertex PBR triple.
+function detailPart(geo, color, rough, metal, coat) {
+  const g = geo.index ? geo.toNonIndexed() : geo.clone();
+  for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'color') g.deleteAttribute(k);
+  if (color !== null || !g.getAttribute('color')) colorize(g, color ?? 0xffffff);
+  const n = g.getAttribute('position').count, a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { a[i * 3] = rough; a[i * 3 + 1] = metal; a[i * 3 + 2] = coat; }
+  g.setAttribute('aPbr', new THREE.BufferAttribute(a, 3));
+  return g;
+}
+function bare(geo) {
+  const g = geo.index ? geo.toNonIndexed() : geo.clone();
+  for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+  return g;
 }
 function glowMat(hex) {
   const s = sharedMats();
@@ -671,19 +700,35 @@ function shapeData(T) {
   const glow = new Batch();
   if (S.glowParts) S.glowParts(glow);
   const big = T.wheelR > 0.44;
+  // gather the non-paint, non-glass parts into the single detail mesh
+  const parts = [];
+  // chrome used to reflect 1.4x through its own material; the brighter base colour keeps that
+  if (G.chrome) parts.push(detailPart(G.chrome, new THREE.Color(0xd4d8dc).multiplyScalar(1.4), 0.16, 1, 0));
+  if (G.gloss) parts.push(detailPart(G.gloss, 0x08090b, 0.2, 0.2, 1));
+  const alt = S.altColor || [0x2a2c30, 0.6, 0.2], dark = S.darkColor || [0x101114, 0.7, 0.1];
+  if (G.alt) parts.push(detailPart(G.alt, alt[0], alt[1], alt[2], alt[1] < 0.5 ? 0.8 : 0));
+  if (G.dark) parts.push(detailPart(G.dark, dark[0], dark[1], dark[2], dark[1] < 0.5 ? 0.8 : 0));
+  if (!trim.empty) parts.push(detailPart(trim.merged(), null, 0.55, 0.25, 0));
+  const glassParts = [];
+  if (G.glass) glassParts.push(bare(G.glass));
+  if (!glassB.empty) glassParts.push(bare(glassB.merged()));
+  const wheel = T.wheelR ? wheelGeo(T.wheelR, big ? 0.38 : 0.26, big) : null;
+  const wheelX = T.wid / 2 - (big ? 0.2 : 0.145);
+  // the four wheels of a parked vehicle as one mesh
+  let wheels4 = null;
+  if (wheel) {
+    const four = [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([sx, sz]) => { const g = wheel.clone(); g.translate(sx * wheelX, T.wheelR, sz * T.wheelbase / 2); return g; });
+    wheels4 = mergeGeometries(four, false);
+  }
   const data = {
     paint: G.paint,
-    glass: G.glass || null,
-    glass2: glassB.empty ? null : glassB.merged(),
-    alt: G.alt || null, altColor: S.altColor || [0x2a2c30, 0.6, 0.2],
-    chrome: G.chrome || null, gloss: G.gloss || null,
-    dark: G.dark || null, darkColor: S.darkColor || [0x101114, 0.7, 0.1],
-    trim: trim.empty ? null : trim.merged(),
+    glass: glassParts.length ? (glassParts.length > 1 ? mergeGeometries(glassParts, false) : glassParts[0]) : null,
+    detail: parts.length ? (parts.length > 1 ? mergeGeometries(parts, false) : parts[0]) : null,
+    wheels4,
     glow: glow.empty ? null : glow.merged(),
     head: lightsGeo(S.head, true),
     tail: lightsGeo(S.tail, false),
-    wheel: T.wheelR ? wheelGeo(T.wheelR, big ? 0.38 : 0.26, big) : null,
-    wheelX: T.wid / 2 - (big ? 0.2 : 0.145),
+    wheel, wheelX,
     siren: S.siren || null,
     seat: S.seat || [0.4, 0.6, 0],
     headPos: S.head,
@@ -704,12 +749,7 @@ export function buildVehicleMesh(T, paintHex) {
   paint.castShadow = true; paint.receiveShadow = true;
   body.add(paint);
   if (D.glass) body.add(new THREE.Mesh(D.glass, M.glass));
-  if (D.glass2) body.add(new THREE.Mesh(D.glass2, M.glass));
-  if (D.chrome) body.add(new THREE.Mesh(D.chrome, M.chrome));
-  if (D.gloss) body.add(new THREE.Mesh(D.gloss, M.gloss));
-  if (D.alt) { const a = new THREE.Mesh(D.alt, altMat(...D.altColor)); a.castShadow = true; body.add(a); }
-  if (D.dark) body.add(new THREE.Mesh(D.dark, altMat(...D.darkColor)));
-  if (D.trim) { const t = new THREE.Mesh(D.trim, M.trim); t.castShadow = true; body.add(t); }
+  if (D.detail) { const t = new THREE.Mesh(D.detail, M.detail); t.castShadow = true; body.add(t); }
   const glowHex = T.police ? 0xbfdcff : T.glow || (T.shape === 'van' ? 0xffe6c4 : null);
   let glow = null;
   if (D.glow && glowHex) { glow = new THREE.Mesh(D.glow, glowMat(glowHex)); body.add(glow); }
@@ -730,6 +770,9 @@ export function buildVehicleMesh(T, paintHex) {
       wheels.push({ pivot, mesh: w, front: sz > 0 });
     }
   }
+  // stand-in for all four wheels while the vehicle is parked (see Vehicle.restWheels)
+  let wheelRest = null;
+  if (D.wheels4) { wheelRest = new THREE.Mesh(D.wheels4, M.wheel); wheelRest.castShadow = true; wheelRest.visible = false; group.add(wheelRest); }
   // underglow for flashy rides
   let under = null;
   if (T.glow && T.cls === 'car') {
@@ -758,7 +801,7 @@ export function buildVehicleMesh(T, paintHex) {
     body.add(L, Rm, fl, fr);
     siren = { L, R: Rm, fl, fr };
   }
-  return { group, body, paintMat, head, tail, wheels, siren, glow, under, seat: D.seat, headPos: D.headPos, baseColor: new THREE.Color(paintHex) };
+  return { group, body, paintMat, head, tail, wheels, wheelRest, siren, glow, under, seat: D.seat, headPos: D.headPos, baseColor: new THREE.Color(paintHex) };
 }
 
 export function vehicleMats() { return sharedMats(); }

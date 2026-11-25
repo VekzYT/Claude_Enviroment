@@ -101,7 +101,7 @@ export function buildMonorail(scene, env) {
   const glassMat = new THREE.MeshStandardMaterial({ color: 0xcfe9f4, transparent: true, opacity: 0.32, roughness: 0.06, metalness: 0.9, envMapIntensity: 1.6, depthWrite: false, side: THREE.DoubleSide });
   const lightMat = new THREE.MeshBasicMaterial({ color: 0xf2f7ff, toneMapped: false });
   for (const ch of ['r', 'g', 'b']) env.nightLerp(lightMat.color, ch, 0.9, 1.5);
-  group.add(white.mesh(whiteMat));
+  group.add(white.cells(whiteMat));
   const gm = glass.mesh(glassMat, { shadow: false });
   gm.renderOrder = 4;
   group.add(gm);

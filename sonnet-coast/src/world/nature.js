@@ -14,6 +14,7 @@ import { PAL } from './palette.js';
 import { makeGlowTexture } from './textures.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { grain } from './citylight.js';
+import { DETAIL_LAYER } from '../state.js';
 
 
 // ---- modelling helpers ---------------------------------------------------------------------
@@ -41,7 +42,7 @@ function blob(r, detail, seed, sx, sy, sz, lo, hi, amp = 0.2) {
 // A tapered trunk or bough from (x0,y0,z0) to (x1,y1,z1), darker at the base, with a root flare.
 function limb(b, x0, y0, z0, x1, y1, z1, r0, r1, lo, hi, seg = 7, flare = 0) {
   const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0, len = Math.hypot(dx, dy, dz);
-  const g = new THREE.CylinderGeometry(r1, r0, len, seg, 3, true);
+  const g = new THREE.CylinderGeometry(r1, r0, len, seg, 1, true);
   const p = g.getAttribute('position'), n = p.count, col = new Float32Array(n * 3);
   _ca.set(lo); _cb.set(hi);
   for (let i = 0; i < n; i++) {
@@ -315,7 +316,7 @@ export function buildNature(scene, env, quality) {
   const cypress = new ChunkedInstances(cypressGeo(), leafMat, { shadow: sh, maxDist: 950 });
   const mangrove = new ChunkedInstances(mangroveGeo(), leafMat, { shadow: false, maxDist: 600 });
   const mg = mushroomGeo();
-  const near = { chunk: 200, maxDist: 260 };
+  const near = { chunk: 200, maxDist: 260, layer: DETAIL_LAYER };
   const stems = new ChunkedInstances(mg.stems, solidMat, near);
   const capsAll = new ChunkedInstances(mg.caps, white(), gl);
   const caps = [0, 1, 3].map((k) => ({ add: (m) => capsAll.add(m, glowCols[k]) }));

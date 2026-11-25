@@ -95,7 +95,8 @@ export function hipsGeo(w = 1, seg = 14) {
 }
 
 // Head centred on the origin, looking down +z: skull, jaw, nose, ears and dark eyes.
-export function headGeo(r = 0.115) {
+export function headGeo(r = 0.115, far = false) {
+  if (far) return join([place(new THREE.SphereGeometry(r, 8, 6), 0, 0.012, 0, 0, 0, 0, 0.94, 1.08, 1.02), place(new THREE.SphereGeometry(r * 0.78, 6, 4), 0, -r * 0.46, r * 0.14, 0, 0, 0, 0.9, 0.86, 0.92)]);
   const skull = place(new THREE.SphereGeometry(r, 16, 12), 0, 0.012, 0, 0, 0, 0, 0.94, 1.08, 1.02);
   const jaw = place(new THREE.SphereGeometry(r * 0.78, 12, 8), 0, -r * 0.46, r * 0.14, 0, 0, 0, 0.9, 0.86, 0.92);
   const nose = place(new THREE.SphereGeometry(r * 0.17, 8, 6), 0, -r * 0.14, r * 1.0, 0, 0, 0, 0.8, 1.2, 1.1);
@@ -109,8 +110,14 @@ export function headGeo(r = 0.115) {
   return join(parts);
 }
 // Hair shells that sit over headGeo. style: 0 short crop, 1 longer, 2 tied back.
-export function hairGeo(style = 0, r = 0.115) {
+export function hairGeo(style = 0, r = 0.115, far = false) {
   const R = r * 1.07;
+  if (far) {
+    const cap = place(new THREE.SphereGeometry(R, 8, 5, 0, Math.PI * 2, 0, Math.PI * (style === 1 ? 0.6 : 0.54)), 0, 0.022, -r * 0.05, -0.24, 0, 0, 0.98, 1.09, 1.07);
+    if (style === 1) return join([cap, place(new THREE.SphereGeometry(R * 0.96, 6, 4), 0, -r * 0.62, -r * 0.42, 0, 0, 0, 0.98, 1.2, 0.62)]);
+    if (style === 2) return join([cap, place(new THREE.SphereGeometry(r * 0.36, 5, 4), 0, r * 0.5, -r * 1.02)]);
+    return join([cap]);
+  }
   if (style === 1) {
     const cap = place(new THREE.SphereGeometry(R, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), 0, 0.024, -r * 0.06, -0.22, 0, 0, 0.98, 1.1, 1.08);
     const back = place(new THREE.SphereGeometry(R * 0.96, 12, 8), 0, -r * 0.62, -r * 0.42, 0, 0, 0, 0.98, 1.2, 0.62);
@@ -126,21 +133,29 @@ export function hairGeo(style = 0, r = 0.115) {
   return join([cap, fringe]);
 }
 // Peaked cap that sits over the head.
-export function capGeo(r = 0.115) {
+export function capGeo(r = 0.115, far = false) {
   const R = r * 1.1;
+  if (far) return join([place(new THREE.SphereGeometry(R, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.5), 0, r * 0.3, -r * 0.02, -0.08, 0, 0, 1, 0.82, 1.06), place(new THREE.CylinderGeometry(R * 0.99, R, r * 0.3, 8), 0, r * 0.24, -r * 0.02), place(new THREE.CylinderGeometry(R * 0.9, R * 0.9, r * 0.07, 6, 1, false, -1.0, 2.0), 0, r * 0.2, r * 0.6, 0.1, 0, 0, 0.9, 1, 0.82)]);
   const crown = place(new THREE.SphereGeometry(R, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), 0, r * 0.3, -r * 0.02, -0.08, 0, 0, 1, 0.82, 1.06);
   const band = place(new THREE.CylinderGeometry(R * 0.99, R * 1.0, r * 0.3, 14), 0, r * 0.24, -r * 0.02);
   const peak = place(new THREE.CylinderGeometry(R * 0.9, R * 0.9, r * 0.07, 14, 1, false, -1.0, 2.0), 0, r * 0.2, r * 0.6, 0.1, 0, 0, 0.9, 1, 0.82);
   return join([crown, band, peak]);
 }
-export function handGeo(r = 0.042) {
+export function handGeo(r = 0.042, far = false) {
+  if (far) return join([place(new THREE.SphereGeometry(r, 5, 4), 0, 0, 0, 0, 0, 0, 0.78, 1.35, 1.0)]);
   const palm = place(new THREE.SphereGeometry(r, 10, 8), 0, 0, 0, 0, 0, 0, 0.78, 1.35, 1.0);
   const thumb = place(new THREE.SphereGeometry(r * 0.42, 6, 5), 0, r * 0.2, r * 0.9, 0, 0, 0, 0.8, 1.4, 0.9);
   return join([palm, thumb]);
 }
 // Shoe centred on the ankle: toe points down +z.
-export function shoeGeo(len = 0.25, w = 0.095, hex = 0x17181c) {
+export function shoeGeo(len = 0.25, w = 0.095, hex = 0x17181c, far = false) {
+  if (far) return tintGeo(ellipseLoft([[-0.085, w * 0.52, len * 0.52, len * 0.165], [-0.03, w * 0.54, len * 0.5, len * 0.15], [0.05, w * 0.5, w * 0.6, 0]], 6, 0.9), hex);
   const upper = ellipseLoft([[-0.075, w * 0.5, len * 0.5, len * 0.16], [-0.04, w * 0.56, len * 0.54, len * 0.17], [0.0, w * 0.52, len * 0.36, len * 0.06], [0.05, w * 0.5, w * 0.6, 0]], 10, 0.9);
   const sole = place(new THREE.BoxGeometry(w * 1.06, 0.022, len * 1.04), 0, -0.082, len * 0.165);
   return join([tintGeo(upper, hex), tintGeo(sole, 0x0b0b0c)]);
+}
+
+// The same limb for a figure seen from a distance: three rings, five sides.
+export function farLimbGeo(len, r0, r1, flat = 0.92) {
+  return ellipseLoft([[-len - r1 * 0.45, r1 * 0.62, r1 * 0.62 * flat], [-len * 0.5, (r0 + r1) * 0.54, (r0 + r1) * 0.54 * flat], [r0 * 0.5, r0 * 0.7, r0 * 0.7 * flat]], 5);
 }

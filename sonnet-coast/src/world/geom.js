@@ -63,6 +63,28 @@ export class Batch {
     m.castShadow = shadow; m.receiveShadow = receive;
     return m;
   }
+  // Like mesh(), but one mesh per `cell`-metre square of the map, so the camera and the shadow
+  // pass can each skip the squares they cannot see instead of always drawing the whole city.
+  cells(material, cell = 450, { shadow = true, receive = true } = {}) {
+    const group = new THREE.Group();
+    const buckets = new Map();
+    for (const g of this.geos) {
+      g.computeBoundingBox();
+      const b = g.boundingBox, k = `${Math.floor((b.min.x + b.max.x) / 2 / cell)},${Math.floor((b.min.z + b.max.z) / 2 / cell)}`;
+      if (!buckets.has(k)) buckets.set(k, []);
+      buckets.get(k).push(g);
+    }
+    for (const list of buckets.values()) {
+      const merged = list.length > 1 ? mergeGeometries(list, false) : list[0].clone();
+      for (const x of list) x.dispose();
+      merged.computeBoundingSphere();
+      const m = new THREE.Mesh(merged, material);
+      m.castShadow = shadow; m.receiveShadow = receive; m.matrixAutoUpdate = false;
+      group.add(m);
+    }
+    this.geos = [];
+    return group;
+  }
 }
 
 // Building walls with UVs scaled to real metres so a window tile is always the same size.
@@ -149,8 +171,8 @@ export class FacadeBatch {
 // hidden entirely once it is further away than `maxDist`.
 const allChunked = [];
 export class ChunkedInstances {
-  constructor(geometry, material, { chunk = 300, shadow = false, colors = false, maxDist = 1200 } = {}) {
-    this.geometry = geometry; this.material = material; this.chunk = chunk;
+  constructor(geometry, material, { chunk = 300, shadow = false, colors = false, maxDist = 1200, layer = 0 } = {}) {
+    this.geometry = geometry; this.material = material; this.chunk = chunk; this.layer = layer;
     this.shadow = shadow; this.colors = colors; this.maxDist = maxDist;
     this.buckets = new Map();
     this.meshes = [];
@@ -179,6 +201,7 @@ export class ChunkedInstances {
       mesh.castShadow = this.shadow;
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
+      if (this.layer) mesh.layers.set(this.layer);
       const [cx, cz] = key.split(',').map(Number);
       mesh.userData.cx = (cx + 0.5) * this.chunk; mesh.userData.cz = (cz + 0.5) * this.chunk;
       b.mesh = mesh;

@@ -1,5 +1,6 @@
 // Street furniture: lamps, traffic signals, benches, bins, hydrants, vending machines, bus shelters.
 import * as THREE from 'three';
+import { DETAIL_LAYER } from '../state.js';
 import { edges, nodes, edgePoint } from './roads.js';
 import { CITY } from './layout.js';
 import { blockAt, DISTRICTS } from './cityplan.js';
@@ -209,9 +210,9 @@ export function buildProps(scene, env, quality) {
   for (const q of ['r', 'a', 'g']) group.add(sigLamps[q]);
 
   // ---- sidewalk clutter ------------------------------------------------------
-  const benches = new ChunkedInstances(benchGeo(), matte, { chunk: 200, maxDist: 190 });
-  const bins = new ChunkedInstances(binGeo(), matte, { chunk: 200, maxDist: 190 });
-  const hydrants = new ChunkedInstances(hydrantGeo(), matte, { chunk: 200, maxDist: 190 });
+  const benches = new ChunkedInstances(benchGeo(), matte, { chunk: 200, maxDist: 190, layer: DETAIL_LAYER });
+  const bins = new ChunkedInstances(binGeo(), matte, { chunk: 200, maxDist: 190, layer: DETAIL_LAYER });
+  const hydrants = new ChunkedInstances(hydrantGeo(), matte, { chunk: 200, maxDist: 190, layer: DETAIL_LAYER });
   const vending = new ChunkedInstances(vendingGeo(), matte, { chunk: 200, maxDist: 260 });
   const vendGlow = new ChunkedInstances(new THREE.PlaneGeometry(0.62, 1.5), new THREE.MeshBasicMaterial({ toneMapped: false }), { chunk: 200, colors: true, maxDist: 420 });
   const shelters = new ChunkedInstances(shelterGeo(), metal, { chunk: 200, maxDist: 320 });

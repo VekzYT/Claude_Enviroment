@@ -21,6 +21,12 @@ const CONTROLS = [
   ['G', 'Police scanner (in a cruiser)'], ['H', 'Horn / siren'], ['C', 'Look behind'], ['V', 'Camera distance'],
   ['M', 'Map and waypoint'], ['Esc / P', 'Pause'],
 ];
+// Feature modules add their own rows: addControls([[key, text], ...], [[touchIcon, text], ...]).
+export function addControls(keys = [], touch = []) {
+  const at = CONTROLS.length - 2;   // keep Map and Pause last
+  CONTROLS.splice(at, 0, ...keys);
+  TOUCH_CONTROLS.splice(TOUCH_CONTROLS.length - 2, 0, ...touch);
+}
 
 export class Menus {
   constructor(root, hooks) {

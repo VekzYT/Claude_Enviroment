@@ -1,6 +1,6 @@
 // Pedestrians. Simulated on the CPU, drawn with a handful of instanced meshes (one per body part).
 import * as THREE from 'three';
-import { G, emit } from '../state.js';
+import { G, emit, DETAIL_LAYER } from '../state.js';
 import { groundHeight } from '../world/roads.js';
 import { resolveCircle } from '../world/colliders.js';
 import { blocks, sidewalkLoop, blockAt, DISTRICTS } from '../world/cityplan.js';
@@ -8,7 +8,7 @@ import { CITY } from '../world/layout.js';
 import { PIER } from '../world/landmarks.js';
 import { PED_LOOKS, COP_LOOK } from './pedlooks.js';
 import { makeBlobTexture } from '../world/textures.js';
-import { ellipseLoft, limbGeo, torsoGeo, hipsGeo, headGeo, hairGeo, capGeo, handGeo, shoeGeo, join, place } from './bodyGeo.js';
+import { ellipseLoft, limbGeo, farLimbGeo, torsoGeo, hipsGeo, headGeo, hairGeo, capGeo, handGeo, shoeGeo, join, place } from './bodyGeo.js';
 import { clamp, wrapAngle } from '../util/math.js';
 import { rand, pick, chance } from '../util/rng.js';
 
@@ -26,36 +26,42 @@ export class Peds {
     this.timer = 0;
     this.density = 1;
     const std = (opts = {}) => new THREE.MeshStandardMaterial({ roughness: 0.8, ...opts });
-    const mk = (geo, mat, shadow = true) => {
-      const m = new THREE.InstancedMesh(geo, mat, MAX);
+    const mk = (geo, mat, shadow = true, cap = MAX) => {
+      const m = new THREE.InstancedMesh(geo, mat, cap);
       m.count = 0; m.frustumCulled = false; m.castShadow = shadow; m.receiveShadow = false;
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       m.setColorAt(0, _c.set(0xffffff));
+      m.layers.set(DETAIL_LAYER);
       scene.add(m);
       return m;
     };
-    const stdv = (opts = {}) => std({ vertexColors: true, ...opts });
     const HR = 0.108;
-    const hand = place(handGeo(0.04), 0, -0.545, 0.004);
-    const shin = join([limbGeo(0.35, 0.064, 0.05), place(shoeGeo(0.25, 0.096, 0x2a2b2e), 0, -0.355, 0)]);
-    this.parts = {
-      torso: mk(torsoGeo(0.48, 1), std()),
-      hips: mk(hipsGeo(1), std()),
-      head: mk(headGeo(HR), stdv({ roughness: 0.55 })),
-      hair: mk(hairGeo(0, HR), std({ roughness: 0.6 })),
-      hair1: mk(hairGeo(1, HR), std({ roughness: 0.6 })),
-      hair2: mk(hairGeo(2, HR), std({ roughness: 0.6 })),
-      hat: mk(capGeo(HR), std()),
-      armL: mk(limbGeo(0.5, 0.06, 0.044), std()),
-      armR: mk(limbGeo(0.5, 0.06, 0.044), std()),
-      handL: mk(hand, std({ roughness: 0.55 })),
-      handR: mk(hand.clone(), std({ roughness: 0.55 })),
-      thighL: mk(limbGeo(0.38, 0.086, 0.066), std()),
-      thighR: mk(limbGeo(0.38, 0.086, 0.066), std()),
-      shinL: mk(shin, stdv()),
-      shinR: mk(shin.clone(), stdv()),
-      glow: mk(ellipseLoft([[-0.016, 0.212, 0.128, 0.006], [0.016, 0.214, 0.13, 0.006]], 16, 0.86), new THREE.MeshBasicMaterial({ toneMapped: false }), false),
+    // Two sets of the same body parts: full detail for people near the camera, and a version with
+    // a fraction of the triangles for everyone further off, where the difference is sub-pixel.
+    // Left and right limbs share one instanced mesh, and each mesh only holds the instances it
+    // really draws (no parked hair styles or hats).
+    const mats = {
+      cloth: std(), skin: std({ roughness: 0.55 }), face: std({ vertexColors: true, roughness: 0.55 }), hair: std({ roughness: 0.6 }),
+      shin: std({ vertexColors: true }), glow: new THREE.MeshBasicMaterial({ toneMapped: false }),
     };
+    const set = (far) => {
+      const limb = (len, r0, r1) => (far ? farLimbGeo(len, r0, r1) : limbGeo(len, r0, r1));
+      return {
+        torso: mk(torsoGeo(0.48, 1, far ? 7 : 16), mats.cloth),
+        hips: mk(hipsGeo(1, far ? 6 : 14), mats.cloth),
+        head: mk(headGeo(HR, far), mats.face),
+        hair: [0, 1, 2].map((k) => mk(hairGeo(k, HR, far), mats.hair)),
+        hat: mk(capGeo(HR, far), mats.cloth),
+        arm: mk(limb(0.5, 0.06, 0.044), mats.cloth, true, MAX * 2),
+        hand: mk(place(handGeo(0.04, far), 0, -0.545, 0.004), mats.skin, true, MAX * 2),
+        thigh: mk(limb(0.38, 0.086, 0.066), mats.cloth, true, MAX * 2),
+        shin: mk(join([limb(0.35, 0.064, 0.05), place(shoeGeo(0.25, 0.096, 0x2a2b2e, far), 0, -0.355, 0)]), mats.shin, true, MAX * 2),
+        glow: mk(ellipseLoft([[-0.016, 0.212, 0.128, 0.006], [0.016, 0.214, 0.13, 0.006]], far ? 8 : 16, 0.86), mats.glow, false),
+      };
+    };
+    this.tiers = [set(false), set(true)];
+    this.meshes = [];
+    for (const T of this.tiers) for (const k of Object.keys(T)) for (const m of Array.isArray(T[k]) ? T[k] : [T[k]]) this.meshes.push(m);
     const blobGeo = new THREE.PlaneGeometry(0.95, 0.95);
     blobGeo.rotateX(-Math.PI / 2);
     this.blobs = mk(blobGeo, new THREE.MeshBasicMaterial({ map: makeBlobTexture(), transparent: true, depthWrite: false, opacity: 0.6, polygonOffset: true, polygonOffsetFactor: -7, polygonOffsetUnits: -7 }), false);
@@ -341,11 +347,26 @@ export class Peds {
   }
 
   draw(t) {
-    const P = this.parts;
     const n = this.list.length;
+    const cam = G.camera.position;
+    for (const m of this.meshes) m.userData.n = 0;
+    let color = _c, flash = false;
+    const col = (hex) => (color = flash ? _c.set(0xffffff) : _c.set(hex));
+    const put = (mesh, base, x, y, z, rx, sx = 1) => {
+      _l.makeRotationX(rx); _l.setPosition(x, y, z);
+      if (sx !== 1) { _r.makeScale(sx, 1, 1); _l.multiply(_r); }
+      _l.premultiply(base);
+      const k = mesh.userData.n++;
+      mesh.setMatrixAt(k, _l); mesh.setColorAt(k, color);
+      return _l;
+    };
     for (let i = 0; i < n; i++) {
       const p = this.list[i];
       const L = p.look, sc = L.scale;
+      // which set: a little hysteresis so nobody flickers at the boundary
+      const dx = p.pos.x - cam.x, dz = p.pos.z - cam.z, d2 = dx * dx + dz * dz;
+      p.farLod = p.farLod ? d2 > 484 : d2 > 729;
+      const P = this.tiers[p.farLod ? 1 : 0];
       const amp = clamp(p.speed / 2.2, 0, 1), run = p.speed > 3;
       const sn = Math.sin(p.phase), cs = Math.cos(p.phase);
       const swing = sn * amp * (run ? 0.95 : 0.6);
@@ -355,47 +376,39 @@ export class Peds {
       _q.setFromEuler(_e);
       _m.compose(_p.set(p.pos.x, p.pos.y + bob + p.lie * 0.16, p.pos.z), _q, _s.set(sc, sc, sc));
       _u.makeRotationX(run ? 0.16 : 0.03); _u.setPosition(0, 1.0, 0); _u.premultiply(_m);
-      const flash = p.flash > 0;
-      const col = (hex) => (flash ? _c.set(0xffffff) : _c.set(hex));
-      const put = (mesh, base, x, y, z, rx, color, sx = 1) => {
-        _l.makeRotationX(rx); _l.setPosition(x, y, z);
-        if (sx !== 1) { _r.makeScale(sx, 1, 1); _l.multiply(_r); }
-        _l.premultiply(base);
-        mesh.setMatrixAt(i, _l); mesh.setColorAt(i, color);
-        return _l;
-      };
+      flash = p.flash > 0;
       const build = L.build || 1;
-      put(P.torso, _u, 0, 0, 0, 0, col(L.top), build);
-      put(P.hips, _m, 0, 1.0, 0, 0, col(L.bottom), build);
-      put(P.head, _u, 0, 0.625, 0.006, 0, col(L.skin));
-      const hs = L.hat ? 0 : L.hairStyle || 0;
-      const hc = col(L.hair);
-      for (let k = 0; k < 3; k++) { const hm = k === 0 ? P.hair : k === 1 ? P.hair1 : P.hair2; if (k === hs) put(hm, _u, 0, 0.625, 0.006, 0, hc); else hm.setMatrixAt(i, ZERO); }
-      if (L.hat) put(P.hat, _u, 0, 0.625, 0.006, 0, col(L.cop ? 0x1c1d22 : L.top)); else P.hat.setMatrixAt(i, ZERO);
-      // arms: the right one comes up when aiming
+      col(L.top); put(P.torso, _u, 0, 0, 0, 0, build);
+      col(L.bottom); put(P.hips, _m, 0, 1.0, 0, 0, build);
+      col(L.skin); put(P.head, _u, 0, 0.625, 0.006, 0);
+      col(L.hair); put(P.hair[L.hat ? 0 : L.hairStyle || 0], _u, 0, 0.625, 0.006, 0);
+      if (L.hat) { col(L.cop ? 0x1c1d22 : L.top); put(P.hat, _u, 0, 0.625, 0.006, 0); }
+      // arms: the right one comes up when aiming. A hand rides on the same matrix as its arm.
       const ax = 0.243 * build;
       const aR = p.aim > 0.5 ? -1.45 : -swing * 0.9;
-      const tc = col(L.top);
-      put(P.armL, _u, ax, 0.385, 0, swing * 0.9, tc); P.handL.setMatrixAt(i, _l);
-      put(P.armR, _u, -ax, 0.385, 0, aR, tc); P.handR.setMatrixAt(i, _l);
-      const sk = col(L.skin);
-      P.handL.setColorAt(i, sk); P.handR.setColorAt(i, sk);
+      col(L.top); put(P.arm, _u, ax, 0.385, 0, swing * 0.9);
+      col(L.skin); { const k = P.hand.userData.n++; P.hand.setMatrixAt(k, _l); P.hand.setColorAt(k, color); }
+      col(L.top); put(P.arm, _u, -ax, 0.385, 0, aR);
+      col(L.skin); { const k = P.hand.userData.n++; P.hand.setMatrixAt(k, _l); P.hand.setColorAt(k, color); }
       // legs: thigh swings, knee folds on the way through
-      const bc = col(L.bottom);
+      col(L.bottom);
       const kL = Math.max(0, cs) * amp * (run ? 1.2 : 0.8), kR = Math.max(0, -cs) * amp * (run ? 1.2 : 0.8);
-      for (const [th, sh, x, a, kn] of [[P.thighL, P.shinL, 0.095, -swing, kL], [P.thighR, P.shinR, -0.095, swing, kR]]) {
-        put(th, _m, x * build, 0.82, 0, a, bc);
-        _r.makeRotationX(kn); _r.setPosition(0, -0.38, 0);
+      for (let side = 0; side < 2; side++) {
+        put(P.thigh, _m, (side ? -0.095 : 0.095) * build, 0.82, 0, side ? swing : -swing);
+        _r.makeRotationX(side ? kR : kL); _r.setPosition(0, -0.38, 0);
         _l.multiply(_r);
-        sh.setMatrixAt(i, _l); sh.setColorAt(i, bc);
+        const k = P.shin.userData.n++;
+        P.shin.setMatrixAt(k, _l); P.shin.setColorAt(k, color);
       }
-      if (L.glow) put(P.glow, _u, 0, 0.3, 0, 0, _c.set(L.glow).multiplyScalar(1.25), build); else P.glow.setMatrixAt(i, ZERO);
+      if (L.glow) { color = _c.set(L.glow).multiplyScalar(1.25); put(P.glow, _u, 0, 0.3, 0, 0, build); }
       _l.makeTranslation(p.pos.x, p.pos.y + 0.05, p.pos.z);
       this.blobs.setMatrixAt(i, _l);
     }
-    for (const k of Object.keys(P)) {
-      const m = P[k];
-      m.count = n;
+    for (const m of this.meshes) {
+      const k = m.userData.n;
+      m.count = k;
+      m.visible = k > 0;
+      if (!k) continue;
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }

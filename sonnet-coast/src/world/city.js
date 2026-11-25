@@ -996,9 +996,10 @@ export function buildCity(scene, env) {
   if (!frames.empty) group.add(frames.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.3 }), 1.0, 0.25, 0.1)));
 
   // ---- merged batches (built last: parks, plazas and landmarks add to them) -------
-  group.add(roofs.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), 0.55, 0.75, 0.26)));
-  group.add(trim.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.15, envMapIntensity: 1.1 }), 0.8, 0.22, 0.1)));
-  if (!relief.empty) group.add(relief.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 }), 0.7, 0.45, 0.16)));
+  // the heavy city-wide batches are cut into squares so views and shadows only draw what they reach
+  group.add(roofs.cells(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), 0.55, 0.75, 0.26)));
+  group.add(trim.cells(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.15, envMapIntensity: 1.1 }), 0.8, 0.22, 0.1)));
+  if (!relief.empty) group.add(relief.cells(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 }), 0.7, 0.45, 0.16)));
   balconies.build(group);
   group.add(deco.mesh(flatMat, { shadow: false }));
   for (const k of Object.keys(glow)) if (!glow[k].empty) group.add(glow[k].mesh(glowMats[k], { shadow: false, receive: false }));

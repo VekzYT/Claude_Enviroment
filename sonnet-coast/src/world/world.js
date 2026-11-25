@@ -34,6 +34,10 @@ export async function buildWorld(scene, renderer, quality, progress) {
   const wildlife = buildWildlife(scene, env);
   env.apply(0);
   env.refreshEnvMap();
+  // Nothing in these groups ever moves as an object (instances are edited in place), so the
+  // renderer need not walk them every frame looking for changed transforms.
+  scene.updateMatrixWorld(true);
+  for (const name of ['terrain', 'roads', 'nature', 'props']) { const g = scene.getObjectByName(name); if (g) g.matrixWorldAutoUpdate = false; }
   let cullTimer = 0;
   const drawScale = { low: 0.55, medium: 0.85, high: 1 };
   return {

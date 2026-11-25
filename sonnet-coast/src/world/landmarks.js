@@ -1,6 +1,7 @@
 // Places outside the city grid: the port, Compute Ridge, bayou hideouts, Sonnet Pier with its
 // big wheel, the lighthouse, the radio mast and the stunt ramps.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { grain } from './citylight.js';
 import { POI, CITY } from './layout.js';
 import { Batch, ChunkedInstances, tmpMatrix } from './geom.js';
@@ -199,41 +200,40 @@ export function buildLandmarks(scene, env) {
     const R = 24, cx = endX - 16, cy = PIER.y + R + 5, cz = 6;
     const wheel = new THREE.Group();
     wheel.position.set(cx, cy, cz);
-    const rimA = new THREE.Mesh(new THREE.TorusGeometry(R, 0.28, 6, 72), glowMats.coral);
-    const rimB = new THREE.Mesh(new THREE.TorusGeometry(R * 0.72, 0.18, 6, 60), glowMats.cyan);
-    for (const [rim, dx] of [[rimA, 1.3], [rimA.clone(), -1.3], [rimB, 0]]) { rim.rotation.y = Math.PI / 2; rim.position.x = dx; wheel.add(rim); }
+    // Everything that turns with the wheel is merged by material; the cabins are one instanced
+    // mesh that is kept upright each frame.
+    const merge = (list) => mergeGeometries(list, false);
+    const at = (g, x, y, z, rx = 0, ry = 0, rz = 0) => { g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(1, 1, 1))); return g; };
+    wheel.add(new THREE.Mesh(merge([at(new THREE.TorusGeometry(R, 0.28, 6, 72), 1.3, 0, 0, 0, Math.PI / 2), at(new THREE.TorusGeometry(R, 0.28, 6, 72), -1.3, 0, 0, 0, Math.PI / 2)]), glowMats.coral));
+    wheel.add(new THREE.Mesh(at(new THREE.TorusGeometry(R * 0.72, 0.18, 6, 60), 0, 0, 0, 0, Math.PI / 2), glowMats.cyan));
     const spokeMat = new THREE.MeshStandardMaterial({ color: 0xd9d2c4, roughness: 0.5, metalness: 0.6 });
-    const cabins = [];
-    const cabinGeo = new THREE.BoxGeometry(2.2, 2.2, 2.2);
     const cabCols = [PAL.terracottaLight, PAL.cream, PAL.teal, PAL.neonAmber];
-    for (let k = 0; k < 16; k++) {
-      const a = (k / 16) * Math.PI * 2;
-      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.22, R, 0.22), spokeMat);
-      spoke.position.set(0, Math.cos(a) * R / 2, Math.sin(a) * R / 2);
-      spoke.rotation.x = a;
-      wheel.add(spoke);
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.1, R * 0.9, 0.1), k % 2 ? glowMats.amber : glowMats.magenta);
-      strip.position.set(0.25, Math.cos(a) * R * 0.52, Math.sin(a) * R * 0.52);
-      strip.rotation.x = a;
-      wheel.add(strip);
-      const cab = new THREE.Mesh(cabinGeo, new THREE.MeshStandardMaterial({ color: cabCols[k % 4], roughness: 0.5 }));
-      cab.position.set(0, Math.cos(a) * R, Math.sin(a) * R);
-      wheel.add(cab);
-      cabins.push(cab);
+    const N = 16, spokes = [at(new THREE.CylinderGeometry(1.6, 1.6, 4, 12), 0, 0, 0, 0, 0, Math.PI / 2)], strips = [[], []];
+    const cabins = new THREE.InstancedMesh(new THREE.BoxGeometry(2.2, 2.2, 2.2), new THREE.MeshStandardMaterial({ roughness: 0.5 }), N);
+    const cabAt = [];
+    for (let k = 0; k < N; k++) {
+      const a = (k / N) * Math.PI * 2;
+      spokes.push(at(new THREE.BoxGeometry(0.22, R, 0.22), 0, Math.cos(a) * R / 2, Math.sin(a) * R / 2, a));
+      strips[k % 2].push(at(new THREE.BoxGeometry(0.1, R * 0.9, 0.1), 0.25, Math.cos(a) * R * 0.52, Math.sin(a) * R * 0.52, a));
+      cabAt.push([Math.cos(a) * R, Math.sin(a) * R]);
+      cabins.setColorAt(k, new THREE.Color(cabCols[k % 4]));
     }
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 4, 12), spokeMat);
-    hub.rotation.z = Math.PI / 2;
-    wheel.add(hub);
+    wheel.add(new THREE.Mesh(merge(spokes), spokeMat));
+    wheel.add(new THREE.Mesh(merge(strips[1]), glowMats.amber), new THREE.Mesh(merge(strips[0]), glowMats.magenta));
+    cabins.frustumCulled = false;
+    wheel.add(cabins);
     group.add(wheel);
+    const legs = [];
     for (const sz of [-1, 1]) for (const sx of [-1, 1]) {
       // A-frame legs
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.7, R + 7.5, 0.7), spokeMat);
-      leg.position.set(cx + sx * 2.6, PIER.y + (R + 5) / 2, cz + sz * 5.5);
-      leg.rotation.x = -sz * 0.36;
-      group.add(leg);
+      legs.push(at(new THREE.BoxGeometry(0.7, R + 7.5, 0.7), cx + sx * 2.6, PIER.y + (R + 5) / 2, cz + sz * 5.5, -sz * 0.36));
       addCircle(cx + sx * 2.6, cz + sz * 10.5, 0.6, 0, PIER.y + 6, {});
     }
-    updaters.push((dt) => { wheel.rotation.x += dt * 0.12; for (const c of cabins) c.rotation.x = -wheel.rotation.x; });
+    group.add(new THREE.Mesh(merge(legs), spokeMat));
+    const _cm = new THREE.Matrix4();
+    const place = () => { for (let k = 0; k < N; k++) { _cm.makeRotationX(-wheel.rotation.x); _cm.setPosition(0, cabAt[k][0], cabAt[k][1]); cabins.setMatrixAt(k, _cm); } cabins.instanceMatrix.needsUpdate = true; };
+    place();
+    updaters.push((dt) => { wheel.rotation.x += dt * 0.12; place(); });
   }
   // a second, plain pier further south
   {
@@ -312,7 +312,7 @@ export function buildLandmarks(scene, env) {
   ramp(PIER.x1 - 8, -16, Math.PI / 2, 10, 6, 2.8); // end of the pier, into the sea
   group.add(rampB.mesh(rampMat));
 
-  group.add(solid.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 }), 0.55, 0.6, 0.22)));
+  group.add(solid.cells(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 }), 0.55, 0.6, 0.22), 600));
   for (const k of Object.keys(glow)) if (!glow[k].empty) group.add(glow[k].mesh(glowMats[k], { shadow: false, receive: false }));
   scene.add(group);
   return { group, update(dt) { for (const u of updaters) u(dt); } };

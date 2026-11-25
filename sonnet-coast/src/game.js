@@ -1,6 +1,6 @@
 // Owns every gameplay system, the update order, and the glue between them (events, audio, flow).
 import * as THREE from 'three';
-import { G, on, emit } from './state.js';
+import { G, on, emit, plugins } from './state.js';
 import { Input } from './input.js';
 import { GameCamera } from './camera.js';
 import { FX } from './fx/particles.js';
@@ -49,6 +49,7 @@ export class Game {
     const car = new Vehicle('sport', POI.safehouse.x + 15, POI.safehouse.z + 5.5, Math.PI / 2, { paint: 0xd97757 });
     car.keep = true;
     this.starterCar = car;
+    for (const p of plugins) if (p.init) p.init(this);
   }
 
   applySave() {
@@ -209,6 +210,7 @@ export class Game {
     G.police.update(dt, t);
     G.missions.update(dt, t);
     this.world.update(dt, t, this.focus());
+    for (const p of plugins) if (p.update) p.update(dt, t);
     for (let i = this.hydrants.length - 1; i >= 0; i--) {
       const h = this.hydrants[i];
       h.t -= dt;
@@ -222,6 +224,7 @@ export class Game {
     G.cam.update(rawDt, t);
     this.updateHeadlight(dt);
     hud.update(rawDt, t);
+    for (const p of plugins) if (p.lateUpdate) p.lateUpdate(rawDt, t);
     this.updateAudio(rawDt);
     G.save.stats.distance += pl.worldSpeed * dt;
     // post effects that follow the action

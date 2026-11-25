@@ -156,14 +156,32 @@ export class Vehicle {
     emit('vehicleImpact', this, speed, x, z, other);
   }
 
+  // A parked vehicle draws its four wheels as one mesh. The swap only happens when it cannot be
+  // seen as a change: the wheels are already in their rest pose, or the camera is far away.
+  restWheels(on) {
+    const m = this.m;
+    if (!m.wheelRest || m.wheelRest.visible === on) return;
+    if (on) {
+      let zero = true;
+      for (const w of m.wheels) if (w.mesh.rotation.x !== 0 || w.pivot.rotation.y !== 0) { zero = false; break; }
+      if (!zero) {
+        const c = G.camera.position;
+        if ((c.x - this.pos.x) ** 2 + (c.z - this.pos.z) ** 2 < 45 * 45) return;
+        for (const w of m.wheels) { w.mesh.rotation.x = 0; w.pivot.rotation.y = 0; }
+      }
+    }
+    m.wheelRest.visible = on;
+    for (const w of m.wheels) w.pivot.visible = !on;
+  }
+
   // ---- simulation ---------------------------------------------------------
   update(dt, t) {
     const T = this.T;
     if (this.sunk) return;
     // Parked and untouched: skip the simulation until something moves us.
     if (this.asleep) {
-      if (this.driver || this.destroyed || this.burning || this.vel.x * this.vel.x + this.vel.z * this.vel.z > 0.02) this.asleep = false;
-      else { if (this.far !== this._farDrawn) { this._farDrawn = this.far; } return; }
+      if (this.driver || this.destroyed || this.burning || this.vel.x * this.vel.x + this.vel.z * this.vel.z > 0.02) { this.asleep = false; this.restWheels(false); }
+      else { if (this.far !== this._farDrawn) { this._farDrawn = this.far; } this.restWheels(true); return; }
     } else if (!this.driver && !this.destroyed && !this.burning && this.onGround && this.cls !== 'boat' && this.speed < 0.05 && Math.abs(this.angVel) < 0.02) {
       this.idleT = (this.idleT || 0) + dt;
       if (this.idleT > 1.5) { this.asleep = true; this.idleT = 0; this.vel.set(0, 0, 0); this.angVel = 0; this.syncMesh(dt, t); return; }
@@ -448,7 +466,12 @@ export class Vehicle {
     this.bodyPitch += (pitchT - this.bodyPitch) * k;
     m.body.rotation.set(this.bodyPitch, 0, this.bodyRoll);
     if (this.cls === 'hover') m.body.position.y = Math.sin(t * 3 + this.id) * 0.05 - T.hover * 0.55;
-    // wheels
+    // wheels: only the ones near the camera cast their own shadows; further off the four tiny
+    // patches under the body cannot be told from the body's own shadow
+    if (m.wheels.length) {
+      const c = G.camera.position, near = (c.x - this.pos.x) ** 2 + (c.z - this.pos.z) ** 2 < 55 * 55;
+      if (near !== m.wheelShadows) { m.wheelShadows = near; for (const w of m.wheels) w.mesh.castShadow = near; }
+    }
     for (const w of m.wheels) {
       w.mesh.rotation.x += (this.fwd / T.wheelR) * dt;
       if (w.front) w.pivot.rotation.y = -this.steer * T.steer * 0.75;

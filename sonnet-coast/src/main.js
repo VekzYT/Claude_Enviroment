@@ -13,6 +13,7 @@ import { Vehicle } from './entities/vehicle.js';
 import { groundHeight } from './world/roads.js';
 import { POI } from './world/layout.js';
 import { Touch } from './touch.js';
+import './plugins.js';
 
 async function boot() {
   const canvas = document.getElementById('game');

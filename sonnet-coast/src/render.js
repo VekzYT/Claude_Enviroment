@@ -4,9 +4,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
-import { G } from './state.js';
+import { G, DETAIL_LAYER } from './state.js';
 
 export const QUALITY = {
   // maxRatio caps the device pixel ratio; scale shrinks the internal resolution below native
@@ -50,6 +49,10 @@ const GradeShader = {
       col *= 1.0 - uVignette * smoothstep(0.12, 0.8, r2 * 1.7);
       col = mix(col, uFlash.rgb, uFlash.a * smoothstep(0.0, 0.5, r2 * 1.6 + uFlash.a * 0.3));
       gl_FragColor = vec4(col, 1.0);
+      // This is the last pass, so it also does what a separate output pass would: the renderer's
+      // tone mapping and the conversion to the screen's colour space.
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
     }`,
 };
 
@@ -62,6 +65,7 @@ export function createRenderer(canvas) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, 1, 0.3, 2600);
   camera.position.set(-250, 30, 60);
+  camera.layers.enable(DETAIL_LAYER);
   scene.add(camera);
 
   G.renderer = renderer; G.scene = scene; G.camera = camera;
@@ -71,7 +75,11 @@ export function createRenderer(canvas) {
     if (R.composer) { R.composer.dispose(); }
     if (R.ao) { R.ao.dispose(); R.ao = null; }
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-    const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples });
+    // With ambient occlusion on, the main pass also keeps its depth as a texture: the occlusion
+    // pass reads that instead of drawing the whole scene a second time into its own buffer.
+    const opts = { type: THREE.HalfFloatType, samples };
+    if (ao) opts.depthTexture = new THREE.DepthTexture(size.x, size.y);
+    const rt = new THREE.WebGLRenderTarget(size.x, size.y, opts);
     const composer = new EffectComposer(renderer, rt);
     composer.addPass(new RenderPass(scene, camera));
     if (ao) {
@@ -81,17 +89,16 @@ export function createRenderer(canvas) {
       pass.blendIntensity = 1;
       pass.updateGtaoMaterial({ radius: 1.7, distanceExponent: 1.4, thickness: 1.3, scale: 1.15, samples: 10, distanceFallOff: 1, screenSpaceRadius: false });
       pass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, radiusExponent: 1, rings: 2, samples: 8 });
-      // Only solid, depth-writing meshes belong in the occlusion buffer: glows, beams, sprites,
-      // water and anything flagged noAO would otherwise cast dark halos.
-      const cache = pass._visibilityCache;
-      const skip = (o) => {
-        if (o.isPoints || o.isLine || o.isSprite || o.userData.noAO) return true;
-        const m = o.material;
-        if (!m) return false;
-        const one = Array.isArray(m) ? m[0] : m;
-        return one.transparent || one.depthWrite === false || one.isShaderMaterial || one.blending === THREE.AdditiveBlending;
+      // Use the scene depth (whichever composer buffer holds this frame) and rebuild normals from
+      // it. Things that do not write depth (glows, beams, glass, sprites) are left out for free.
+      pass._renderGBuffer = false;
+      for (const m of [pass.gtaoMaterial, pass.pdMaterial]) { m.defines.NORMAL_VECTOR_TYPE = 0; m.defines.DEPTH_SWIZZLING = 'x'; m.uniforms.tNormal.value = null; m.needsUpdate = true; }
+      const baseRender = pass.render.bind(pass);
+      pass.render = (rnd, writeBuffer, readBuffer, dt, mask) => {
+        pass.gtaoMaterial.uniforms.tDepth.value = readBuffer.depthTexture;
+        pass.pdMaterial.uniforms.tDepth.value = readBuffer.depthTexture;
+        baseRender(rnd, writeBuffer, readBuffer, dt, mask);
       };
-      pass.overrideVisibility = () => { scene.traverse((o) => { cache.set(o, o.visible); if (o.visible && skip(o)) o.visible = false; }); };
       composer.addPass(pass);
       R.ao = pass;
     }
@@ -99,7 +106,6 @@ export function createRenderer(canvas) {
     composer.addPass(R.bloom);
     R.grade = new ShaderPass(GradeShader);
     composer.addPass(R.grade);
-    composer.addPass(new OutputPass());
     R.composer = composer;
     R.samples = samples;
     R.hasAO = !!ao;
