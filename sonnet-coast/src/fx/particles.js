@@ -23,6 +23,8 @@ const VERT = /* glsl */`
     vColor = aColor;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_PointSize = aSize * uScale / max(-mv.z, 0.5);
+    // a puff or spark right at the lens would fill the screen with one flat blob: fade it out instead
+    vColor.a *= smoothstep(0.8, 3.0, -mv.z);
     #ifdef PULL
       // a sprite is depth-tested at one depth, so the ground cut a low puff along a hard line; test it at the
       // front of its ball instead (same spot on screen, size from the real depth)
