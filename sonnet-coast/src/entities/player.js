@@ -48,6 +48,7 @@ export class Player {
     this.standOn = null;       // vehicle whose roof we stand on
     this.camDip = 0;
     this.dustT = 0;
+    this.scan = 0;
     this.outfit = fullOutfit(DEFAULT_OUTFIT);
     const m = buildModel();
     this.model = m.root; this.P = m.P; this.mats = m.mats;
@@ -313,8 +314,9 @@ export class Player {
       const p = planClimb(this, fx, fz, null, false, -0.2, 1.9, 0.7);
       if (p) return this.startClimb(p);
     }
-    // sprinting into something low vaults it
-    if (this.sprinting && this.speed > 5 && d.mag > 0.5) {
+    // sprinting into something low vaults it (looked for 20 times a second: well inside the reach)
+    this.scan = (this.scan + 1) % 3;
+    if (this.sprinting && this.speed > 5 && d.mag > 0.5 && !this.scan) {
       const p = planVault(this, fx, fz, 0.45 + this.speed * 0.08);
       if (p && p.kind === 'vault') return this.startVault(p);
     }
