@@ -4,8 +4,9 @@ import * as THREE from 'three';
 import { CITY, POI } from './layout.js';
 import { blocks, buildings, BUILDING_COLORS, DISTRICTS } from './cityplan.js';
 import { KERB } from './roads.js';
-import { Batch, FacadeBatch } from './geom.js';
-import { makeFacade, makeStorefronts, makeNoiseTexture, makeGround, makeCanvas, canvasToTexture, FACADE_STYLES, UI_FONT } from './textures.js';
+import { Batch, FacadeBatch, ChunkedInstances } from './geom.js';
+import { buildShopKit, BAY, LOBBY_BAY, SHOP_CEIL, LOBBY_CEIL } from './shops.js';
+import { makeFacade, makeStorefronts, makeNoiseTexture, makeGround, makeCanvas, canvasToTexture, FACADE_STYLES, UI_FONT, SHOP_ROWS, SHOP_ATLAS_ROWS } from './textures.js';
 import { addBox, addCircle } from './colliders.js';
 import { setNeon, grain } from './citylight.js';
 import { RNG } from '../util/rng.js';
@@ -20,6 +21,9 @@ export const parkLamps = [];      // {x, z}
 export const roofTrees = [];      // {x, y, z, s} trees growing on roofs and terraces
 const GY = CITY.y + KERB;
 const SHOP_H = 4.5;
+const SHOP_DIST = 115;      // how far the real shopfronts are drawn (scaled down on lower presets)
+const PIER = 4.1;            // solid corner left on a side wall next to a corner shop
+export const shopNear = { value: 0 };
 
 export function drawSpark(g, cx, cy, r, color, width = 0.16) {
   g.save();
@@ -198,6 +202,95 @@ function makePavingTexture() {
   return { map: canvasToTexture(c), rough: canvasToTexture(r, { srgb: false }) };
 }
 
+// Rooms behind the glass. Wherever the facade texture marks glass, the shader traces the view
+// ray into a box one bay wide and one floor tall and shades whatever it hits: back wall with a
+// door and a picture, side walls, floor, ceiling lamp, a desk standing mid-room, blinds or
+// curtains. Rooms are lit or dark by their own hash, more of them after sunset.
+const ROOMS_GLSL = /* glsl */`
+float glassK = 0.0;
+{
+  glassK = 1.0 - texture2D( roughnessMap, vRoughnessMapUv ).r;
+  if ( glassK > 0.02 ) {
+    vec2 cuv = vMapUv * 8.0;
+    vec2 cell = floor( cuv );
+    vec2 f = fract( cuv );
+    float h1 = fract( sin( dot( cell, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+    float h2 = fract( h1 * 37.17 + 0.31 );
+    float h3 = fract( h1 * 91.7 + 0.73 );
+    vec3 vdir = normalize( vViewPosition );
+    vec3 tT = tbn[ 0 ], tB = tbn[ 1 ];
+    float tl = dot( tT, tT ), bl = dot( tB, tB );
+    tT = tl > 1e-16 ? tT * inversesqrt( tl ) : vec3( 1.0, 0.0, 0.0 );
+    tB = bl > 1e-16 ? tB * inversesqrt( bl ) : vec3( 0.0, 1.0, 0.0 );
+    vec3 d = - vec3( dot( vdir, tT ), dot( vdir, tB ), dot( vdir, tbn[ 2 ] ) );
+    d.z = min( d.z, - 0.06 );
+    // never divide by a zero component
+    d.x = abs( d.x ) < 1e-4 ? 1e-4 : d.x;
+    d.y = abs( d.y ) < 1e-4 ? 1e-4 : d.y;
+    const float DEPTH = 1.25;
+    vec3 o = vec3( f, 0.0 );
+    vec3 tm = vec3( ( ( d.x > 0.0 ? 1.0 : 0.0 ) - o.x ) / d.x, ( ( d.y > 0.0 ? 1.0 : 0.0 ) - o.y ) / d.y, - DEPTH / d.z );
+    float t = min( tm.x, min( tm.y, tm.z ) );
+    vec3 hit = o + d * t;
+    float dep = clamp( - hit.z / DEPTH, 0.0, 1.0 );
+    vec3 wallCol = mix( vec3( 0.80, 0.77, 0.70 ), mix( vec3( 0.60, 0.69, 0.74 ), vec3( 0.78, 0.64, 0.52 ), h2 ), step( 0.55, h3 ) * 0.7 );
+    vec3 rc;
+    if ( t == tm.z ) {
+      rc = wallCol * 0.92;
+      if ( abs( hit.x - ( 0.25 + h2 * 0.5 ) ) < 0.11 && hit.y < 0.62 ) rc = vec3( 0.36, 0.26, 0.18 );
+      vec2 pc = abs( hit.xy - vec2( 0.72 - h2 * 0.45, 0.62 ) );
+      if ( pc.x < 0.1 && pc.y < 0.09 ) rc = mix( vec3( 0.2, 0.3, 0.42 ), vec3( 0.7, 0.4, 0.25 ), h3 );
+    } else if ( t == tm.x ) {
+      rc = wallCol * 0.8;
+    } else if ( d.y > 0.0 ) {
+      rc = vec3( 0.7, 0.69, 0.66 );
+      vec2 lc = abs( vec2( hit.x - 0.5, dep - 0.45 ) );
+      if ( lc.x < 0.22 && lc.y < 0.08 ) rc = vec3( 2.4 );
+    } else {
+      rc = mix( vec3( 0.42, 0.32, 0.24 ), vec3( 0.34, 0.35, 0.38 ), step( 0.5, h2 ) ) * ( 0.9 + 0.1 * step( 0.5, fract( hit.x * 5.0 ) ) );
+    }
+    rc *= 1.0 - 0.45 * dep;
+    rc *= 0.74 + 0.26 * smoothstep( 0.0, 0.3, min( hit.y, 1.0 - hit.y ) * 2.0 );
+    float tp = - 0.6 * DEPTH / d.z;
+    if ( tp < t ) {
+      vec2 q = o.xy + d.xy * tp;
+      float cx = 0.3 + h3 * 0.4;
+      if ( q.y > 0.0 && ( ( abs( q.x - cx ) < 0.2 && q.y < 0.24 ) || ( abs( q.x - cx - 0.26 ) < 0.045 && q.y < 0.5 ) ) ) rc = mix( vec3( 0.2, 0.17, 0.15 ), vec3( 0.3, 0.33, 0.36 ), h2 ) * 0.7;
+    }
+    float cover = 0.0;
+    vec3 coverCol = vec3( 0.86, 0.84, 0.78 );
+    if ( h1 < 0.3 ) {
+      if ( f.y > 0.75 - h2 * 0.6 ) { cover = 0.93; coverCol *= 0.8 + 0.2 * step( 0.5, fract( f.y * 22.0 ) ); }
+    } else if ( h1 < 0.5 ) {
+      if ( abs( f.x - 0.5 ) > 0.3 + h2 * 0.1 ) { cover = 0.95; coverCol = mix( vec3( 0.7, 0.62, 0.5 ), vec3( 0.5, 0.56, 0.62 ), h3 ) * ( 0.85 + 0.15 * sin( f.x * 90.0 ) ); }
+    }
+    float nightK = clamp( ( emissive.r - 0.02 ) / 0.8, 0.0, 1.0 );
+    float litRoom = step( h3, 0.18 + ( 0.14 + 0.45 * fract( cell.y * 0.37 + 0.2 ) ) * nightK );
+    vec3 lamp = mix( vec3( 1.0, 0.86, 0.66 ), vec3( 0.86, 0.94, 1.0 ), step( 0.78, h2 ) );
+    float light = ( 1.0 - nightK ) * ( 0.1 + 0.1 * h2 ) * ( 1.0 - 0.5 * dep ) + litRoom * ( 0.1 + 0.5 * nightK ) * ( 0.75 + 0.5 * h1 );
+    vec3 inside = mix( rc, coverCol, cover ) * mix( vec3( 1.0 ), lamp, litRoom ) * light;
+    float tiny = smoothstep( 0.2, 0.7, max( fwidth( cuv.x ), fwidth( cuv.y ) ) );
+    inside = mix( inside, vec3( 0.52, 0.48, 0.42 ) * ( ( 1.0 - nightK ) * 0.12 + ( 0.2 + 0.3 * nightK ) * ( 0.1 + 0.7 * nightK ) * 0.7 ), tiny );
+    inside *= vec3( 0.84, 0.93, 0.96 );
+    float fres = 0.1 + 0.9 * pow( 1.0 - max( dot( vdir, tbn[ 2 ] ), 0.0 ), 5.0 );
+    totalEmissiveRadiance = mix( totalEmissiveRadiance, inside * ( 1.0 - fres ), glassK );
+    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.015, 0.02, 0.025 ), glassK );
+    metalnessFactor = mix( metalnessFactor, 0.0, glassK );
+    roughnessFactor = mix( roughnessFactor, 0.05, glassK );
+  }
+}
+`;
+function withRooms(mat) {
+  mat.onBeforeCompile = function (shader, renderer) {
+    THREE.Material.prototype.onBeforeCompile.call(this, shader, renderer);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + ROOMS_GLSL)
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  material.specularColor = mix( material.specularColor, vec3( 0.17 ), glassK );');
+  };
+  mat.customProgramCacheKey = () => 'rooms';
+  return mat;
+}
+
 export function buildCity(scene, env) {
   const group = new THREE.Group();
   group.name = 'city';
@@ -215,21 +308,130 @@ export function buildCity(scene, env) {
   const WHITE = 0xf2f3f4, DECK = 0xe6e7e9, ROOF = 0x8d9096, LAWN = 0x4a8a3c;
   const GREENS = [0x3f7a35, 0x4a8a3c, 0x376b33, 0x55913f, 0x426f3a];
 
-  const shopQuad = (ax, az, bx, bz, nx, nz, nx2, nz2, row, u0, u1, col) => {
-    const o = 0.07;
-    const p = [[ax + nx * o, GY, az + nz * o], [bx + nx2 * o, GY, bz + nz2 * o], [bx + nx2 * o, GY + SHOP_H, bz + nz2 * o], [ax + nx * o, GY + SHOP_H, az + nz * o]];
-    const v0 = 1 - (row + 1) / 4 + 0.003, v1 = 1 - row / 4 - 0.003;
+  // Painted ground-floor strip. The vertex colour doubles as a flag: pure white fades out near the
+  // camera (a real shopfront stands behind it), anything else always draws.
+  const KEEP = [0.99, 0.99, 0.99], FADE = [1, 1, 1];
+  const shopQuad = (ax, az, bx, bz, nx, nz, nx2, nz2, row, u0, u1, col, y0 = 0, y1 = SHOP_H, o = 0.07) => {
+    const p = [[ax + nx * o, GY + y0, az + nz * o], [bx + nx2 * o, GY + y0, bz + nz2 * o], [bx + nx2 * o, GY + y1, bz + nz2 * o], [ax + nx * o, GY + y1, az + nz * o]];
+    const vb = 1 - (row + 1) / SHOP_ATLAS_ROWS + 0.002, vt = 1 - row / SHOP_ATLAS_ROWS - 0.002;
+    const v0 = vb + (vt - vb) * (y0 / SHOP_H), v1 = vb + (vt - vb) * (y1 / SHOP_H);
     const t = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
     const n = [[nx, nz], [nx2, nz2], [nx2, nz2], [nx, nz]];
     for (const k of [0, 1, 2, 0, 2, 3]) { shopB.pos.push(...p[k]); shopB.nor.push(n[k][0], 0, n[k][1]); shopB.uv.push(...t[k]); shopB.col.push(col[0], col[1], col[2]); }
   };
-  const shopWall = (ax, az, bx, bz, nx, nz, row, uOff, col) => shopQuad(ax, az, bx, bz, nx, nz, nx, nz, row, uOff, uOff + Math.hypot(bx - ax, bz - az) / 36, col);
-  const shopRing = (cx, cz, r, row, col) => {
+  const shopWall = (ax, az, bx, bz, nx, nz, row, uOff, col, o = 0.07) => shopQuad(ax, az, bx, bz, nx, nz, nx, nz, row, uOff, uOff + Math.hypot(bx - ax, bz - az) / 36, col, 0, SHOP_H, o);
+
+  // ---- real shopfronts ---------------------------------------------------------------------
+  // Every bay of a street-facing ground floor gets a frame, glass and a furnished interior,
+  // instanced and only drawn near the camera; the painted strip above is its distant stand-in.
+  const kit = buildShopKit();
+  const shopFrameMat = grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.4 }), 1.4, 0.25, 0.1);
+  const shopGlass = new THREE.MeshPhysicalMaterial({ color: 0x000000, roughness: 0.03, metalness: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, envMapIntensity: 1.25, fog: false });
+  const insideMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  for (const ch of ['r', 'g', 'b']) env.nightLerp(insideMat.color, ch, 0.92, 0.8);
+  const awningMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
+  const shopOpts = { chunk: 110, maxDist: SHOP_DIST };
+  const shopCI = {};
+  for (const k of ['shop', 'lobby']) {
+    const K = kit[k];
+    shopCI[k] = { frame: new ChunkedInstances(K.frame, shopFrameMat, shopOpts), glass: new ChunkedInstances(K.glass, shopGlass, shopOpts), interiors: {} };
+    if (K.awning) shopCI[k].awning = new ChunkedInstances(K.awning, awningMat, { ...shopOpts, colors: true, shadow: true });
+    for (const name of Object.keys(K.interiors)) shopCI[k].interiors[name] = new ChunkedInstances(K.interiors[name], insideMat, shopOpts);
+  }
+  const _bm = new THREE.Matrix4(), _bs = new THREE.Matrix4(), _bc = new THREE.Color();
+  let bayCount = 0;
+  const addBay = (lobby, info, x, z, nx, nz, sx) => {
+    _bm.makeRotationY(Math.atan2(nx, nz)); _bs.makeScale(sx, 1, 1); _bm.multiply(_bs); _bm.setPosition(x, GY, z);
+    const K = lobby ? shopCI.lobby : shopCI.shop;
+    K.frame.add(_bm); K.glass.add(_bm); K.interiors[info[2]].add(_bm);
+    if (K.awning && (bayCount * 7) % 5 < 2) K.awning.add(_bm, _bc.set(info[1]).lerp(new THREE.Color(0xf2efe8), 0.25));
+    bayCount++;
+  };
+  // One wall of a building, cut into whole bays. m0 / m1 are solid piers left at the ends where
+  // the neighbouring wall's corner shop already fills the space behind.
+  const shopFace = (f, row, m0, m1) => {
+    const L = Math.hypot(f.bx - f.ax, f.bz - f.az);
+    const lobby = row === 2, nominal = lobby ? LOBBY_BAY : BAY, tb = lobby ? 4 : 6, ceil = lobby ? LOBBY_CEIL : SHOP_CEIL;
+    const usable = L - m0 - m1;
+    if (usable < nominal * 0.72) { shopWall(f.ax, f.az, f.bx, f.bz, f.nx, f.nz, row, rng.float(0, 1), KEEP, 0); return; }
+    const n = Math.max(1, Math.round(usable / nominal)), w = usable / n;
+    const tx = (f.bx - f.ax) / L, tz = (f.bz - f.az) / L;
+    const k0 = rng.int(0, tb - 1);
+    const pier = (s0, s1) => shopQuad(f.ax + tx * s0, f.az + tz * s0, f.ax + tx * s1, f.az + tz * s1, f.nx, f.nz, f.nx, f.nz, row, k0 / tb - 0.005, k0 / tb + 0.005, KEEP, 0, SHOP_H, 0);
+    if (m0 > 0) pier(0, m0);
+    if (m1 > 0) pier(L - m1, L);
+    for (let i = 0; i < n; i++) {
+      const a = (k0 + i) % tb, s0 = m0 + i * w, s1 = s0 + w;
+      const x0 = f.ax + tx * s0, z0 = f.az + tz * s0, x1 = f.ax + tx * s1, z1 = f.az + tz * s1;
+      shopQuad(x0, z0, x1, z1, f.nx, f.nz, f.nx, f.nz, row, a / tb, (a + 1) / tb, KEEP, ceil, SHOP_H, 0);   // sign band
+      shopQuad(x0, z0, x1, z1, f.nx, f.nz, f.nx, f.nz, row, a / tb, (a + 1) / tb, FADE, 0, ceil, 0);        // window, far view only
+      addBay(lobby, SHOP_ROWS[row][a], x0, z0, f.nx, f.nz, w / nominal);
+    }
+  };
+  const shopRing = (cx, cz, r, row) => {
     const seg = 28, reps = Math.max(1, Math.round((2 * Math.PI * r) / 36));
     for (let i = 0; i < seg; i++) {
       // walk clockwise seen from above so that, from outside, u runs left to right
       const a0 = -(i / seg) * Math.PI * 2, a1 = -((i + 1) / seg) * Math.PI * 2;
-      shopQuad(cx + Math.cos(a0) * r, cz + Math.sin(a0) * r, cx + Math.cos(a1) * r, cz + Math.sin(a1) * r, Math.cos(a0), Math.sin(a0), Math.cos(a1), Math.sin(a1), row, (i / seg) * reps, ((i + 1) / seg) * reps, col);
+      shopQuad(cx + Math.cos(a0) * r, cz + Math.sin(a0) * r, cx + Math.cos(a1) * r, cz + Math.sin(a1) * r, Math.cos(a0), Math.sin(a0), Math.cos(a1), Math.sin(a1), row, (i / seg) * reps, ((i + 1) / seg) * reps, KEEP);
+    }
+  };
+
+  // ---- facade relief ------------------------------------------------------------------------
+  // Real geometry standing proud of the wall plane: piers on the bay lines, ledges and sunshades
+  // on the floor lines, cornices, and balconies on the apartment towers. Bay and floor positions
+  // are worked out from the same texture offsets the wall uses, so the solid parts land on the
+  // painted ones.
+  const relief = new Batch();
+  const FLOOR = 3.5;
+  const balconyGeo = (() => {
+    const b = new Batch();
+    b.box(2.7, 0.12, 1.1, 0, 0, 0.5, 0xd9d6cf);                                        // slab
+    b.box(2.7, 0.86, 0.03, 0, 0.12, 1.03, 0xa9c0cc);                                   // glass front
+    b.box(2.76, 0.04, 1.1, 0, 0.98, 0.52, 0x3a3c41);                                   // handrail, seen edge-on
+    return b.merged();
+  })();
+  const balconies = new ChunkedInstances(balconyGeo, grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.2 }), 1.2, 0.2, 0.08), { chunk: 130, maxDist: 170, shadow: true });
+  const _cc = new THREE.Color();
+  const hexOf = (c, k = 1) => _cc.setRGB(Math.min(1, c[0] * k), Math.min(1, c[1] * k), Math.min(1, c[2] * k)).getHex();
+  const addRelief = (style, x0, z0, x1, z1, yb, yt, col, uOff, top) => {
+    const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, h = yt - yb;
+    if (h < 6) return;
+    const wall = hexOf(col, 0.96), pale = hexOf(col, 1.04);
+    const ring = (y, p, th, hex) => relief.box(w + p * 2, th, d + p * 2, cx, y, cz, hex);
+    // the four faces in the order and direction the wall builder lays them out
+    const faces = [[x1, z1, 0, -1, 1, 0, d], [x0, z0, 0, 1, -1, 0, d], [x0, z1, 1, 0, 0, 1, w], [x1, z0, -1, 0, 0, -1, w]];
+    const onBays = (step, half, fn) => {
+      for (const [sx, sz, tx, tz, nx, nz, L] of faces) {
+        const first = ((((half ? 0.5 : 0) / 8 - uOff) * 28) % FLOOR + FLOOR) % FLOOR;
+        let k = 0;
+        for (let q = first; q < L - 0.3; q += FLOOR, k++) if (q > 0.3 && k % step === 0) fn(sx + tx * q, sz + tz * q, nx, nz, tx);
+      }
+    };
+    const pier = (pw, pd, hex) => onBays(1, false, (x, z, nx, nz, tx) => relief.box(tx ? pw : pd, h, tx ? pd : pw, x + nx * (pd / 2 - 0.03), yb, z + nz * (pd / 2 - 0.03), hex));
+    const floor0 = Math.ceil((yb - 0.2) / FLOOR) * FLOOR;
+    if (style === 'bands') {
+      for (let y = floor0; y < yt - 0.5; y += FLOOR) ring(y - 0.06, 0.5, 0.14, pale);          // sunshades on every floor
+    } else if (style === 'grid') {
+      onBays(2, false, (x, z, nx, nz, tx) => relief.box(tx ? 0.55 : 0.3, h, tx ? 0.3 : 0.55, x + nx * 0.12, yb, z + nz * 0.12, pale));
+      for (let y = floor0 + FLOOR * 4, k = 0; y < yt - 3; y += FLOOR * 4, k++) ring(y - 0.15, 0.32, 0.3, pale);
+      if (top) { ring(yt - 0.5, 0.55, 0.5, pale); ring(yt - 0.9, 0.3, 0.4, wall); }
+    } else if (style === 'brick') {
+      if (top) { ring(yt - 0.45, 0.5, 0.45, 0xd9d2c2); ring(yt - 0.8, 0.28, 0.35, 0xc9c2b2); }
+      for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) relief.box(0.7, h, 0.7, px, yb, pz, hexOf(col, 0.9));   // quoins
+    } else if (style === 'fins') {
+      pier(0.36, 0.5, pale);
+      onBays(1, true, (x, z, nx, nz) => {
+        for (let y = floor0 + FLOOR; y < yt - 2; y += FLOOR) {
+          _bm.makeRotationY(Math.atan2(nx, nz)); _bm.setPosition(x, y + 0.02, z);
+          balconies.add(_bm);
+        }
+      });
+    } else if (style === 'panel') {
+      for (let y = floor0 + FLOOR * 2; y < yt - 1; y += FLOOR * 2) ring(y - 0.05, 0.16, 0.1, 0xeef1f3);
+      for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) relief.box(0.4, h, 0.4, px, yb, pz, 0xdfe3e6);
+    } else if (style === 'glass') {
+      onBays(2, false, (x, z, nx, nz, tx) => relief.box(tx ? 0.1 : 0.22, h, tx ? 0.22 : 0.1, x + nx * 0.09, yb, z + nz * 0.09, 0xe9edf0));
     }
   };
 
@@ -289,8 +491,13 @@ export function buildCity(scene, env) {
         topW = topD = b.topR * 1.6;
       } else {
         for (const t of b.tiers) {
-          if (t.ins) fb.wallFrustum(t.x0, GY + t.y0, t.z0, t.x1, GY + t.y1, t.z1, t.ins, col, uOff);
-          else fb.wallBox(t.x0, GY + t.y0, t.z0, t.x1, GY + t.y1, t.z1, col, uOff);
+          // the ground floor of a building with shops is all shopfront, so its wall starts above it
+          const lift = t === b.tiers[0] && b.shop >= 0 && t.y1 - t.y0 > SHOP_H + 2 ? SHOP_H : 0;
+          if (t.ins) { const q = (t.ins * lift) / (t.y1 - t.y0); fb.wallFrustum(t.x0 + q, GY + t.y0 + lift, t.z0 + q, t.x1 - q, GY + t.y1, t.z1 - q, t.ins - q, col, uOff); }
+          else fb.wallBox(t.x0, GY + t.y0 + lift, t.z0, t.x1, GY + t.y1, t.z1, col, uOff);
+          // a projecting course over the shopfronts closes the joint and throws a shadow line
+          if (lift) trim.box(t.x1 - t.x0 + 0.5, 0.2, t.z1 - t.z0 + 0.5, (t.x0 + t.x1) / 2, GY + SHOP_H - 0.06, (t.z0 + t.z1) / 2, 0xe4e2dc);
+          if (!t.ins && fb !== facades.diagrid) addRelief(b.style, t.x0, t.z0, t.x1, t.z1, GY + t.y0 + lift, GY + t.y1, col, uOff, t === b.tiers[b.tiers.length - 1]);
           const i2 = t.ins || 0;
           const last = t === b.tiers[b.tiers.length - 1];
           const green = !last && b.roof === 'garden';
@@ -318,7 +525,7 @@ export function buildCity(scene, env) {
       if (circular) {
         const R = b.r;
         const near = [['w', b.cx - R - line.x0], ['e', line.x1 - (b.cx + R)], ['n', b.cz - R - line.z0], ['s', line.z1 - (b.cz + R)]].filter((q) => q[1] < 12).map((q) => q[0]);
-        if (b.shop >= 0) { shopRing(b.cx, b.cz, R + (b.shape === 'hyper' ? 1.45 : 0.02), b.shop === 3 ? 2 : b.shop, [1, 1, 1]); for (const f of near) addGlow(block, f, shopHue(b.shop), 0.6); }
+        if (b.shop >= 0) { shopRing(b.cx, b.cz, R + (b.shape === 'hyper' ? 1.45 : 0.02), b.shop === 3 ? 2 : b.shop === 0 && bi % 2 ? 4 : b.shop === 1 && bi % 2 ? 5 : b.shop); for (const f of near) addGlow(block, f, shopHue(b.shop), 0.6); }
       } else if (!custom) {
         const faces = [
           { f: 'w', on: Math.abs(base.x0 - line.x0) < 9, ax: base.x0, az: base.z0, bx: base.x0, bz: base.z1, nx: -1, nz: 0 },
@@ -328,9 +535,19 @@ export function buildCity(scene, env) {
         ];
         street = faces.filter((f) => f.on);
         if (b.shop >= 0) {
+          const lifted = base.y1 - base.y0 > SHOP_H + 2;
+          const row = b.shop === 0 && bi % 2 ? 4 : b.shop === 1 && bi % 2 ? 5 : b.shop;
+          const live = (f) => f.on && row !== 3 && lifted;
+          const by = {};
+          for (const f of faces) by[f.f] = f;
           for (const f of faces) {
-            shopWall(f.ax, f.az, f.bx, f.bz, f.nx, f.nz, f.on ? b.shop : 3, rng.float(0, 1), f.on ? [1, 1, 1] : [0.7, 0.7, 0.7]);
-            if (f.on && b.shop !== 3) addGlow(block, f.f, shopHue(b.shop), b.shop === 2 ? 0.5 : 0.7);
+            if (!live(f)) { shopWall(f.ax, f.az, f.bx, f.bz, f.nx, f.nz, f.on ? row : 3, rng.float(0, 1), f.on ? KEEP : [0.7, 0.7, 0.7], lifted ? 0 : 0.07); continue; }
+            // the east-west walls own the corners; the north-south ones stop a pier short of them
+            let m0 = 0, m1 = 0;
+            if (f.f === 'w') { if (live(by.n)) m0 = PIER; if (live(by.s)) m1 = PIER; }
+            if (f.f === 'e') { if (live(by.s)) m0 = PIER; if (live(by.n)) m1 = PIER; }
+            shopFace(f, row, m0, m1);
+            addGlow(block, f.f, shopHue(b.shop), b.shop === 2 ? 0.5 : 0.7);
           }
         }
       }
@@ -405,11 +622,11 @@ export function buildCity(scene, env) {
   FACADE_STYLES.forEach((style, i) => {
     if (!facades[style].pos.length) return;
     const tx = makeFacade(style, 31 + i * 17);
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = withRooms(new THREE.MeshStandardMaterial({
       map: tx.map, emissiveMap: tx.emissive, emissive: 0xffffff, emissiveIntensity: 0.05,
       roughnessMap: tx.orm, metalnessMap: tx.orm, roughness: 1, metalness: 1, vertexColors: true, envMapIntensity: 1.3,
       normalMap: tx.normal, normalScale: new THREE.Vector2(1.1, 1.1),
-    });
+    }));
     env.nightLerp(mat, 'emissiveIntensity', 0.02, 0.85);
     const mesh = new THREE.Mesh(facades[style].geometry(), mat);
     mesh.castShadow = true; mesh.receiveShadow = true;
@@ -428,6 +645,18 @@ export function buildCity(scene, env) {
       normalMap: tx.normal, normalScale: new THREE.Vector2(1.2, 1.2),
     });
     env.nightLerp(mat, 'emissiveIntensity', 0.12, 0.7);
+    mat.onBeforeCompile = function (shader, renderer) {
+      THREE.Material.prototype.onBeforeCompile.call(this, shader, renderer);
+      shader.uniforms.uShopNear = shopNear;
+      shader.fragmentShader = shader.fragmentShader.replace('void main() {', 'uniform float uShopNear;\nvoid main() {').replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+  #ifdef USE_COLOR
+  if ( vColor.b > 0.995 ) {
+    float sDither = fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) );
+    if ( length( vViewPosition ) < uShopNear + ( sDither - 0.5 ) * 14.0 ) discard;
+  }
+  #endif`);
+    };
+    mat.customProgramCacheKey = () => 'shopfade';
     const m = new THREE.Mesh(g, mat);
     m.receiveShadow = true;
     group.add(m);
@@ -580,7 +809,7 @@ export function buildCity(scene, env) {
   paveMesh.receiveShadow = true;
   group.add(paveMesh);
   const grass = makeGround('grass');
-  const lawnMat = grain(new THREE.MeshStandardMaterial({ color: 0xf0f6e8, map: grass.map, normalMap: grass.normal, roughness: 0.95 }), 0.04, 0.0, 0.4);
+  const lawnMat = grain(new THREE.MeshStandardMaterial({ color: 0xb9b6a0, map: grass.map, normalMap: grass.normal, roughness: 0.95 }), 0.04, 0.0, 0.4);
   const lawn = new THREE.Mesh(slabGeometry(lawnRects, CITY.y - 0.5, GY, 4.5), lawnMat);
   lawn.receiveShadow = true;
   group.add(lawn);
@@ -684,7 +913,7 @@ export function buildCity(scene, env) {
     const fb = new FacadeBatch(28);
     fb.revolve(tcx, tcz, prof, BUILDING_COLORS.ice, 0, 36);
     const tx = makeFacade('glass', 77);
-    const mat = new THREE.MeshStandardMaterial({ map: tx.map, emissiveMap: tx.emissive, emissive: 0xffffff, roughnessMap: tx.orm, metalnessMap: tx.orm, normalMap: tx.normal, roughness: 1, metalness: 1, vertexColors: true, envMapIntensity: 1.4 });
+    const mat = withRooms(new THREE.MeshStandardMaterial({ map: tx.map, emissiveMap: tx.emissive, emissive: 0xffffff, roughnessMap: tx.orm, metalnessMap: tx.orm, normalMap: tx.normal, roughness: 1, metalness: 1, vertexColors: true, envMapIntensity: 1.4 }));
     env.nightLerp(mat, 'emissiveIntensity', 0.02, 0.9);
     const m = new THREE.Mesh(fb.geometry(), mat);
     m.castShadow = true; m.receiveShadow = true;
@@ -711,7 +940,7 @@ export function buildCity(scene, env) {
   trim.cyl(shaft(1) + 2.2, shaft(1) + 0.6, 2.4, tcx, topY, tcz, WHITE, 32);
   trim.cyl(0.7, 1.3, 26, tcx, topY + 2.4, tcz, WHITE, 8);
   trim.cyl(R0 + 1.2, R0 + 2.4, 1.2, tcx, GY, tcz, WHITE, 40);
-  shopRing(tcx, tcz, R0 + 2.45, 2, [1, 1, 1]);
+  shopRing(tcx, tcz, R0 + 2.45, 2);
   addCircle(tcx, tcz, R0 + 2.4, 0, topY, { building: T });
   for (const [ax, li, ci, sd] of [['z', tb.i, tb.j, 1], ['z', tb.i + 1, tb.j, 0], ['x', tb.j, tb.i, 1], ['x', tb.j + 1, tb.i, 0]]) setNeon(ax, li, ci, sd, new THREE.Color(0xffe6cf), 0.5);
 
@@ -769,6 +998,8 @@ export function buildCity(scene, env) {
   // ---- merged batches (built last: parks, plazas and landmarks add to them) -------
   group.add(roofs.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), 0.55, 0.75, 0.26)));
   group.add(trim.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.15, envMapIntensity: 1.1 }), 0.8, 0.22, 0.1)));
+  if (!relief.empty) group.add(relief.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 }), 0.7, 0.45, 0.16)));
+  balconies.build(group);
   group.add(deco.mesh(flatMat, { shadow: false }));
   for (const k of Object.keys(glow)) if (!glow[k].empty) group.add(glow[k].mesh(glowMats[k], { shadow: false, receive: false }));
   if (!pools.empty) {
@@ -777,8 +1008,21 @@ export function buildCity(scene, env) {
     group.add(pools.mesh(pm, { shadow: false }));
   }
 
+  // real shopfronts: glass draws after everything solid behind it
+  for (const k of ['shop', 'lobby']) {
+    const C = shopCI[k];
+    C.frame.build(group);
+    for (const name of Object.keys(C.interiors)) C.interiors[name].build(group);
+    if (C.awning) C.awning.build(group);
+    C.glass.build(group);
+    for (const m of C.glass.meshes) { m.renderOrder = 3; m.receiveShadow = false; }
+  }
+
   scene.add(group);
   return {
+    bays: bayCount,
+    // called when the draw distance changes: the painted strips give way just inside the range
+    setDrawScale(scale) { shopNear.value = Math.max(0, SHOP_DIST * scale - 14); },
     group, atlas, screenMat, paveMat,
     update(dt, t) {
       spark.rotation.y += dt * 0.35;

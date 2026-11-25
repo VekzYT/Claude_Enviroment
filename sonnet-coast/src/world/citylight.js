@@ -191,8 +191,10 @@ export function installCityLighting() {
   // World-space grain (see grain()). Sampled once in the colour chunk, reused for roughness and normal.
   C.color_fragment = C.color_fragment + /* glsl */`
 #ifdef WORLD_GRAIN
-  vec3 grainW = abs( normalize( cross( dFdx( vCityPos ), dFdy( vCityPos ) ) ) );
-  grainW *= grainW; grainW /= ( grainW.x + grainW.y + grainW.z );
+  vec3 grainC = cross( dFdx( vCityPos ), dFdy( vCityPos ) );
+  float grainL = dot( grainC, grainC );
+  vec3 grainW = grainL > 1e-24 ? abs( grainC ) * inversesqrt( grainL ) : vec3( 0.0, 1.0, 0.0 );   // degenerate derivatives at grazing angles
+  grainW *= grainW; grainW /= max( grainW.x + grainW.y + grainW.z, 1e-6 );
   vec3 grainP = vCityPos * WORLD_GRAIN;
   vec4 grainX = texture2D( uGrainTex, grainP.zy ), grainY = texture2D( uGrainTex, grainP.xz ), grainZ = texture2D( uGrainTex, grainP.xy );
   vec4 grainS = grainX * grainW.x + grainY * grainW.y + grainZ * grainW.z;
@@ -209,6 +211,12 @@ export function installCityLighting() {
     normal = normalize( ( viewMatrix * vec4( normalize( gw ), 0.0 ) ).xyz );
   }
 #endif
+`;
+  // No shader may hand an invalid or absurd value on: one NaN pixel would smear across the whole
+  // frame through bloom, or through the reflection probe into every surface.
+  C.opaque_fragment = C.opaque_fragment + /* glsl */`
+  if ( ! ( gl_FragColor.r >= 0.0 && gl_FragColor.g >= 0.0 && gl_FragColor.b >= 0.0 ) ) gl_FragColor.rgb = vec3( 0.0 );
+  gl_FragColor.rgb = min( gl_FragColor.rgb, vec3( 48.0 ) );
 `;
   // Every material shares the same uniform objects, so one write updates them all.
   const base = THREE.Material.prototype.onBeforeCompile;

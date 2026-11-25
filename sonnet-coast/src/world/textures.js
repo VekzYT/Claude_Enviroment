@@ -137,6 +137,10 @@ function windowPane(L, rng, x, y, w, h, litChance, opts = {}) {
     L.g.globalAlpha = 0.35; L.g.fillStyle = c; L.g.fillRect(gx, gy, gw, gh); L.g.globalAlpha = 1;
     L.go.fillStyle = Layers.rm(0.25, 0.3); L.go.fillRect(gx, gy, gw, gh);
   }
+  // Red channel of the roughness/metal map = 0 marks glass: the facade shader puts a room behind it.
+  L.go.globalCompositeOperation = 'multiply';
+  L.go.fillStyle = 'rgb(0,255,255)'; L.go.fillRect(gx, gy, gw, gh);
+  L.go.globalCompositeOperation = 'source-over';
 }
 
 // One tile = 8 bays x 8 floors (28 m x 28 m).
@@ -251,15 +255,25 @@ export const SHOP_NAMES = [
   ['SYSTEM PROMPT TAILORS', '#8fe1ff'], ['EPOCH VINTAGE', '#ffb347'], ['THE LOSS FUNCTION PUB', '#ff7a59'], ['SOFTMAX SOFT SERVE', '#ff9ad5'],
 ];
 
-// Ground-floor strip atlas: 4 rows (retail, food, lobby, industrial); one tile = 36 m x 4.5 m.
+// Which shop sits in each bay of the ground-floor atlas: [name, sign colour, interior type].
+// Rows: 0 retail, 1 food, 2 lobbies, 3 industrial shutters, 4 retail, 5 food.
+export const SHOP_ROWS = [
+  [['OPUS BOOKS', '#d9b26a', 'books'], ['PROMPT & CIRCUMSTANCE', '#c8643b', 'clothes'], ['SONNET FLORIST', '#6aa84f', 'florist'], ['FINE-TUNE BARBER', '#4a8fd0', 'barber'], ['SAFETY FIRST PHARMACY', '#2ea86b', 'market'], ['ATTENTION SPAN ARCADE', '#c94fb8', 'arcade']],
+  [['CONTEXT CAFÉ', '#b9825a', 'cafe'], ['HAIKU NOODLES', '#d9603b', 'bar'], ['TOKEN TACOS', '#e0a530', 'diner'], ['LATENT SPACE BAR', '#a14fc9', 'bar'], ['GRADIENT GELATO', '#4ab8d0', 'cafe'], ['PARAMETER PIZZA', '#d9603b', 'diner']],
+  [[null, null, 'lobby'], [null, null, 'lobby'], [null, null, 'lobby'], [null, null, 'lobby']],
+  null,
+  [['EPOCH VINTAGE', '#e0a530', 'clothes'], ['BAYOU BYTES', '#2ea86b', 'tech'], ['EMBEDDINGS TATTOO', '#d9486e', 'gallery'], ['WEIGHTS & MEASURES GYM', '#4a8fd0', 'gym'], ['SYSTEM PROMPT TAILORS', '#6a7f9a', 'clothes'], ['GROUND TRUTH GROCER', '#6aa84f', 'market']],
+  [['ZERO-SHOT ESPRESSO', '#b9825a', 'cafe'], ['THE LOSS FUNCTION PUB', '#d9603b', 'bar'], ['SOFTMAX SOFT SERVE', '#e07aa8', 'cafe'], ['HALLUCINATION KARAOKE', '#a14fc9', 'bar'], ['BEAM SEARCH BAKERY', '#d9b26a', 'cafe'], ['DROPOUT DINER', '#c8643b', 'diner']],
+];
+export const SHOP_ATLAS_ROWS = SHOP_ROWS.length;
+
+// Ground-floor strip atlas; one tile = 36 m x 4.5 m.
 export function makeStorefronts(seed = 7) {
   const rng = new RNG(seed);
-  const W = 2048, RH = 256, L = new Layers(W, RH * 4);
-  const names = SHOP_NAMES.slice();
-  const nextName = () => names.splice(rng.int(0, names.length - 1), 1)[0] || rng.pick(SHOP_NAMES);
-  for (let row = 0; row < 4; row++) {
+  const W = 2048, RH = 256, L = new Layers(W, RH * SHOP_ATLAS_ROWS);
+  for (let row = 0; row < SHOP_ATLAS_ROWS; row++) {
     const y0 = row * RH;
-    const wall = ['#f1efea', '#ece6dc', '#eef1f4', '#c9c9cb'][row];
+    const wall = ['#f1efea', '#ece6dc', '#eef1f4', '#c9c9cb', '#efece4', '#ebe4d8'][row];
     L.rect(0, y0, W, RH, wall, 0.85, 0, 0.56);
     L.rect(0, y0 + RH - 22, W, 22, '#9a9892', 0.9, 0, 0.72);           // plinth
     const bays = row === 2 ? 4 : 6;
@@ -276,7 +290,7 @@ export function makeStorefronts(seed = 7) {
         for (let k = 0; k < sw; k += 28) L.rect(sx + k, y0 + RH - 30, 14, 8, '#e0a530', 0.8, 0);
         continue;
       }
-      const [name, color] = nextName();
+      const [name, color] = SHOP_ROWS[row][b];
       const lobby = row === 2;
       // shop window
       const wx = x0 + 22, wy = y0 + (lobby ? 30 : 74), ww = bw - 44, wh = RH - 22 - (lobby ? 30 : 74);

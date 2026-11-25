@@ -11,16 +11,16 @@ import { G } from './state.js';
 export const QUALITY = {
   // maxRatio caps the device pixel ratio; scale shrinks the internal resolution below native
   // shadowBox is the half-width of the sun's shadow volume in metres; ao adds ambient occlusion
-  low: { maxRatio: 1, scale: 0.8, shadows: false, post: false, samples: 0, far: 1400, fogFar: 1150, cityLights: false, shadowMap: 1024, shadowBox: 90, ao: false },
-  medium: { maxRatio: 1.25, scale: 1, shadows: true, post: true, samples: 2, far: 2000, fogFar: 1700, cityLights: true, shadowMap: 2048, shadowBox: 110, ao: false },
-  high: { maxRatio: 1.75, scale: 1, shadows: true, post: true, samples: 4, far: 2700, fogFar: 2200, cityLights: true, shadowMap: 4096, shadowBox: 150, ao: true },
+  low: { maxRatio: 1, scale: 0.8, shadows: false, post: false, samples: 0, far: 1400, fogFar: 1150, cityLights: false, shadowMap: 1024, shadowBox: 90, ao: false, probe: 0, probeSize: 64 },
+  medium: { maxRatio: 1.25, scale: 1, shadows: true, post: true, samples: 2, far: 2000, fogFar: 1700, cityLights: true, shadowMap: 2048, shadowBox: 110, ao: false, probe: 2.2, probeSize: 128 },
+  high: { maxRatio: 1.75, scale: 1, shadows: true, post: true, samples: 4, far: 2700, fogFar: 2200, cityLights: true, shadowMap: 4096, shadowBox: 150, ao: true, probe: 0.8, probeSize: 256 },
 };
 
 // Final grade: speed blur, chromatic fringe, split-tone, vignette. Runs in linear HDR.
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null }, uSpeed: { value: 0 }, uCA: { value: 0.6 }, uVignette: { value: 0.42 }, uTexel: { value: new THREE.Vector2(1 / 1280, 1 / 720) }, uSharp: { value: 0.35 },
-    uSat: { value: 1.08 }, uFlash: { value: new THREE.Vector4(0, 0, 0, 0) }, uDesat: { value: 0 },
+    uSat: { value: 1.0 }, uFlash: { value: new THREE.Vector4(0, 0, 0, 0) }, uDesat: { value: 0 },
   },
   vertexShader: /* glsl */`varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */`
@@ -113,6 +113,7 @@ export function createRenderer(canvas) {
     if (G.env) {
       G.env.sun.castShadow = q.shadows;
       G.env.cityLights = q.cityLights;
+      G.env.setProbe(q.probe, q.probeSize);
       const sh = G.env.sun.shadow, sc = sh.camera, b = q.shadowBox;
       if (sh.mapSize.x !== q.shadowMap) {
         sh.mapSize.set(q.shadowMap, q.shadowMap);

@@ -116,14 +116,14 @@ function palmGeo() {
       p.setX(k, p.getX(k) * (1 - t * 0.7));
     }
     g.computeVertexNormals();
-    b.add(g, f.upper ? 0x3f8f40 : 0x2f7436, x, y + 0.15, 0, f.tilt, f.a, 0);
+    b.add(g, f.upper ? 0x46733c : 0x345a30, x, y + 0.15, 0, f.tilt, f.a, 0);
   }
   return b.merged();
 }
 function palmShellGeo() {
   const b = new Batch();
   const [x, y] = PALM_TOP;
-  for (const f of PALM_FRONDS) b.add(frondGeo(f.len, 9, f.droop, f.upper ? 0x2c7a34 : 0x24602c, f.upper ? 0x6fc058 : 0x4f9a48), null, x, y + 0.15, 0, f.tilt, f.a, 0);
+  for (const f of PALM_FRONDS) b.add(frondGeo(f.len, 9, f.droop, f.upper ? 0x2a5a30 : 0x244a28, f.upper ? 0x6f9a4c : 0x55803f), null, x, y + 0.15, 0, f.tilt, f.a, 0);
   return b.merged();
 }
 
@@ -171,7 +171,7 @@ function pineGlowGeo() {
   return b.merged();
 }
 // Broadleaf trees: trunk, boughs and a small core of canopy in the far model...
-const LEAF = [[0x1f5a2a, 0x58a846], [0x25672e, 0x6ab54e], [0x1b5226, 0x4c9a40]];
+const LEAF = [[0x1c3a20, 0x587a3c], [0x223f22, 0x66863f], [0x19361f, 0x4c6f38]];
 function broadleafGeo() {
   const b = new Batch();
   limb(b, 0, 0, 0, 0.15, 3.3, 0.05, 0.42, 0.26, 0x33261c, 0x5b4634, 8, 0.45);

@@ -161,6 +161,8 @@ export class Environment {
     this.envScene.add(this.glowBand);
     this.pmrem = renderer ? new THREE.PMREMGenerator(renderer) : null;
     this.envRT = null;
+    // Live reflection probe (see updateProbe). every = seconds between captures, 0 = sky only.
+    this.probe = { every: 0, size: 128, rt: null, cam: null, face: -1, timer: 0.5, pos: new THREE.Vector3(), env: null };
     this.apply(0);
   }
 
@@ -233,8 +235,52 @@ export class Environment {
     }
   }
 
+  // What paint and glass reflect. The scene around the camera is rendered into a small cube, one
+  // face a frame so it never costs more than one extra low-resolution pass, then filtered into
+  // scene.environment. Cars mirror the street they are on; towers mirror their neighbours.
+  setProbe(every, size = 128) {
+    const P = this.probe;
+    if (P.rt && P.size !== size) { P.rt.dispose(); P.rt = null; P.cam = null; }
+    P.every = every; P.size = size;
+    if (!every) { P.face = -1; if (P.env) { P.env.dispose(); P.env = null; this.refreshEnvMap(); } }
+  }
+  updateProbe(dt, at) {
+    const P = this.probe, r = this.renderer;
+    if (!P.every || !this.pmrem || !r) return;
+    if (P.face < 0) {
+      P.timer -= dt;
+      if (P.timer > 0) return;
+      P.face = 0;
+      P.pos.copy(at);
+    }
+    if (!P.rt) {
+      P.rt = new THREE.WebGLCubeRenderTarget(P.size, { type: THREE.HalfFloatType, generateMipmaps: false });
+      P.cam = new THREE.CubeCamera(0.4, 900, P.rt);
+      P.cam.coordinateSystem = r.coordinateSystem;
+      P.cam.updateCoordinateSystem();
+      this.scene.add(P.cam);
+    }
+    const prevRT = r.getRenderTarget(), prevAuto = r.shadowMap.autoUpdate;
+    r.shadowMap.autoUpdate = false;                // reuse this frame's shadow map
+    P.cam.position.copy(P.pos);
+    P.cam.updateMatrixWorld(true);
+    this.sky.position.copy(P.pos);
+    r.setRenderTarget(P.rt, P.face);
+    r.render(this.scene, P.cam.children[P.face]);
+    r.setRenderTarget(prevRT);
+    r.shadowMap.autoUpdate = prevAuto;
+    this.sky.position.copy(G.camera.position);
+    if (++P.face < 6) return;
+    P.face = -1; P.timer = P.every;
+    P.env = this.pmrem.fromCubemap(P.rt.texture, P.env || undefined);
+    if (this.envRT) { this.envRT.dispose(); this.envRT = null; }
+    this.scene.environment = P.env.texture;
+    this._envHour = this.hour; this._envTimer = 0;
+  }
+
   refreshEnvMap() {
     if (!this.pmrem) return;
+    if (this.probe.env) { this._envHour = this.hour; this._envTimer = 0; return; }   // the probe has it covered
     const rt = this.pmrem.fromScene(this.envScene, 0, 1, 500);
     if (this.envRT) this.envRT.dispose();
     this.envRT = rt;
@@ -260,6 +306,7 @@ export class Environment {
     this._envTimer += dt;
     let dh = Math.abs(this.hour - this._envHour); if (dh > 12) dh = 24 - dh;
     if (dh > 0.12 && this._envTimer > 3) this.refreshEnvMap();
+    this.updateProbe(dt, G.camera.position);
   }
 
   clockText() {

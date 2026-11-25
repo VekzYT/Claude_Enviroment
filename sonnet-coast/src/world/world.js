@@ -44,6 +44,7 @@ export async function buildWorld(scene, renderer, quality, progress) {
       if (cullTimer <= 0) {
         cullTimer = 0.3;
         cullChunks(focus.x, focus.z, drawScale[this.quality] || 1);
+        city.setDrawScale(drawScale[this.quality] || 1);
         terrain.update(focus.x, focus.z);
       }
       env.update(dt, focus);

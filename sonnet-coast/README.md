@@ -111,6 +111,21 @@ After the prototype job, Gator Garage hands out repeatable chop-shop contracts. 
 Weights are scattered around the wilds, and seven stunt ramps pay out the first time you land each
 one.
 
+**Depth.** Nothing in the city is a flat painted wall any more.
+
+- *Shops.* Street-facing ground floors are real shopfronts near you: frames, glass doors and
+  windows, and furnished interiors you can look into from the pavement: bookshop, boutique,
+  florist, barber, mini-mart, arcade, café, bar, diner, tech store, gallery, gym and office
+  lobbies, each with staff or customers inside. You cannot go in. Far away they fall back to the
+  painted version with the same shop name.
+- *Windows.* Behind every upper-floor pane the shader traces a room: back wall with a door and a
+  picture, side walls, floor, ceiling lamp, a desk standing mid-room, blinds or curtains. Rooms
+  shift with parallax as you move, and more of them are lit after dark.
+- *Facades.* Piers on the bay lines, sunshades and ledges on the floor lines, cornices, quoins,
+  and balconies on the apartment towers, lined up with the texture underneath.
+- *Reflections.* A live probe renders the surroundings into a small cube, one face per frame, so
+  car paint, shop glass and towers mirror the street they are on rather than just the sky.
+
 **Also:** a weapon wheel (fists, shock baton, pulse pistol, EMP charges, a hack tool), a wardrobe
 at the safehouse, a gadget shop, five radio stations of generated music, a day-night cycle, and a
 full map with GPS routing.
@@ -122,9 +137,9 @@ poor. You can pick a preset in *Settings*; once you do, it stays where you put i
 
 | Preset | What changes |
 | --- | --- |
-| High | Ambient occlusion, 4× anti-aliasing, 4096 shadow map, detailed tree crowns out to 210 m, longest draw distance |
-| Medium | 2× anti-aliasing, 2048 shadow map, detailed crowns to 130 m, shorter draw distance, no ambient occlusion |
-| Low | No bloom, shadows or street-lamp lighting; far tree models only; lower resolution |
+| High | Ambient occlusion, 4× anti-aliasing, 4096 shadow map, reflection probe refreshed about once a second, shop interiors to 115 m, longest draw distance |
+| Medium | 2× anti-aliasing, 2048 shadow map, probe every couple of seconds, shop interiors to about 100 m, no ambient occlusion |
+| Low | No bloom, shadows, probe or street-lamp lighting; shop interiors to about 60 m; far tree models only; lower resolution |
 
 Every preset gets the same models and textures; the presets only change lighting effects, shadow
 quality and how far the detail reaches.
@@ -165,6 +180,12 @@ How things are modelled, since there are no asset files:
 - **Grain.** Vertex-coloured geometry (roofs, concrete, bark, foliage) opts into a world-space
   grain in the shader: fine bumps, roughness breakup and slow colour mottling, projected along the
   world axes so it needs no UVs.
+- **Shopfronts** (`src/world/shops.js`) are instanced bays: one frame, one sheet of glass and
+  one interior per shop type. The interiors are shaded once when they are built and then drawn
+  unlit, so a shop looks lit from inside at any hour. The painted strip in front of each bay
+  discards itself with a dither as the camera approaches.
+- **Rooms** behind facade glass are a fragment-shader ray cast into a box per bay per floor
+  (`ROOMS_GLSL` in `src/world/city.js`); the red channel of the roughness map marks the glass.
 - **Trees** have a cheap far model that is always drawn and a detailed crown that is added near
   the camera and sits over it, so there is no visible switch.
 
@@ -183,7 +204,8 @@ This was built and tested in a headless browser with software rendering. Game lo
 scripted playthroughs of every job, and the touch controls by an emulated phone, but nobody has
 played it on a real phone or a real graphics card: frame rate, how the music sounds, how the
 touch layout feels under actual thumbs, and whether the medal times and fights are fair are all
-unchecked. The detailed models roughly doubled the triangle count (about 1.5 million a frame in
-the city on Medium, shadows included), so older laptops and phones are more likely to step down a
-preset than before. It is all generated geometry and painted textures: stylised, not
-photorealistic. Interiors, a story beyond the jobs above, and gamepad support are not included.
+unchecked. The detailed models, shop interiors and facade relief put a city frame at roughly 1.8 to
+2.2 million triangles on Medium with shadows included, so older laptops and phones are more likely
+to step down a preset than before. It is all generated geometry, painted textures and shader
+tricks: closer to a real street than it was, but still not a photograph. Round towers keep painted
+ground floors, and shop interiors repeat (there are thirteen kinds). Interiors, a story beyond the jobs above, and gamepad support are not included.
