@@ -17,6 +17,7 @@ import { PAL } from '../world/palette.js';
 import { PED_LOOKS } from '../entities/pedlooks.js';
 import { Job, fmtTime } from './job.js';
 import { TailLights, SignalLoss, HotPursuit, WakeUpCall, CourierRush, GlidePath, WeightsJob } from './more.js';
+import { DriftTrial } from './drift.js';
 import { ramps } from '../world/roads.js';
 
 const P = {};
@@ -462,6 +463,7 @@ const JOBS = [
   { id: 'wake', title: 'Wake Up Call', where: 'Sonnet Pier', cls: WakeUpCall, reward: 2800, req: 'intro', at: () => ({ x: PIER.x1 - 100, z: 5.5 }), type: 'mission' },
   { id: 'courier', title: 'Courier Rush (deliveries)', where: 'Haiku Express', cls: CourierRush, reward: 900, req: 'intro', at: () => ({ x: 250, z: 209.2 }), type: 'activity' },
   { id: 'glide', title: 'Glide Path (hover-bike trial)', where: 'Sonnet Pier', cls: GlidePath, reward: 1600, req: 'intro', at: () => ({ x: PIER.x0 + 11, z: -4.5 }), type: 'activity', cleanOnly: true },
+  { id: 'drift', title: 'Drift Trial (score attack)', where: 'Port of Sonnet', cls: DriftTrial, reward: 2500, req: 'intro', at: () => ({ x: 666, z: 1031 }), type: 'activity', cleanOnly: true },
   { id: 'weights', title: 'The Weights Job', where: 'Claude Tower', cls: WeightsJob, reward: 9000, reqAll: ['prototype', 'heist', 'bayou', 'tail'], at: () => ({ x: POI.tower.x, z: POI.tower.z }), type: 'mission', finale: true, cleanOnly: true },
 ];
 const STUNT_PAY = 400, STUNT_ALL = 3000;
