@@ -2,6 +2,7 @@
 // Keep one import per line, with a blank line between groups, so parallel work merges cleanly.
 
 // traffic
+import './entities/vehicleLod.js';
 
 // driving
 import './drive/drift.js';
