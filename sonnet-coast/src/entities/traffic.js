@@ -319,6 +319,7 @@ export class Traffic {
     this.slotUsed = new Set();
     this.fixed = [];
     this.sirens = [];
+    this.racing = false;
     this.cand = []; this.candW = 0;
     this.buildFixed();
     this.buildStreets();
@@ -440,7 +441,7 @@ export class Traffic {
     const night = G.env.night;
     for (let tries = 0; tries < 10; tries++) {
       const e = this.pickEdge(kind === 'bus' ? (x) => x.type === 'blvd' : null);
-      if (!e || e.len < 20) continue;
+      if (!e || e.len < 20 || (this.racing && e.type === 'dirt')) continue;
       const s = rand(8, e.len - 8);
       edgePoint(e, s, 0, P);
       const d = Math.hypot(P.x - pp.x, P.z - pp.z);
@@ -493,7 +494,7 @@ export class Traffic {
     _fr.setFromProjectionMatrix(_pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     const inCity = pp.x > CITY.x0 - 80 && pp.x < CITY.x1 + 80 && pp.z > CITY.z0 - 80 && pp.z < CITY.z1 + 80;
     // busy by day, thinner at night (when every car shows its lights), and thinned out for a street race
-    const racing = !!(G.missions && G.missions.active && G.missions.active.rivals);
+    const racing = this.racing = !!(G.missions && G.missions.active && G.missions.active.rivals);
     const want = G.indoors ? 0 : Math.round((inCity ? CITY_CARS : OUT_CARS) * this.density * (1 - night * 0.45) * (racing ? 0.35 : 1));
     let moving = 0, buses = 0, lots = 0, kerbs = 0;
     this.sirens.length = 0;
@@ -514,7 +515,9 @@ export class Traffic {
         const ai = v.ai;
         if (ai) ai.stillT = v.speed < 0.4 ? (ai.stillT || 0) + step : 0;
         const stuck = ai && ai.stillT > 30;
-        if (d > DESPAWN_SEEN || (stuck && d > 90) || ((d > DESPAWN || stuck) && !this.inView(v.pos.x, v.pos.y, v.pos.z, v.radius))) { v.dispose(); continue; }
+        // and during a race, the trails are cleared for the rally (and nobody is wiser)
+        const trail = racing && ai && ai.edge.type === 'dirt';
+        if (d > DESPAWN_SEEN || (stuck && d > 90) || ((d > DESPAWN || stuck || trail) && !this.inView(v.pos.x, v.pos.y, v.pos.z, v.radius))) { v.dispose(); continue; }
         moving++;
         if (v.bus) buses++;
         continue;
@@ -529,7 +532,7 @@ export class Traffic {
     }
     if (moving < want) {
       this.candidates(pp);
-      if (inCity && buses < Math.round(BUSES * (1 - night * 0.4)) && this.spawnOnRoad(pp, 'bus')) moving++;
+      if (inCity && !racing && buses < Math.round(BUSES * (1 - night * 0.4)) && this.spawnOnRoad(pp, 'bus')) moving++;
       // a few at a time, so no single tick stalls a frame
       for (let k = moving < want * 0.5 ? 4 : 2; k > 0 && moving < want; k--) if (this.spawnOnRoad(pp)) moving++;
     }
