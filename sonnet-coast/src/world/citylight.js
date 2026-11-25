@@ -10,6 +10,7 @@
 // Lamp on/off state and storefront colours live in two tiny data textures.
 import * as THREE from 'three';
 import { CITY } from './layout.js';
+import { makeGrainTexture } from './textures.js';
 
 const NX = CITY.xs.length, NZ = CITY.zs.length;
 const TEX = 64;
@@ -34,7 +35,15 @@ export const cityUniforms = {
   uLampY: { value: LAMP_Y },
   uFogHeight: { value: new THREE.Vector4(2, 0.02, 0, 0) },
   uWet: { value: 0 },
+  uGrainTex: { value: null },
 };
+
+// Opt a material into the world-space grain: fine bumps, roughness breakup and slow colour
+// mottling, projected along the world axes so it needs no UVs. freq is tiles per metre.
+export function grain(mat, freq = 0.5, bump = 0.5, tint = 0.14) {
+  mat.defines = { ...(mat.defines || {}), WORLD_GRAIN: freq.toFixed(3), WORLD_GRAIN_BUMP: bump.toFixed(3), WORLD_GRAIN_TINT: tint.toFixed(3) };
+  return mat;
+}
 
 // axis 'z' = a north-south street (constant x, line index i); 'x' = east-west street (constant z).
 // cell = block index along the street, slot 0..2, side 0 = low-coordinate kerb, 1 = high.
@@ -68,6 +77,7 @@ uniform float uNeonK;
 uniform float uLampY;
 uniform vec4 uFogHeight;
 uniform float uWet;
+uniform sampler2D uGrainTex;
 `;
 
 const LIGHTING = /* glsl */`
@@ -157,6 +167,7 @@ let installed = false;
 export function installCityLighting() {
   if (installed) return;
   installed = true;
+  cityUniforms.uGrainTex.value = makeGrainTexture();
   const C = THREE.ShaderChunk;
   C.common = C.common + DECL;
   C.project_vertex = C.project_vertex + /* glsl */`
@@ -170,8 +181,33 @@ export function installCityLighting() {
   C.fog_fragment = FOG;
   // Wet roads: rain lowers roughness on anything that opts in via the WET_SURFACE define.
   C.roughnessmap_fragment = C.roughnessmap_fragment + /* glsl */`
+#ifdef WORLD_GRAIN
+  roughnessFactor = clamp( roughnessFactor * ( 0.8 + grainS.a * 0.4 ), 0.04, 1.0 );
+#endif
 #ifdef WET_SURFACE
   roughnessFactor = mix( roughnessFactor, roughnessFactor * 0.3 + 0.03, uWet );
+#endif
+`;
+  // World-space grain (see grain()). Sampled once in the colour chunk, reused for roughness and normal.
+  C.color_fragment = C.color_fragment + /* glsl */`
+#ifdef WORLD_GRAIN
+  vec3 grainW = abs( normalize( cross( dFdx( vCityPos ), dFdy( vCityPos ) ) ) );
+  grainW *= grainW; grainW /= ( grainW.x + grainW.y + grainW.z );
+  vec3 grainP = vCityPos * WORLD_GRAIN;
+  vec4 grainX = texture2D( uGrainTex, grainP.zy ), grainY = texture2D( uGrainTex, grainP.xz ), grainZ = texture2D( uGrainTex, grainP.xy );
+  vec4 grainS = grainX * grainW.x + grainY * grainW.y + grainZ * grainW.z;
+  float grainMacro = texture2D( uGrainTex, grainP.xz * 0.11 + grainP.y * 0.07 ).b;
+  diffuseColor.rgb *= 1.0 + ( grainS.b - 0.5 ) * WORLD_GRAIN_TINT + ( grainMacro - 0.5 ) * WORLD_GRAIN_TINT * 1.4;
+#endif
+`;
+  C.normal_fragment_maps = C.normal_fragment_maps + /* glsl */`
+#ifdef WORLD_GRAIN
+  {
+    vec3 gw = inverseTransformDirection( normal, viewMatrix );
+    vec2 tx = grainX.xy * 2.0 - 1.0, ty = grainY.xy * 2.0 - 1.0, tz = grainZ.xy * 2.0 - 1.0;
+    gw += ( vec3( 0.0, tx.y, tx.x ) * grainW.x + vec3( ty.x, 0.0, ty.y ) * grainW.y + vec3( tz.x, tz.y, 0.0 ) * grainW.z ) * WORLD_GRAIN_BUMP;
+    normal = normalize( ( viewMatrix * vec4( normalize( gw ), 0.0 ) ).xyz );
+  }
 #endif
 `;
   // Every material shares the same uniform objects, so one write updates them all.

@@ -1,6 +1,7 @@
 // Elevated monorail: two lines on ring-headed pylons down the boulevard medians, with trains
 // that shuttle between arched glass stations.
 import * as THREE from 'three';
+import { grain } from './citylight.js';
 import { CITY } from './layout.js';
 import { Batch } from './geom.js';
 import { addCircle } from './colliders.js';
@@ -96,7 +97,7 @@ export function buildMonorail(scene, env) {
       light.cbox(0.25, 0.1, LEN - 2, q.x, top + 0.2, q.z, 0xffffff, heading);
     }
   }
-  const whiteMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.32, metalness: 0.15, envMapIntensity: 1.1 });
+  const whiteMat = grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.32, metalness: 0.15, envMapIntensity: 1.1 }), 0.8, 0.2, 0.08);
   const glassMat = new THREE.MeshStandardMaterial({ color: 0xcfe9f4, transparent: true, opacity: 0.32, roughness: 0.06, metalness: 0.9, envMapIntensity: 1.6, depthWrite: false, side: THREE.DoubleSide });
   const lightMat = new THREE.MeshBasicMaterial({ color: 0xf2f7ff, toneMapped: false });
   for (const ch of ['r', 'g', 'b']) env.nightLerp(lightMat.color, ch, 0.9, 1.5);

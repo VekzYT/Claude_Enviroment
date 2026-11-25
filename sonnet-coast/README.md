@@ -122,9 +122,12 @@ poor. You can pick a preset in *Settings*; once you do, it stays where you put i
 
 | Preset | What changes |
 | --- | --- |
-| High | 4× anti-aliasing, 2048 shadow map, longest draw distance |
-| Medium | 2× anti-aliasing, smaller shadow map, shorter draw distance |
-| Low | No bloom, shadows or street-lamp lighting; lower resolution |
+| High | Ambient occlusion, 4× anti-aliasing, 4096 shadow map, detailed tree crowns out to 210 m, longest draw distance |
+| Medium | 2× anti-aliasing, 2048 shadow map, detailed crowns to 130 m, shorter draw distance, no ambient occlusion |
+| Low | No bloom, shadows or street-lamp lighting; far tree models only; lower resolution |
+
+Every preset gets the same models and textures; the presets only change lighting effects, shadow
+quality and how far the detail reaches.
 
 ## How it is built
 
@@ -148,7 +151,24 @@ npm run watch      # rebuild on change
 
 Everything is generated at load time: there are no model, texture or audio files.
 
-Two things worth knowing if you read the code:
+How things are modelled, since there are no asset files:
+
+- **Vehicles** are lofted (`src/entities/vehicleMesh.js`): a cross-section ring is evaluated at
+  stations along the car and skinned into one smooth surface with real wheel arches, then split
+  into paint, glass, chrome and trim by region. Paint is a metallic base under a clear coat.
+- **People** are built from shared parts (`src/entities/bodyGeo.js`): lofted torsos, tapered limbs
+  with knees and elbows, heads with faces, hair, hands and shoes. Pedestrians draw the same parts
+  through instancing.
+- **Surfaces** are painted on canvases in four layers at once: colour, emissive, roughness/metal,
+  and height. The height layer becomes a normal map, so windows sit back in their frames and
+  paving joints catch the light.
+- **Grain.** Vertex-coloured geometry (roofs, concrete, bark, foliage) opts into a world-space
+  grain in the shader: fine bumps, roughness breakup and slow colour mottling, projected along the
+  world axes so it needs no UVs.
+- **Trees** have a cheap far model that is always drawn and a detailed crown that is added near
+  the camera and sits over it, so there is no visible switch.
+
+Two more things worth knowing if you read the code:
 
 - **The world is a function.** Terrain height, biome and road surface are computed from `(x, z)`
   rather than read from meshes, so physics, AI and the map all ask the same source.
@@ -163,4 +183,7 @@ This was built and tested in a headless browser with software rendering. Game lo
 scripted playthroughs of every job, and the touch controls by an emulated phone, but nobody has
 played it on a real phone or a real graphics card: frame rate, how the music sounds, how the
 touch layout feels under actual thumbs, and whether the medal times and fights are fair are all
-unchecked. Interiors, a story beyond the jobs above, and gamepad support are not included.
+unchecked. The detailed models roughly doubled the triangle count (about 1.5 million a frame in
+the city on Medium, shadows included), so older laptops and phones are more likely to step down a
+preset than before. It is all generated geometry and painted textures: stylised, not
+photorealistic. Interiors, a story beyond the jobs above, and gamepad support are not included.

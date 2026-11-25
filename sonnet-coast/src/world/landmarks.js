@@ -1,6 +1,7 @@
 // Places outside the city grid: the port, Compute Ridge, bayou hideouts, Sonnet Pier with its
 // big wheel, the lighthouse, the radio mast and the stunt ramps.
 import * as THREE from 'three';
+import { grain } from './citylight.js';
 import { POI, CITY } from './layout.js';
 import { Batch, ChunkedInstances, tmpMatrix } from './geom.js';
 import { addBox, addCircle } from './colliders.js';
@@ -56,7 +57,7 @@ export function buildLandmarks(scene, env) {
   addSign(group, 'PORT OF SONNET', 650, PY + 11, 1039.5, Math.PI, 30, '#2f7d8f', 'restricted hardware terminal');
 
   const contGeo = new THREE.BoxGeometry(12, 2.8, 2.6);
-  const contMat = new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.35 });
+  const contMat = grain(new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.35 }), 0.9, 0.3, 0.2);
   const containers = new ChunkedInstances(contGeo, contMat, { chunk: 600, shadow: true, colors: true, maxDist: 1000 });
   const contCols = [PAL.terracotta, PAL.cream, PAL.slateLight, PAL.teal, PAL.clay, 0x2a4a5a, PAL.neonAmber].map((c) => new THREE.Color(c));
   for (let row = 0; row < 5; row++) for (let colm = 0; colm < 6; colm++) {
@@ -311,7 +312,7 @@ export function buildLandmarks(scene, env) {
   ramp(PIER.x1 - 8, -16, Math.PI / 2, 10, 6, 2.8); // end of the pier, into the sea
   group.add(rampB.mesh(rampMat));
 
-  group.add(solid.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 })));
+  group.add(solid.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 }), 0.55, 0.6, 0.22)));
   for (const k of Object.keys(glow)) if (!glow[k].empty) group.add(glow[k].mesh(glowMats[k], { shadow: false, receive: false }));
   scene.add(group);
   return { group, update(dt) { for (const u of updaters) u(dt); } };

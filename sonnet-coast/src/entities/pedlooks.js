@@ -15,6 +15,8 @@ for (let i = 0; i < 40; i++) {
     hat: h(5) < 0.2,
     glow: h(6) < 0.3 ? [0x3ff2ff, 0xff7a59, 0xff4fd8, 0xa6ff4d][Math.floor(h(7) * 4)] : 0,
     scale: 0.94 + h(8) * 0.14,
+    hairStyle: Math.floor(h(9) * 3),
+    build: 0.9 + h(10) * 0.2,
   });
 }
 export const COP_LOOK = { skin: 0xd9a47c, top: 0x2b2d33, bottom: 0x1c1d22, hair: 0x15161a, hat: true, glow: 0x4da3ff, scale: 1.02, cop: true };

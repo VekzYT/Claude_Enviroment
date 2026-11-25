@@ -8,12 +8,13 @@ import { CITY } from '../world/layout.js';
 import { PIER } from '../world/landmarks.js';
 import { PED_LOOKS, COP_LOOK } from './pedlooks.js';
 import { makeBlobTexture } from '../world/textures.js';
+import { ellipseLoft, limbGeo, torsoGeo, hipsGeo, headGeo, hairGeo, capGeo, handGeo, shoeGeo, join, place } from './bodyGeo.js';
 import { clamp, wrapAngle } from '../util/math.js';
 import { rand, pick, chance } from '../util/rng.js';
 
 const MAX = 96;
 const out = { x: 0, z: 0, broken: [] };
-const _m = new THREE.Matrix4(), _l = new THREE.Matrix4(), _r = new THREE.Matrix4(), _c = new THREE.Color();
+const _m = new THREE.Matrix4(), _l = new THREE.Matrix4(), _r = new THREE.Matrix4(), _u = new THREE.Matrix4(), _c = new THREE.Color();
 const _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _p = new THREE.Vector3(), _s = new THREE.Vector3();
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 const DENSITY = { strip: 1.6, downtown: 1.2, ocean: 1.2, midtown: 0.9, oldtown: 0.9, riverside: 0.6, uptown: 0.5, docks: 0.3 };
@@ -33,17 +34,27 @@ export class Peds {
       scene.add(m);
       return m;
     };
-    const head = new THREE.IcosahedronGeometry(0.135, 1);
-    const hair = new THREE.SphereGeometry(0.15, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.55);
+    const stdv = (opts = {}) => std({ vertexColors: true, ...opts });
+    const HR = 0.108;
+    const hand = place(handGeo(0.04), 0, -0.545, 0.004);
+    const shin = join([limbGeo(0.35, 0.064, 0.05), place(shoeGeo(0.25, 0.096, 0x2a2b2e), 0, -0.355, 0)]);
     this.parts = {
-      torso: mk(new THREE.BoxGeometry(0.44, 0.62, 0.25), std()),
-      head: mk(head, std({ roughness: 0.6 })),
-      hair: mk(hair, std()),
-      armL: mk(new THREE.BoxGeometry(0.115, 0.58, 0.115), std()),
-      armR: mk(new THREE.BoxGeometry(0.115, 0.58, 0.115), std()),
-      legL: mk(new THREE.BoxGeometry(0.16, 0.78, 0.17), std()),
-      legR: mk(new THREE.BoxGeometry(0.16, 0.78, 0.17), std()),
-      glow: mk(new THREE.BoxGeometry(0.46, 0.06, 0.27), new THREE.MeshBasicMaterial({ toneMapped: false }), false),
+      torso: mk(torsoGeo(0.48, 1), std()),
+      hips: mk(hipsGeo(1), std()),
+      head: mk(headGeo(HR), stdv({ roughness: 0.55 })),
+      hair: mk(hairGeo(0, HR), std({ roughness: 0.6 })),
+      hair1: mk(hairGeo(1, HR), std({ roughness: 0.6 })),
+      hair2: mk(hairGeo(2, HR), std({ roughness: 0.6 })),
+      hat: mk(capGeo(HR), std()),
+      armL: mk(limbGeo(0.5, 0.06, 0.044), std()),
+      armR: mk(limbGeo(0.5, 0.06, 0.044), std()),
+      handL: mk(hand, std({ roughness: 0.55 })),
+      handR: mk(hand.clone(), std({ roughness: 0.55 })),
+      thighL: mk(limbGeo(0.38, 0.086, 0.066), std()),
+      thighR: mk(limbGeo(0.38, 0.086, 0.066), std()),
+      shinL: mk(shin, stdv()),
+      shinR: mk(shin.clone(), stdv()),
+      glow: mk(ellipseLoft([[-0.016, 0.212, 0.128, 0.006], [0.016, 0.214, 0.13, 0.006]], 16, 0.86), new THREE.MeshBasicMaterial({ toneMapped: false }), false),
     };
     const blobGeo = new THREE.PlaneGeometry(0.95, 0.95);
     blobGeo.rotateX(-Math.PI / 2);
@@ -335,32 +346,50 @@ export class Peds {
     for (let i = 0; i < n; i++) {
       const p = this.list[i];
       const L = p.look, sc = L.scale;
-      const swing = Math.sin(p.phase) * clamp(p.speed / 2.2, 0, 1) * 0.75;
-      const bob = Math.abs(Math.cos(p.phase)) * 0.03 * clamp(p.speed / 2, 0, 1);
-      // root
+      const amp = clamp(p.speed / 2.2, 0, 1), run = p.speed > 3;
+      const sn = Math.sin(p.phase), cs = Math.cos(p.phase);
+      const swing = sn * amp * (run ? 0.95 : 0.6);
+      const bob = Math.abs(cs) * 0.03 * clamp(p.speed / 2, 0, 1);
+      // root, then the upper body leaning from the waist
       _e.set(-p.lie * 1.5, p.heading, 0);
       _q.setFromEuler(_e);
       _m.compose(_p.set(p.pos.x, p.pos.y + bob + p.lie * 0.16, p.pos.z), _q, _s.set(sc, sc, sc));
-      const part = (mesh, x, y, z, rx = 0, py = 0, color) => {
-        _l.makeRotationX(rx);
-        _l.setPosition(x, y, z);
-        if (py) { _r.makeTranslation(0, py, 0); _l.multiply(_r); }
-        _l.premultiply(_m);
-        mesh.setMatrixAt(i, _l);
-        mesh.setColorAt(i, color);
-      };
+      _u.makeRotationX(run ? 0.16 : 0.03); _u.setPosition(0, 1.0, 0); _u.premultiply(_m);
       const flash = p.flash > 0;
       const col = (hex) => (flash ? _c.set(0xffffff) : _c.set(hex));
-      part(P.torso, 0, 1.1, 0, p.speed > 3 ? 0.14 : 0.02, 0, col(L.top));
-      part(P.head, 0, 1.58, 0.01, 0, 0, col(L.skin));
-      _l.makeScale(L.hat ? 1.12 : 1, L.hat ? 0.62 : 1, L.hat ? 1.25 : 1); _l.setPosition(0, L.hat ? 1.66 : 1.6, L.hat ? 0.03 : -0.01); _l.premultiply(_m);
-      P.hair.setMatrixAt(i, _l); P.hair.setColorAt(i, col(L.hat ? (L.cop ? 0x1c1d22 : L.top) : L.hair));
-      const armR = p.aim > 0.5 ? -1.45 : -swing;
-      part(P.armL, 0.28, 1.38, 0, swing, -0.27, col(L.top));
-      part(P.armR, -0.28, 1.38, 0, armR, -0.27, col(L.top));
-      part(P.legL, 0.11, 0.78, 0, -swing, -0.39, col(L.bottom));
-      part(P.legR, -0.11, 0.78, 0, swing, -0.39, col(L.bottom));
-      if (L.glow) { part(P.glow, 0, 1.2, 0, 0, 0, _c.set(L.glow).multiplyScalar(1.6)); } else P.glow.setMatrixAt(i, ZERO);
+      const put = (mesh, base, x, y, z, rx, color, sx = 1) => {
+        _l.makeRotationX(rx); _l.setPosition(x, y, z);
+        if (sx !== 1) { _r.makeScale(sx, 1, 1); _l.multiply(_r); }
+        _l.premultiply(base);
+        mesh.setMatrixAt(i, _l); mesh.setColorAt(i, color);
+        return _l;
+      };
+      const build = L.build || 1;
+      put(P.torso, _u, 0, 0, 0, 0, col(L.top), build);
+      put(P.hips, _m, 0, 1.0, 0, 0, col(L.bottom), build);
+      put(P.head, _u, 0, 0.625, 0.006, 0, col(L.skin));
+      const hs = L.hat ? 0 : L.hairStyle || 0;
+      const hc = col(L.hair);
+      for (let k = 0; k < 3; k++) { const hm = k === 0 ? P.hair : k === 1 ? P.hair1 : P.hair2; if (k === hs) put(hm, _u, 0, 0.625, 0.006, 0, hc); else hm.setMatrixAt(i, ZERO); }
+      if (L.hat) put(P.hat, _u, 0, 0.625, 0.006, 0, col(L.cop ? 0x1c1d22 : L.top)); else P.hat.setMatrixAt(i, ZERO);
+      // arms: the right one comes up when aiming
+      const ax = 0.243 * build;
+      const aR = p.aim > 0.5 ? -1.45 : -swing * 0.9;
+      const tc = col(L.top);
+      put(P.armL, _u, ax, 0.385, 0, swing * 0.9, tc); P.handL.setMatrixAt(i, _l);
+      put(P.armR, _u, -ax, 0.385, 0, aR, tc); P.handR.setMatrixAt(i, _l);
+      const sk = col(L.skin);
+      P.handL.setColorAt(i, sk); P.handR.setColorAt(i, sk);
+      // legs: thigh swings, knee folds on the way through
+      const bc = col(L.bottom);
+      const kL = Math.max(0, cs) * amp * (run ? 1.2 : 0.8), kR = Math.max(0, -cs) * amp * (run ? 1.2 : 0.8);
+      for (const [th, sh, x, a, kn] of [[P.thighL, P.shinL, 0.095, -swing, kL], [P.thighR, P.shinR, -0.095, swing, kR]]) {
+        put(th, _m, x * build, 0.82, 0, a, bc);
+        _r.makeRotationX(kn); _r.setPosition(0, -0.38, 0);
+        _l.multiply(_r);
+        sh.setMatrixAt(i, _l); sh.setColorAt(i, bc);
+      }
+      if (L.glow) put(P.glow, _u, 0, 0.3, 0, 0, _c.set(L.glow).multiplyScalar(1.25), build); else P.glow.setMatrixAt(i, ZERO);
       _l.makeTranslation(p.pos.x, p.pos.y + 0.05, p.pos.z);
       this.blobs.setMatrixAt(i, _l);
     }

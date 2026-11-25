@@ -9,7 +9,7 @@ import { registerBreakable } from './breakables.js';
 import { makeGlowTexture } from './textures.js';
 import { PAL } from './palette.js';
 import { benchSpots, parkLamps, NEON } from './city.js';
-import { setLamp, LAMP_SLOTS } from './citylight.js';
+import { setLamp, LAMP_SLOTS, grain } from './citylight.js';
 import { RNG } from '../util/rng.js';
 
 const GY = CITY.y + 0.16;
@@ -91,8 +91,8 @@ export function buildProps(scene, env, quality) {
   const group = new THREE.Group();
   group.name = 'props';
   const rng = new RNG(2024);
-  const metal = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.5 });
-  const matte = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.05 });
+  const metal = grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.55 }), 1.6, 0.2, 0.1);
+  const matte = grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.05 }), 1.2, 0.4, 0.16);
   const glowTex = makeGlowTexture();
 
   // ---- street lamps ---------------------------------------------------------

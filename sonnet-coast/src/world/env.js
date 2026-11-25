@@ -252,7 +252,9 @@ export class Environment {
     this.cityK += (target - this.cityK) * Math.min(1, dt * 0.8);
     this.apply(dt);
     this.sky.position.copy(G.camera.position);
-    const tx = Math.round(focus.x / 4) * 4, tz = Math.round(focus.z / 4) * 4;
+    // snap the shadow volume to whole texels so shadow edges do not crawl as the camera moves
+    const q = Math.max(0.25, (this.shadowTexel || 0.1) * 8);
+    const tx = Math.round(focus.x / q) * q, tz = Math.round(focus.z / q) * q;
     this.sun.target.position.set(tx, focus.y, tz);
     this.sun.position.set(tx + this.lightDir.x * 320, focus.y + this.lightDir.y * 320, tz + this.lightDir.z * 320);
     this._envTimer += dt;

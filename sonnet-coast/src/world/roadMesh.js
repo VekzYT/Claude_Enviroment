@@ -1,5 +1,6 @@
 // Turns the road graph into ribbon meshes, junction patches, bridge decks and pillars.
 import * as THREE from 'three';
+import { grain } from './citylight.js';
 import { edges, nodes, edgePoint, junctionTrim } from './roads.js';
 import { CITY } from './layout.js';
 import { makeRoadTexture } from './textures.js';
@@ -134,7 +135,7 @@ export function buildRoads(scene) {
   const off = { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 };
   const roadMat = (type) => {
     const t = makeRoadTexture(type);
-    const m = new THREE.MeshStandardMaterial({ map: t.map, roughnessMap: t.rough, roughness: 1, metalness: 0.0, ...off });
+    const m = new THREE.MeshStandardMaterial({ map: t.map, roughnessMap: t.rough, normalMap: t.normal, roughness: 1, metalness: 0.0, ...off });
     m.defines = { ...m.defines, WET_SURFACE: '' };
     return m;
   };
@@ -142,14 +143,14 @@ export function buildRoads(scene) {
   mats.blvd = roadMat('blvd');
   add(builders.asphalt.build(), mats.asphalt);
   add(builders.blvd.build(), mats.blvd);
-  add(builders.dirt.build(), new THREE.MeshStandardMaterial({ map: makeRoadTexture('dirt').map, roughness: 1, ...off }));
-  mats.plain = new THREE.MeshStandardMaterial({ color: 0x4a4a4f, roughness: 0.6, ...off, polygonOffsetFactor: -3 });
+  { const d = makeRoadTexture('dirt'); add(builders.dirt.build(), new THREE.MeshStandardMaterial({ map: d.map, normalMap: d.normal, roughness: 1, ...off })); }
+  mats.plain = grain(new THREE.MeshStandardMaterial({ color: 0x47474c, roughness: 0.72, ...off, polygonOffsetFactor: -3 }), 1.3, 0.55, 0.3);
   mats.plain.defines = { ...mats.plain.defines, WET_SURFACE: '' };
   add(builders.plain.build(), mats.plain);
   add(builders.stripes.build(), new THREE.MeshStandardMaterial({ color: 0xa9a498, roughness: 0.7, ...off, polygonOffsetFactor: -4 }));
-  const deck = add(builders.deck.build(), new THREE.MeshStandardMaterial({ color: 0xb9b2a4, roughness: 0.9, flatShading: true, side: THREE.DoubleSide }));
+  const deck = add(builders.deck.build(), grain(new THREE.MeshStandardMaterial({ color: 0xb9b2a4, roughness: 0.9, flatShading: true, side: THREE.DoubleSide }), 0.5, 0.6, 0.2));
   if (deck) deck.castShadow = true;
-  add(builders.wood.build(), new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1, flatShading: true, side: THREE.DoubleSide }));
+  add(builders.wood.build(), grain(new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1, flatShading: true, side: THREE.DoubleSide }), 0.9, 0.7, 0.3));
   scene.add(group);
   group.userData.mats = mats;
   return group;

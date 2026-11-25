@@ -5,7 +5,8 @@ import { terrainHeight, roadAt } from './roads.js';
 import { forestMask, swampMask, meadowMask, landDist } from './terrain.js';
 import { makeNoise2D } from '../util/noise.js';
 import { smoothstep, lerp, clamp } from '../util/math.js';
-import { makeNoiseTexture } from './textures.js';
+import { makeGround } from './textures.js';
+import { grain } from './citylight.js';
 
 const TILE = 300;
 const STEP = 5;
@@ -86,7 +87,7 @@ function tileGeometry(tx, tz, step, skirt) {
     pos.push(x, h, z); nor.push(nx, ny, nz);
     terrainColor(x, z, h, 1 - ny, col);
     colr.push(clamp(col[0], 0, 1), clamp(col[1], 0, 1), clamp(col[2], 0, 1));
-    uv.push(x / 14, z / 14);
+    uv.push(x / 7, z / 7);
   }
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const a = j * (n + 1) + i, b = a + 1, c = a + n + 1, d = c + 1;
@@ -123,10 +124,12 @@ function tileGeometry(tx, tz, step, skirt) {
 export function buildTerrain(scene) {
   const group = new THREE.Group();
   group.name = 'terrain';
-  const mat = new THREE.MeshStandardMaterial({
+  // greyscale blade-and-pebble detail under the biome colours, plus slow world-space mottling
+  const det = makeGround('detail');
+  const mat = grain(new THREE.MeshStandardMaterial({
     vertexColors: true, roughness: 0.96, metalness: 0,
-    map: makeNoiseTexture(5, 256, 0.16),
-  });
+    map: det.map, normalMap: det.normal, normalScale: new THREE.Vector2(0.9, 0.9),
+  }), 0.06, 0.0, 0.42);
   const tiles = [];
   for (let tx = WORLD_MIN; tx < WORLD_MAX; tx += TILE) for (let tz = WORLD_MIN; tz < WORLD_MAX; tz += TILE) {
     const fine = tileGeometry(tx, tz, STEP, 0);

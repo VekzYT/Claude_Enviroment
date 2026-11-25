@@ -5,24 +5,26 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { G } from './state.js';
 
 export const QUALITY = {
   // maxRatio caps the device pixel ratio; scale shrinks the internal resolution below native
-  low: { maxRatio: 1, scale: 0.8, shadows: false, post: false, samples: 0, far: 1400, fogFar: 1150, cityLights: false, shadowMap: 1024 },
-  medium: { maxRatio: 1.25, scale: 1, shadows: true, post: true, samples: 2, far: 2000, fogFar: 1700, cityLights: true, shadowMap: 1536 },
-  high: { maxRatio: 1.75, scale: 1, shadows: true, post: true, samples: 4, far: 2700, fogFar: 2200, cityLights: true, shadowMap: 2048 },
+  // shadowBox is the half-width of the sun's shadow volume in metres; ao adds ambient occlusion
+  low: { maxRatio: 1, scale: 0.8, shadows: false, post: false, samples: 0, far: 1400, fogFar: 1150, cityLights: false, shadowMap: 1024, shadowBox: 90, ao: false },
+  medium: { maxRatio: 1.25, scale: 1, shadows: true, post: true, samples: 2, far: 2000, fogFar: 1700, cityLights: true, shadowMap: 2048, shadowBox: 110, ao: false },
+  high: { maxRatio: 1.75, scale: 1, shadows: true, post: true, samples: 4, far: 2700, fogFar: 2200, cityLights: true, shadowMap: 4096, shadowBox: 150, ao: true },
 };
 
 // Final grade: speed blur, chromatic fringe, split-tone, vignette. Runs in linear HDR.
 const GradeShader = {
   uniforms: {
-    tDiffuse: { value: null }, uSpeed: { value: 0 }, uCA: { value: 0.6 }, uVignette: { value: 0.42 },
+    tDiffuse: { value: null }, uSpeed: { value: 0 }, uCA: { value: 0.6 }, uVignette: { value: 0.42 }, uTexel: { value: new THREE.Vector2(1 / 1280, 1 / 720) }, uSharp: { value: 0.35 },
     uSat: { value: 1.08 }, uFlash: { value: new THREE.Vector4(0, 0, 0, 0) }, uDesat: { value: 0 },
   },
   vertexShader: /* glsl */`varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform float uSpeed, uCA, uVignette, uSat, uDesat; uniform vec4 uFlash;
+    uniform sampler2D tDiffuse; uniform float uSpeed, uCA, uVignette, uSat, uDesat, uSharp; uniform vec4 uFlash; uniform vec2 uTexel;
     varying vec2 vUv;
     void main() {
       vec2 c = vUv - 0.5;
@@ -32,6 +34,10 @@ const GradeShader = {
       col.r = texture2D(tDiffuse, 0.5 + c * (1.0 + ca)).r;
       col.g = texture2D(tDiffuse, vUv).g;
       col.b = texture2D(tDiffuse, 0.5 + c * (1.0 - ca)).b;
+      // unsharp mask: lift fine texture detail a little (clamped so bright lamps do not ring)
+      vec3 blur = (texture2D(tDiffuse, vUv + vec2(uTexel.x, 0.0)).rgb + texture2D(tDiffuse, vUv - vec2(uTexel.x, 0.0)).rgb
+        + texture2D(tDiffuse, vUv + vec2(0.0, uTexel.y)).rgb + texture2D(tDiffuse, vUv - vec2(0.0, uTexel.y)).rgb) * 0.25;
+      col += clamp(col - blur, -0.08, 0.08) * uSharp;
       if (uSpeed > 0.01) {
         float amt = uSpeed * 0.07 * smoothstep(0.01, 0.35, r2);
         vec3 acc = col;
@@ -59,14 +65,36 @@ export function createRenderer(canvas) {
   scene.add(camera);
 
   G.renderer = renderer; G.scene = scene; G.camera = camera;
-  const R = { renderer, scene, camera, composer: null, bloom: null, grade: null, usePost: true, samples: -1 };
+  const R = { renderer, scene, camera, composer: null, bloom: null, grade: null, ao: null, usePost: true, samples: -1, hasAO: null };
 
-  const buildComposer = (samples) => {
+  const buildComposer = (samples, ao) => {
     if (R.composer) { R.composer.dispose(); }
+    if (R.ao) { R.ao.dispose(); R.ao = null; }
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples });
     const composer = new EffectComposer(renderer, rt);
     composer.addPass(new RenderPass(scene, camera));
+    if (ao) {
+      // Ground-truth ambient occlusion: contact darkening under cars, in doorways, between buildings.
+      const pass = new GTAOPass(scene, camera, size.x, size.y);
+      pass.output = GTAOPass.OUTPUT.Default;
+      pass.blendIntensity = 1;
+      pass.updateGtaoMaterial({ radius: 1.7, distanceExponent: 1.4, thickness: 1.3, scale: 1.15, samples: 10, distanceFallOff: 1, screenSpaceRadius: false });
+      pass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, radiusExponent: 1, rings: 2, samples: 8 });
+      // Only solid, depth-writing meshes belong in the occlusion buffer: glows, beams, sprites,
+      // water and anything flagged noAO would otherwise cast dark halos.
+      const cache = pass._visibilityCache;
+      const skip = (o) => {
+        if (o.isPoints || o.isLine || o.isSprite || o.userData.noAO) return true;
+        const m = o.material;
+        if (!m) return false;
+        const one = Array.isArray(m) ? m[0] : m;
+        return one.transparent || one.depthWrite === false || one.isShaderMaterial || one.blending === THREE.AdditiveBlending;
+      };
+      pass.overrideVisibility = () => { scene.traverse((o) => { cache.set(o, o.visible); if (o.visible && skip(o)) o.visible = false; }); };
+      composer.addPass(pass);
+      R.ao = pass;
+    }
     R.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.5, 0.55, 0.9);
     composer.addPass(R.bloom);
     R.grade = new ShaderPass(GradeShader);
@@ -74,6 +102,7 @@ export function createRenderer(canvas) {
     composer.addPass(new OutputPass());
     R.composer = composer;
     R.samples = samples;
+    R.hasAO = !!ao;
   };
 
   R.applyQuality = () => {
@@ -84,16 +113,23 @@ export function createRenderer(canvas) {
     if (G.env) {
       G.env.sun.castShadow = q.shadows;
       G.env.cityLights = q.cityLights;
-      if (G.env.sun.shadow.mapSize.x !== q.shadowMap) {
-        G.env.sun.shadow.mapSize.set(q.shadowMap, q.shadowMap);
-        if (G.env.sun.shadow.map) { G.env.sun.shadow.map.dispose(); G.env.sun.shadow.map = null; }
+      const sh = G.env.sun.shadow, sc = sh.camera, b = q.shadowBox;
+      if (sh.mapSize.x !== q.shadowMap) {
+        sh.mapSize.set(q.shadowMap, q.shadowMap);
+        if (sh.map) { sh.map.dispose(); sh.map = null; }
       }
+      sc.left = -b; sc.right = b; sc.top = b; sc.bottom = -b;
+      sc.updateProjectionMatrix();
+      // bias in proportion to one shadow texel, so contact shadows stay attached
+      const texel = (b * 2) / q.shadowMap;
+      sh.normalBias = texel * 1.7; sh.bias = -0.00025;
+      G.env.shadowTexel = texel;
     }
     camera.far = q.far;
     if (scene.fog) { scene.fog.far = q.fogFar; scene.fog.near = q.fogFar * 0.22; }
     R.usePost = q.post;
     renderer.setSize(window.innerWidth, window.innerHeight, false);
-    if (q.post && R.samples !== q.samples) buildComposer(q.samples);
+    if (q.post && (R.samples !== q.samples || R.hasAO !== q.ao)) buildComposer(q.samples, q.ao);
     R.resize();
     scene.traverse((o) => { if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m) => { m.needsUpdate = true; }); } });
   };
@@ -101,6 +137,7 @@ export function createRenderer(canvas) {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h, false);
     if (R.composer) { R.composer.setPixelRatio(renderer.getPixelRatio()); R.composer.setSize(w, h); }
+    if (R.grade) { const s = renderer.getDrawingBufferSize(new THREE.Vector2()); R.grade.uniforms.uTexel.value.set(1 / s.x, 1 / s.y); }
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   };

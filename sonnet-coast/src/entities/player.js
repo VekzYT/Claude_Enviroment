@@ -10,6 +10,8 @@ import { clamp, wrapAngle, lerp } from '../util/math.js';
 import { rand, pick } from '../util/rng.js';
 import { PAL } from '../world/palette.js';
 import { PED_LOOKS } from './pedlooks.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { ellipseLoft, limbGeo, torsoGeo, hipsGeo, headGeo, hairGeo, capGeo, handGeo, shoeGeo } from './bodyGeo.js';
 
 export const OUTFITS = {
   jacket: [['Terracotta Bomber', 0xc8643b], ['Slate Tactical', 0x3d3f45], ['Cream Windbreaker', 0xeee6d6], ['Midnight Shell', 0x14161c], ['Teal Tech', 0x1f8f88], ['Signal Coral', 0xff7a59]],
@@ -27,64 +29,89 @@ const GRAV = 24;
 function buildModel() {
   const root = new THREE.Group();
   const mats = {
-    jacket: new THREE.MeshStandardMaterial({ color: 0xc8643b, roughness: 0.7 }),
+    jacket: new THREE.MeshStandardMaterial({ color: 0xc8643b, roughness: 0.72 }),
     pants: new THREE.MeshStandardMaterial({ color: 0x25272c, roughness: 0.85 }),
-    skin: new THREE.MeshStandardMaterial({ color: 0xd9a47c, roughness: 0.6 }),
-    dark: new THREE.MeshStandardMaterial({ color: 0x17181c, roughness: 0.6, metalness: 0.2 }),
+    skin: new THREE.MeshStandardMaterial({ color: 0xd9a47c, roughness: 0.55, vertexColors: true }),
+    dark: new THREE.MeshStandardMaterial({ color: 0x17181c, roughness: 0.55, metalness: 0.2 }),
     gear: new THREE.MeshStandardMaterial({ color: 0x33363d, roughness: 0.7 }),
-    accent: new THREE.MeshBasicMaterial({ color: new THREE.Color(PAL.neonCyan).multiplyScalar(1.8), toneMapped: false }),
+    hair: new THREE.MeshStandardMaterial({ color: 0x2a1c14, roughness: 0.6 }),
+    boot: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }),
+    accent: new THREE.MeshBasicMaterial({ color: new THREE.Color(PAL.neonCyan).multiplyScalar(1.4), toneMapped: false }),
   };
-  const box = (w, h, d, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; return m; };
+  const mesh = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; return m; };
+  const rb = (w, h, d, mat, x = 0, y = 0, z = 0, r = 0.03) => mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2.01, h / 2.01, d / 2.01)), mat, x, y, z);
   const P = {};
   P.hips = new THREE.Group(); P.hips.position.y = 0.86; root.add(P.hips);
-  P.hips.add(box(0.4, 0.2, 0.25, mats.pants, 0, 0, 0));
+  P.hips.add(mesh(hipsGeo(1.02), mats.pants, 0, 0.1, 0));
+  P.hips.add(mesh(ellipseLoft([[0, 0.178, 0.116], [0.035, 0.18, 0.118], [0.07, 0.176, 0.116]], 16, 0.86), mats.dark, 0, 0.06, 0));   // belt
+  P.hips.add(rb(0.07, 0.05, 0.02, mats.gear, 0, 0.095, 0.118, 0.008));
   P.torso = new THREE.Group(); P.torso.position.y = 0.1; P.hips.add(P.torso);
-  P.torso.add(box(0.46, 0.6, 0.27, mats.jacket, 0, 0.3, 0));
-  P.torso.add(box(0.47, 0.05, 0.28, mats.accent, 0, 0.5, 0));                 // chest stripe
-  P.torso.add(box(0.2, 0.1, 0.2, mats.skin, 0, 0.64, 0));                      // neck
+  P.torso.add(mesh(torsoGeo(0.56, 1.08), mats.jacket));
+  P.torso.add(mesh(ellipseLoft([[0, 0.086, 0.082, -0.004], [0.05, 0.084, 0.078, -0.006], [0.085, 0.07, 0.066, -0.006]], 12), mats.jacket, 0, 0.56, 0));   // collar
+  P.torso.add(mesh(limbGeo(0.09, 0.055, 0.052, 10, 1), mats.skin, 0, 0.71, -0.004));                                                                    // neck
+  P.torso.add(rb(0.022, 0.4, 0.012, mats.accent, 0, 0.3, 0.127, 0.005));                                                                               // zip line
   P.vest = new THREE.Group();
-  P.vest.add(box(0.5, 0.42, 0.31, mats.gear, 0, 0.26, 0));
-  P.vest.add(box(0.14, 0.14, 0.06, mats.dark, -0.13, 0.18, 0.17), box(0.14, 0.14, 0.06, mats.dark, 0.13, 0.18, 0.17));
+  P.vest.add(mesh(ellipseLoft([[0.04, 0.182, 0.122], [0.14, 0.2, 0.134, 0.004], [0.3, 0.236, 0.142, 0.008], [0.44, 0.232, 0.136, 0.006], [0.5, 0.2, 0.12, 0.002]], 16, 0.8), mats.gear));
+  for (const sx of [-1, 1]) P.vest.add(rb(0.12, 0.12, 0.05, mats.dark, sx * 0.1, 0.16, 0.14, 0.02), rb(0.05, 0.3, 0.03, mats.dark, sx * 0.16, 0.42, 0.11, 0.012));
   P.torso.add(P.vest);
   P.pack = new THREE.Group();
-  P.pack.add(box(0.34, 0.42, 0.16, mats.gear, 0, 0.3, -0.21), box(0.04, 0.3, 0.02, mats.accent, 0, 0.3, -0.3));
+  P.pack.add(rb(0.32, 0.4, 0.15, mats.gear, 0, 0.3, -0.2, 0.06), rb(0.24, 0.14, 0.06, mats.dark, 0, 0.2, -0.29, 0.025), rb(0.03, 0.26, 0.012, mats.accent, 0, 0.36, -0.278, 0.005));
   P.torso.add(P.pack);
   P.head = new THREE.Group(); P.head.position.y = 0.78; P.torso.add(P.head);
-  const skull = new THREE.Mesh(new THREE.IcosahedronGeometry(0.145, 1), mats.skin); skull.castShadow = true;
-  P.head.add(skull);
-  P.head.add(box(0.27, 0.055, 0.1, mats.accent, 0, 0.02, 0.11));              // visor
-  P.hair = new THREE.Mesh(new THREE.SphereGeometry(0.155, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.55), mats.dark); P.hair.position.y = 0.01;
-  P.cap = new THREE.Group();
-  const capTop = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.5), mats.jacket); capTop.scale.y = 0.7; capTop.position.y = 0.04;
-  P.cap.add(capTop, box(0.22, 0.02, 0.16, mats.jacket, 0, 0.05, 0.19));
+  P.head.add(mesh(headGeo(0.118), mats.skin));
+  // slim wrap-around glasses in the accent colour
+  const visor = new THREE.Mesh(new THREE.CylinderGeometry(0.117, 0.117, 0.034, 16, 1, true, -1.25, 2.5), mats.accent);
+  visor.position.set(0, 0.012, 0.004);
+  P.head.add(visor);
+  P.hair = mesh(hairGeo(0, 0.118), mats.hair);
+  P.cap = new THREE.Group(); P.cap.add(mesh(capGeo(0.118), mats.jacket));
   P.helmet = new THREE.Group();
-  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.185, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), mats.gear); shell.position.y = 0.0;
-  P.helmet.add(shell, box(0.3, 0.09, 0.12, mats.accent, 0, 0.02, 0.12), box(0.05, 0.12, 0.05, mats.dark, 0.17, -0.02, 0));
-  P.hood = new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.72), mats.jacket); P.hood.position.set(0, 0.0, -0.03);
+  const shell = mesh(new THREE.SphereGeometry(0.15, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), mats.gear, 0, 0.012, -0.006);
+  shell.scale.set(0.98, 1.06, 1.08);
+  P.helmet.add(shell, rb(0.3, 0.035, 0.05, mats.dark, 0, 0.02, 0.13, 0.015), rb(0.04, 0.1, 0.06, mats.dark, 0.15, -0.04, 0, 0.015), rb(0.04, 0.1, 0.06, mats.dark, -0.15, -0.04, 0, 0.015));
+  P.hood = mesh(new THREE.SphereGeometry(0.152, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.72), mats.jacket, 0, 0.0, -0.03);
+  P.hood.scale.set(1, 1.08, 1.1);
   P.head.add(P.hair, P.cap, P.helmet, P.hood);
-  const limb = (x, y, len, w, mat, endMat, endH) => {
-    const g = new THREE.Group(); g.position.set(x, y, 0);
-    g.add(box(w, len, w, mat, 0, -len / 2, 0));
-    const end = box(w * 1.05, endH, endMat === mats.dark ? w * 1.7 : w * 1.05, endMat, 0, -len - endH / 2, endMat === mats.dark ? 0.05 : 0);
-    g.add(end);
-    return g;
+  // arms: shoulder -> elbow -> hand
+  const arm = (x) => {
+    const g = new THREE.Group(); g.position.set(x, 0.47, 0);
+    g.add(mesh(new THREE.SphereGeometry(0.078, 10, 8), mats.jacket, 0, 0.0, 0));       // shoulder
+    g.add(mesh(limbGeo(0.28, 0.066, 0.056), mats.jacket));
+    const fore = new THREE.Group(); fore.position.y = -0.28; g.add(fore);
+    fore.add(mesh(limbGeo(0.25, 0.055, 0.044), mats.jacket));
+    fore.add(mesh(ellipseLoft([[-0.02, 0.05, 0.048], [0.02, 0.05, 0.048]], 10), mats.dark, 0, -0.235, 0));   // cuff
+    fore.add(mesh(handGeo(0.045), mats.skin, 0, -0.315, 0.004));
+    return { g, fore };
   };
-  P.armL = limb(0.3, 0.56, 0.5, 0.13, mats.jacket, mats.skin, 0.1); P.torso.add(P.armL);
-  P.armR = limb(-0.3, 0.56, 0.5, 0.13, mats.jacket, mats.skin, 0.1); P.torso.add(P.armR);
-  P.legL = limb(0.115, -0.06, 0.7, 0.17, mats.pants, mats.dark, 0.1); P.hips.add(P.legL);
-  P.legR = limb(-0.115, -0.06, 0.7, 0.17, mats.pants, mats.dark, 0.1); P.hips.add(P.legR);
+  const aL = arm(0.262), aR = arm(-0.262);
+  P.armL = aL.g; P.armR = aR.g; P.foreL = aL.fore; P.foreR = aR.fore;
+  P.torso.add(P.armL, P.armR);
+  // legs: hip -> knee -> boot
+  const leg = (x) => {
+    const g = new THREE.Group(); g.position.set(x, -0.06, 0);
+    g.add(mesh(limbGeo(0.37, 0.094, 0.07), mats.pants));
+    const shin = new THREE.Group(); shin.position.y = -0.37; g.add(shin);
+    shin.add(mesh(limbGeo(0.34, 0.068, 0.052), mats.pants));
+    shin.add(mesh(shoeGeo(0.27, 0.104, 0x1b1c20), mats.boot, 0, -0.345, 0));
+    return { g, shin };
+  };
+  const lL = leg(0.1), lR = leg(-0.1);
+  P.legL = lL.g; P.legR = lR.g; P.shinL = lL.shin; P.shinR = lR.shin;
+  P.hips.add(P.legL, P.legR);
   // held items (right hand)
-  P.items = {};
-  const hand = new THREE.Group(); hand.position.set(0, -0.6, 0.05); P.armR.add(hand);
+  const hand = new THREE.Group(); hand.position.set(0, -0.33, 0.05); P.foreR.add(hand);
   const pistol = new THREE.Group();
-  pistol.add(box(0.06, 0.1, 0.3, mats.dark, 0, 0, 0.12), box(0.05, 0.16, 0.07, mats.dark, 0, -0.1, 0.02), box(0.065, 0.03, 0.2, mats.accent, 0, 0.05, 0.14));
+  pistol.add(rb(0.05, 0.085, 0.27, mats.dark, 0, 0, 0.12, 0.014), rb(0.045, 0.15, 0.065, mats.dark, 0, -0.1, 0.02, 0.014), rb(0.054, 0.02, 0.16, mats.accent, 0, 0.046, 0.14, 0.008), rb(0.02, 0.02, 0.03, mats.gear, 0, 0.05, 0.02, 0.006));
   pistol.rotation.x = Math.PI / 2;
   const baton = new THREE.Group();
-  baton.add(box(0.045, 0.045, 0.62, mats.dark, 0, 0, 0.26), box(0.06, 0.06, 0.22, mats.accent, 0, 0, 0.5));
+  const stick = mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.62, 10), mats.dark, 0, 0, 0.26); stick.rotation.x = Math.PI / 2;
+  const tip = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 10), mats.accent, 0, 0, 0.5); tip.rotation.x = Math.PI / 2;
+  baton.add(stick, tip);
   baton.rotation.x = Math.PI / 2;
-  const emp = new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 1), mats.accent); emp.position.z = 0.06;
+  const emp = mesh(new THREE.IcosahedronGeometry(0.085, 2), mats.gear, 0, 0, 0.06);
+  emp.add(new THREE.Mesh(new THREE.TorusGeometry(0.087, 0.012, 6, 20), mats.accent));
   const hack = new THREE.Group();
-  hack.add(box(0.2, 0.03, 0.3, mats.dark, 0, 0, 0.14), box(0.17, 0.035, 0.22, mats.accent, 0, 0.004, 0.16));
+  hack.add(rb(0.19, 0.022, 0.29, mats.dark, 0, 0, 0.14, 0.01), rb(0.16, 0.006, 0.22, mats.accent, 0, 0.014, 0.16, 0.002));
   hack.rotation.x = Math.PI / 2 - 0.5;
   P.items = { pistol, baton, emp, hack };
   for (const k of Object.keys(P.items)) { P.items[k].visible = false; hand.add(P.items[k]); }
@@ -123,8 +150,8 @@ export class Player {
     const O = this.outfit, M = this.mats, P = this.P;
     M.jacket.color.set(OUTFITS.jacket[O.jacket % OUTFITS.jacket.length][1]);
     M.pants.color.set(OUTFITS.pants[O.pants % OUTFITS.pants.length][1]);
-    M.accent.color.set(OUTFITS.accent[O.accent % OUTFITS.accent.length][1]).multiplyScalar(1.8);
-    P.hair.visible = O.head === 0; P.cap.visible = O.head === 1; P.helmet.visible = O.head === 2; P.hood.visible = O.head === 3;
+    M.accent.color.set(OUTFITS.accent[O.accent % OUTFITS.accent.length][1]).multiplyScalar(1.4);
+    P.hair.visible = O.head === 0 || O.head === 1; P.cap.visible = O.head === 1; P.helmet.visible = O.head === 2; P.hood.visible = O.head === 3;
     P.vest.visible = !!O.vest; P.pack.visible = !!O.pack;
   }
   setHeld(name) {
@@ -437,6 +464,18 @@ export class Player {
     P.armL.rotation.z += (aLz - P.armL.rotation.z) * k; P.armR.rotation.z += (aRz - P.armR.rotation.z) * k;
     P.legL.rotation.x += (lL - P.legL.rotation.x) * k; P.legR.rotation.x += (lR - P.legR.rotation.x) * k;
     P.head.rotation.x = this.aiming ? clamp(G.cam.pitch, -0.5, 0.5) * 0.6 : 0;
+    // knees fold as each leg swings through; elbows carry a little bend that deepens on a run
+    const stride = Math.min(1, moving), cs = Math.cos(this.phase);
+    let kL = Math.max(0, cs) * 1.0 * stride, kR = Math.max(0, -cs) * 1.0 * stride;
+    let eL = -0.16 - 0.5 * stride * (this.speed > 6 ? 1.6 : 0.6), eR = eL;
+    if (!this.onGround && !this.swimming && this.state === 'foot') { kL = 0.9; kR = 0.5; }
+    if (this.swimming) { kL = 0.3 + Math.max(0, Math.sin(t * 6)) * 0.5; kR = 0.3 + Math.max(0, -Math.sin(t * 6)) * 0.5; eL = eR = -0.3; }
+    if (this.state === 'busted') { eL = eR = -1.2; }
+    if (this.state === 'foot' && !this.swimming && (this.aiming || (G.weapons && G.weapons.facingCamera))) { eR = -0.06; if (held === 'pistol' || held === 'hack') eL = -0.5; }
+    else if (held && this.state === 'foot') eR = -0.5;
+    if (this.punchT > 0) eR = -0.2;
+    P.shinL.rotation.x += (kL - P.shinL.rotation.x) * k; P.shinR.rotation.x += (kR - P.shinR.rotation.x) * k;
+    P.foreL.rotation.x += (eL - P.foreL.rotation.x) * k; P.foreR.rotation.x += (eR - P.foreR.rotation.x) * k;
   }
   animateSeated(dt, t) {
     const v = this.vehicle, P = this.P;
@@ -445,6 +484,8 @@ export class Player {
     P.legL.rotation.x = bike ? -0.9 : -1.45; P.legR.rotation.x = bike ? -0.9 : -1.45;
     P.armL.rotation.x = -1.1 + v.steer * 0.25; P.armR.rotation.x = -1.1 - v.steer * 0.25;
     P.armL.rotation.z = P.armR.rotation.z = 0;
+    P.shinL.rotation.x = P.shinR.rotation.x = bike ? 1.25 : 1.35;
+    P.foreL.rotation.x = P.foreR.rotation.x = -0.55;
     P.torso.rotation.y = 0;
     this.model.rotation.set(bike ? 0.28 : 0.05, 0, 0);
   }

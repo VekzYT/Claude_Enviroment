@@ -28,7 +28,8 @@ export class Batch {
     _q.setFromEuler(_e);
     _m.compose(_p.set(x, y, z), _q, _s.set(sx, sy, sz));
     geo.applyMatrix4(_m);
-    colorize(geo, color);
+    // null keeps the vertex colours the geometry already carries
+    if (color !== null || !geo.getAttribute('color')) colorize(geo, color ?? 0xffffff);
     if (!geo.getAttribute('uv')) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geo.getAttribute('position').count * 2), 2));
     this.geos.push(geo);
     return this;

@@ -5,9 +5,9 @@ import { CITY, POI } from './layout.js';
 import { blocks, buildings, BUILDING_COLORS, DISTRICTS } from './cityplan.js';
 import { KERB } from './roads.js';
 import { Batch, FacadeBatch } from './geom.js';
-import { makeFacade, makeStorefronts, makeNoiseTexture, makeCanvas, canvasToTexture, FACADE_STYLES, UI_FONT } from './textures.js';
+import { makeFacade, makeStorefronts, makeNoiseTexture, makeGround, makeCanvas, canvasToTexture, FACADE_STYLES, UI_FONT } from './textures.js';
 import { addBox, addCircle } from './colliders.js';
-import { setNeon } from './citylight.js';
+import { setNeon, grain } from './citylight.js';
 import { RNG } from '../util/rng.js';
 import { PAL } from './palette.js';
 
@@ -408,6 +408,7 @@ export function buildCity(scene, env) {
     const mat = new THREE.MeshStandardMaterial({
       map: tx.map, emissiveMap: tx.emissive, emissive: 0xffffff, emissiveIntensity: 0.05,
       roughnessMap: tx.orm, metalnessMap: tx.orm, roughness: 1, metalness: 1, vertexColors: true, envMapIntensity: 1.3,
+      normalMap: tx.normal, normalScale: new THREE.Vector2(1.1, 1.1),
     });
     env.nightLerp(mat, 'emissiveIntensity', 0.02, 0.85);
     const mesh = new THREE.Mesh(facades[style].geometry(), mat);
@@ -424,6 +425,7 @@ export function buildCity(scene, env) {
     const mat = new THREE.MeshStandardMaterial({
       map: tx.map, emissiveMap: tx.emissive, emissive: 0xffffff, emissiveIntensity: 0.2,
       roughnessMap: tx.orm, metalnessMap: tx.orm, roughness: 1, metalness: 1, vertexColors: true,
+      normalMap: tx.normal, normalScale: new THREE.Vector2(1.2, 1.2),
     });
     env.nightLerp(mat, 'emissiveIntensity', 0.12, 0.7);
     const m = new THREE.Mesh(g, mat);
@@ -456,6 +458,7 @@ export function buildCity(scene, env) {
   // ---- ground: paving, lawns, parks, plazas, parking ---------------------------
   const paveRects = [], lawnRects = [];
   const lots = new Batch(), lines = new Batch(), deco = new Batch();
+  const lotRects = [];
   const holoGroup = new THREE.Group();
   const holos = [];
   const domes = [];
@@ -555,7 +558,7 @@ export function buildCity(scene, env) {
     }
     if (bl.lot) {
       const L = bl.lot;
-      lots.box(L.x1 - L.x0, 0.04, L.z1 - L.z0, (L.x0 + L.x1) / 2, GY, (L.z0 + L.z1) / 2, 0x4a4b50);
+      lotRects.push([L.x0, L.z0, L.x1, L.z1]);
       const rows = [];
       const depth = L.z1 - L.z0;
       rows.push({ z: L.z0 + 3.2, heading: 0 });
@@ -570,26 +573,35 @@ export function buildCity(scene, env) {
       for (const [dx, dz] of [[-0.3, -0.3], [0.3, 0.3], [-0.3, 0.3], [0.3, -0.3]]) parkLamps.push({ x: (L.x0 + L.x1) / 2 + dx * (L.x1 - L.x0), z: (L.z0 + L.z1) / 2 + dz * (L.z1 - L.z0) });
     }
   }
-  const paving = makePavingTexture();
-  const paveMat = new THREE.MeshStandardMaterial({ map: paving.map, roughnessMap: paving.rough, roughness: 1, metalness: 0 });
+  const paving = makeGround('paving');
+  const paveMat = grain(new THREE.MeshStandardMaterial({ map: paving.map, roughnessMap: paving.rough, normalMap: paving.normal, roughness: 1, metalness: 0 }), 0.05, 0.0, 0.3);
   paveMat.defines = { ...paveMat.defines, WET_SURFACE: '' };
   const paveMesh = new THREE.Mesh(slabGeometry(paveRects, CITY.y - 0.5, GY), paveMat);
   paveMesh.receiveShadow = true;
   group.add(paveMesh);
-  const lawnMat = new THREE.MeshStandardMaterial({ color: 0x5a9a44, map: makeNoiseTexture(21, 256, 0.3), roughness: 0.95 });
-  const lawn = new THREE.Mesh(slabGeometry(lawnRects, CITY.y - 0.5, GY, 9), lawnMat);
+  const grass = makeGround('grass');
+  const lawnMat = grain(new THREE.MeshStandardMaterial({ color: 0xf0f6e8, map: grass.map, normalMap: grass.normal, roughness: 0.95 }), 0.04, 0.0, 0.4);
+  const lawn = new THREE.Mesh(slabGeometry(lawnRects, CITY.y - 0.5, GY, 4.5), lawnMat);
   lawn.receiveShadow = true;
   group.add(lawn);
   {
     const p = CITY.promenade;
-    const boardMat = new THREE.MeshStandardMaterial({ color: 0xcfc6b4, map: makeNoiseTexture(33, 256, 0.3), roughness: 0.8 });
+    const planks = makeGround('planks');
+    const boardMat = new THREE.MeshStandardMaterial({ map: planks.map, roughnessMap: planks.rough, normalMap: planks.normal, roughness: 1 });
     const m = new THREE.Mesh(slabGeometry([[p.x0, p.z0, p.x1, p.z1]], CITY.y - 1.2, GY, 3), boardMat);
     m.receiveShadow = true;
     group.add(m);
     for (let z = p.z0 + 30; z < p.z1 - 20; z += 46) benchSpots.push({ x: p.x1 - 2.2, z, heading: -Math.PI / 2 });
   }
-  const flatMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86 });
-  if (!lots.empty) { const lm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 }); lm.defines = { ...lm.defines, WET_SURFACE: '' }; group.add(lots.mesh(lm, { shadow: false })); }
+  const flatMat = grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86 }), 0.6, 0.5, 0.2);
+  if (lotRects.length) {
+    const asp = makeGround('asphalt');
+    const lm = grain(new THREE.MeshStandardMaterial({ map: asp.map, roughnessMap: asp.rough, normalMap: asp.normal, roughness: 1 }), 0.05, 0.0, 0.34);
+    lm.defines = { ...lm.defines, WET_SURFACE: '' };
+    const lotMesh = new THREE.Mesh(slabGeometry(lotRects, GY - 0.02, GY + 0.04, 6), lm);
+    lotMesh.receiveShadow = true;
+    group.add(lotMesh);
+  }
   if (!lines.empty) group.add(lines.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }), { shadow: false }));
 
   // ---- conservatory domes --------------------------------------------------------
@@ -672,7 +684,7 @@ export function buildCity(scene, env) {
     const fb = new FacadeBatch(28);
     fb.revolve(tcx, tcz, prof, BUILDING_COLORS.ice, 0, 36);
     const tx = makeFacade('glass', 77);
-    const mat = new THREE.MeshStandardMaterial({ map: tx.map, emissiveMap: tx.emissive, emissive: 0xffffff, roughnessMap: tx.orm, metalnessMap: tx.orm, roughness: 1, metalness: 1, vertexColors: true, envMapIntensity: 1.4 });
+    const mat = new THREE.MeshStandardMaterial({ map: tx.map, emissiveMap: tx.emissive, emissive: 0xffffff, roughnessMap: tx.orm, metalnessMap: tx.orm, normalMap: tx.normal, roughness: 1, metalness: 1, vertexColors: true, envMapIntensity: 1.4 });
     env.nightLerp(mat, 'emissiveIntensity', 0.02, 0.9);
     const m = new THREE.Mesh(fb.geometry(), mat);
     m.castShadow = true; m.receiveShadow = true;
@@ -752,11 +764,11 @@ export function buildCity(scene, env) {
   const screenMat = makeScreenMaterial(atlas);
   env.nightLerp(screenMat.uniforms.uBright, 'value', 0.9, 1.15);
   group.add(new THREE.Mesh(screens.geometry(), screenMat));
-  if (!frames.empty) group.add(frames.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.3 })));
+  if (!frames.empty) group.add(frames.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.3 }), 1.0, 0.25, 0.1)));
 
   // ---- merged batches (built last: parks, plazas and landmarks add to them) -------
-  group.add(roofs.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })));
-  group.add(trim.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.15, envMapIntensity: 1.1 })));
+  group.add(roofs.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), 0.55, 0.75, 0.26)));
+  group.add(trim.mesh(grain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.15, envMapIntensity: 1.1 }), 0.8, 0.22, 0.1)));
   group.add(deco.mesh(flatMat, { shadow: false }));
   for (const k of Object.keys(glow)) if (!glow[k].empty) group.add(glow[k].mesh(glowMats[k], { shadow: false, receive: false }));
   if (!pools.empty) {
