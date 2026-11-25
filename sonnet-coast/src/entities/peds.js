@@ -128,7 +128,7 @@ class Part {
   }
 }
 
-const _fr = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere(), _v = new THREE.Vector3(), _bm = new THREE.Matrix4();
+const _fr = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere(), _bm = new THREE.Matrix4();
 
 export class Peds {
   constructor(scene) {
@@ -180,7 +180,7 @@ export class Peds {
       heading: opts.heading ?? rand(0, 6.28), look, kit: kitData(look), role, state: 'walk',
       health: opts.health ?? 60, phase: rand(0, 6), speedWant: rand(1.25, 1.65), speed: 0,
       dest: null, path: [], stateT: 0, lie: 0, aim: 0, alive: true, brain: opts.brain || null,
-      block: null, region: null, cw: 1, corner: 0, lane: rand(-1.4, 0.7), fleeFrom: null, flash: 0, gun: false,
+      block: null, region: null, cw: 1, corner: 0, lane: rand(-1.1, 0.7), fleeFrom: null, flash: 0,
       pose: opts.pose || null, talkT: 0, faceH: null, seatH: 0.46,
       mode: 'route', act: 'idle', habit: null, group: null, seat: null, modeT: 0,
       seed: Math.random(), lookH: 0, lookT: 0, acc: 0, near: false, j: Float32Array.from(REST), _d: { x: 0, z: 0 },
@@ -318,7 +318,7 @@ export class Peds {
   spawnAmbient(pp, minD, seen) {
     for (let tries = 0; tries < 8; tries++) {
       // closer spots are likelier, so the streets around the player are the busy ones
-      const a = rand(0, 6.283), d = minD + (115 - minD) * Math.random() ** 1.4;
+      const a = rand(0, 6.283), d = minD + (115 - minD) * Math.random() ** 2;
       const x = pp.x + Math.cos(a) * d, z = pp.z + Math.sin(a) * d;
       // out of sight where possible: nobody pops up in plain view nearby
       if (d < seen && this.visible(x, pp.y || 2, z, 2.5)) continue;
@@ -348,7 +348,7 @@ export class Peds {
     const night = G.env ? G.env.night : 0;
     const r = Math.random();
     const c = Math.floor(rand(0, 4)), cw = chance(0.5) ? 1 : -1;
-    const lane = rand(-1.4, 0.7);
+    const lane = r >= 0.52 && r < 0.7 ? rand(-0.6, 0.4) : rand(-1.1, 0.7);   // groups keep off the kerb
     const A = this.loopPt(b, c, lane), B = this.loopPt(b, (c + cw + 4) % 4, lane);
     const f = rand(0.05, 0.95);
     const sx = A.x + (B.x - A.x) * f, sz = A.z + (B.z - A.z) * f;
@@ -379,7 +379,7 @@ export class Peds {
     }
     // waiting at the kerb, facing the street
     const inX = Math.abs(B.x - A.x) > Math.abs(B.z - A.z);
-    const kx = inX ? sx : (sx < b.cx ? b.x0 + 1.6 : b.x1 - 1.6), kz = inX ? (sz < b.cz ? b.z0 + 1.6 : b.z1 - 1.6) : sz;
+    const kx = inX ? sx : (sx < b.cx ? b.x0 + 2 : b.x1 - 2), kz = inX ? (sz < b.cz ? b.z0 + 2 : b.z1 - 2) : sz;
     const p = this.civ(kx, kz, undefined, 'wait');
     if (!p) return false;
     p.block = b;
@@ -1053,7 +1053,7 @@ export class Peds {
       r[9] = p.pos.x; r[10] = p.pos.y + lie * 0.16 + (legDrop + F[DROP]) * sc * (1 - lie); r[11] = p.pos.z;
       rx(r, F[PITCH] - lie * 1.5);
       // pelvis, torso, head
-      rz(rx(ry(child(Mpel, r, F[SWAY], 1.0, 0), F[HIPY]), 0), F[HIPR]);
+      rz(ry(child(Mpel, r, F[SWAY], 1.0, 0), F[HIPY]), F[HIPR]);
       rz(rx(ry(child(Mtor, Mpel, 0, 0, 0), F[SY]), F[SP]), F[SR]);
       const build = L.build || 1, hipW = L.hipW || 1, depth = L.depth || 1;
       const tier = nearT ? NT : FT;
