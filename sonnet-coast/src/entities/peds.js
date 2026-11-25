@@ -11,7 +11,9 @@
 //   p.pose:  null (walk / stand by itself), 'idle', 'talk', 'phone', 'wave', 'dance', 'lean',
 //            'cross' (arms crossed), 'sit' (onto a seat p.seatH metres high, default 0.46, with
 //            p.pos on the floor under the seat and the back to p.heading + PI), 'sitGround',
-//            'lie', 'cower'. The seated and lying poses keep the person in place.
+//            'lie', 'cower'. The seated and lying poses keep the person in place; a knock-down
+//            clears them (back to null), so the person gets up where they land. The pose shows
+//            from the first frame the person is on screen.
 //   p.talkT: while > 0 (seconds, counts down) the person stands still, turns to face p.faceH when
 //            it is set, and talks with their hands. Works on ambient and scripted people alike.
 //   p.keep:  never removed for distance (otherwise civilians go beyond 150 m from the player and
@@ -208,7 +210,7 @@ export class Peds {
     this.benches = null;
     this.beach = null;
     // spatial hash for keeping people from walking through each other
-    this.cellHead = new Int32Array(1024);
+    this.cellHead = new Int32Array(1024).fill(-1);
     this.cellNext = new Int32Array(MAX);
     this.vbuf = new Float32Array(256);
   }
@@ -226,7 +228,7 @@ export class Peds {
       block: null, region: null, cw: 1, corner: 0, lane: rand(-1.1, 0.7), fleeFrom: null, flash: 0,
       pose: opts.pose || null, talkT: 0, faceH: null, seatH: 0.46,
       mode: 'route', act: 'idle', habit: null, group: null, seat: null, modeT: 0,
-      seed: Math.random(), lookH: 0, lookT: 0, acc: 0, near: false, j: Float32Array.from(REST), _d: { x: 0, z: 0 },
+      seed: Math.random(), lookH: 0, lookT: 0, acc: 0, near: false, j: Float32Array.from(REST), drawnF: -9, _d: { x: 0, z: 0 },
     };
     p.gy = p.pos.y;
     this.list.push(p);
@@ -359,6 +361,12 @@ export class Peds {
     _sph.center.set(x, y + 1, z); _sph.radius = r;
     return _fr.intersectsSphere(_sph);
   }
+  // a spawn point the player does not see: never right next to them, out of view up close, and
+  // not so far off that the crowd would drop them again at once
+  unseen(x, z, pp, seen) {
+    const d = Math.hypot(x - pp.x, z - pp.z);
+    return d >= 12 && d < 140 && (d >= seen || !this.visible(x, pp.y || 2, z, 2.5));
+  }
   spawnAmbient(pp, minD, seen) {
     for (let tries = 0; tries < 8; tries++) {
       // closer spots are likelier, so the streets around the player are the busy ones
@@ -371,13 +379,13 @@ export class Peds {
       if (region) {
         const sx = clamp(x, region.x0, region.x1), sz = clamp(z, region.z0, region.z1);
         if (region.avoid && Math.hypot(sx - region.avoid.x, sz - region.avoid.z) < region.avoid.r) continue;
-        if (this.spawnInRegion(region, sx, sz)) return true;
+        if (this.unseen(sx, sz, pp, seen) && this.spawnInRegion(region, sx, sz, pp, seen)) return true;
         continue;
       }
       const b = blockAt(x, z);
       if (!b || b.park || b.plaza || b.dome) continue;
       if (!chance(Math.min(1, DENSITY[b.district] || 0.5))) continue;
-      if (this.spawnOnBlock(b, x, z, pp)) return true;
+      if (this.spawnOnBlock(b, x, z, pp, seen)) return true;
     }
     return false;
   }
@@ -388,7 +396,7 @@ export class Peds {
     if (p) p.mode = mode;
     return p;
   }
-  spawnOnBlock(b, x, z, pp) {
+  spawnOnBlock(b, x, z, pp, seen) {
     const night = G.env ? G.env.night : 0;
     const r = Math.random();
     const c = Math.floor(rand(0, 4)), cw = chance(0.5) ? 1 : -1;
@@ -396,7 +404,7 @@ export class Peds {
     const A = this.loopPt(b, c, lane), B = this.loopPt(b, (c + cw + 4) % 4, lane);
     const f = rand(0.05, 0.95);
     const sx = A.x + (B.x - A.x) * f, sz = A.z + (B.z - A.z) * f;
-    if (Math.hypot(sx - pp.x, sz - pp.z) < 12) return false;
+    if (!this.unseen(sx, sz, pp, seen)) return false;
     const walker = (px, pz) => {
       const p = this.civ(px, pz, undefined, 'route');
       if (!p) return null;
@@ -415,7 +423,7 @@ export class Peds {
       // a few people stopped to chat, on the building side of the pavement
       const inX = Math.abs(B.x - A.x) > Math.abs(B.z - A.z);
       const cx = sx + (inX ? 0 : Math.sign(b.cx - sx) * (0.4 - lane)), cz = sz + (inX ? Math.sign(b.cz - sz) * (0.4 - lane) : 0);
-      return this.chatGroup(cx, cz, Math.floor(rand(2, 4.6)), { block: b });
+      return this.unseen(cx, cz, pp, seen) && this.chatGroup(cx, cz, Math.floor(rand(2, 4.6)), { block: b });
     }
     if (r < 0.92) {
       const s = this.freeSeat(sx, sz, 40);
@@ -424,6 +432,7 @@ export class Peds {
     // waiting at the kerb, facing the street
     const inX = Math.abs(B.x - A.x) > Math.abs(B.z - A.z);
     const kx = inX ? sx : (sx < b.cx ? b.x0 + 2 : b.x1 - 2), kz = inX ? (sz < b.cz ? b.z0 + 2 : b.z1 - 2) : sz;
+    if (!this.unseen(kx, kz, pp, seen)) return false;
     const p = this.civ(kx, kz, undefined, 'wait');
     if (!p) return false;
     p.block = b;
@@ -431,7 +440,7 @@ export class Peds {
     p.heading = p.faceH; p.modeT = rand(15, 60); p.habit = chance(0.4) ? 'phone' : null;
     return true;
   }
-  spawnInRegion(rg, x, z) {
+  spawnInRegion(rg, x, z, pp, seen) {
     const night = G.env ? G.env.night : 0;
     const r = Math.random();
     const beach = rg.kind === 'beach';
@@ -477,6 +486,7 @@ export class Peds {
       const pier = rg.kind === 'pier';
       const side = chance(0.5) ? 1 : -1;
       const px = pier ? x : rg.x1 + 0.6, pz = pier ? (side > 0 ? rg.z1 + 1.2 : rg.z0 - 1.2) : z;
+      if (!this.unseen(px, pz, pp, seen)) return false;
       const p = this.civ(px, pz, undefined, 'wait');
       if (!p) return false;
       p.region = rg; p.faceH = pier ? (side > 0 ? 0 : Math.PI) : Math.PI / 2; p.heading = p.faceH; p.modeT = rand(20, 70);
@@ -551,6 +561,8 @@ export class Peds {
     p.vel.x = vx; p.vel.y = vy; p.vel.z = vz;
     p.flash = 0.15;
     this.leaveSeat(p);
+    // whoever is knocked off a seat or the ground gets up where they land
+    if (p.pose === 'sit' || p.pose === 'sitGround' || p.pose === 'lie') p.pose = null;
     if (p.role === 'civ' && p.mode !== 'route' && p.mode !== 'region') this.wander(p);
     if (wasUp) emit('pedDown', p, source, dmg);
     return wasUp;
@@ -565,16 +577,25 @@ export class Peds {
     emit('pedHurt', p, source, dmg);
   }
 
-  // distance to the nearest ped in front of vehicle v, in its lane (for traffic braking)
+  // distance to the nearest ped in front of vehicle v, in its lane (for traffic braking). Only the
+  // cells of this frame's neighbour hash under the 15 m look-ahead are searched.
   gapAhead(v, fx, fz) {
     let gap = 999;
-    for (const p of this.list) {
-      if (p.state === 'down') continue;
-      const dx = p.pos.x - v.pos.x, dz = p.pos.z - v.pos.z;
-      const f = dx * fx + dz * fz;
-      if (f < 0 || f > 15) continue;
-      if (Math.abs(dx * -fz + dz * fx) > 1.7) continue;
-      gap = Math.min(gap, f - v.T.len / 2 - 0.5);
+    const list = this.list, head = this.cellHead, next = this.cellNext;
+    const x0 = v.pos.x, z0 = v.pos.z, x1 = x0 + fx * 15, z1 = z0 + fz * 15;
+    // a little margin: the hash was built from where people stood at the start of the frame
+    const cx0 = Math.floor((Math.min(x0, x1) - 2) * 0.5), cx1 = Math.floor((Math.max(x0, x1) + 2) * 0.5);
+    const cz0 = Math.floor((Math.min(z0, z1) - 2) * 0.5), cz1 = Math.floor((Math.max(z0, z1) + 2) * 0.5);
+    for (let cx = cx0; cx <= cx1; cx++) for (let cz = cz0; cz <= cz1; cz++) {
+      for (let j = head[((cx * 73856093) ^ (cz * 19349663)) & 1023]; j >= 0; j = next[j]) {
+        const p = list[j];
+        if (!p || p.state === 'down') continue;
+        const dx = p.pos.x - x0, dz = p.pos.z - z0;
+        const f = dx * fx + dz * fz;
+        if (f < 0 || f > 15) continue;
+        if (Math.abs(dx * -fz + dz * fx) > 1.7) continue;
+        gap = Math.min(gap, f - v.T.len / 2 - 0.5);
+      }
     }
     return gap;
   }
@@ -601,7 +622,8 @@ export class Peds {
       const t = (-b - Math.sqrt(disc)) / (2 * a);
       if (t < 0 || t > bt) continue;
       const y = oy + dy * t - p.pos.y;
-      const top = p.state === 'ragdoll' || p.mode === 'beach' ? 0.6 : p.state === 'cower' || p.mode === 'sit' ? 1.3 : 1.85;
+      const act = p.act;
+      const top = p.state === 'ragdoll' || act === 'lie' ? 0.6 : act === 'sitGround' ? 1.0 : act === 'cower' ? 1.3 : act === 'sit' || act === 'sitPhone' ? p.seatH + 0.95 : 1.85;
       if (y < -0.1 || y > top) continue;
       bt = t; best = p;
     }
@@ -1064,12 +1086,17 @@ export class Peds {
       // detail tier, with a little hysteresis so nobody flickers at the boundary
       p.farLod = p.farLod ? d2 > NEAR_IN * NEAR_IN : d2 > NEAR_OUT * NEAR_OUT;
       const nearT = !p.farLod && NT.torso.n < NEAR_MAX;
+      // someone coming back into view takes up their current pose at once: poses only ease on
+      // screen, and they may have sat down, got up or been placed in a scripted pose meanwhile
+      const snap = this.frame - p.drawnF > 2;
+      p.drawnF = this.frame;
       // occasionally glance somewhere new
       p.lookT -= dt;
       if (p.lookT <= 0) { p.lookT = rand(2, 6); p.lookH = chance(0.5) ? 0 : rand(-0.9, 0.9); }
       // ease towards the activity's pose (every other frame for people further off)
       const J = p.j;
-      if (!p.farLod || (this.frame + p.id) & 1) {
+      if (snap) J.set(this.target(p, t, T));
+      else if (!p.farLod || (this.frame + p.id) & 1) {
         const tg = this.target(p, t, T);
         let kk = p.farLod ? k2 : k;
         if (p.act === 'ragdoll' || p.act === 'panic' || p.act === 'cower') kk = Math.min(1, kk * 2);
