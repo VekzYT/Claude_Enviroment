@@ -95,7 +95,7 @@ export class PlayerAnim {
       case 'busted':
         // kneeling, hands behind the head
         o[DROP] = -0.36; o[LTP] = o[RTP] = 0.02; o[LKN] = o[RKN] = 1.62; o[LFT] = o[RFT] = 0.5; o[LTR] = o[RTR] = 0.12;
-        o[LAP] = o[RAP] = 0.25; o[LAR] = o[RAR] = 2.1; o[LAY] = o[RAY] = 1.5; o[LEL] = o[REL] = -2.1; o[HP] = 0.25; o[SP] = 0.05;
+        o[LAP] = o[RAP] = 0.25; o[LAR] = o[RAR] = 2.1; o[LAY] = o[RAY] = -1.5; o[LEL] = o[REL] = -2.1; o[HP] = 0.25; o[SP] = 0.05;
         o[LOCO] = 0; o[SWL] = o[SWR] = 0;
         return 7;
       case 'ragdoll': case 'dead': {
