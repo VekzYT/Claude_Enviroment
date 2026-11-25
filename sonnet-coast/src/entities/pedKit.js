@@ -1,13 +1,16 @@
-// Body-part kit for the instanced crowd. Each body part is ONE geometry that holds every variant of
-// that part (hair styles, hats, sleeves, bags, shoes...). Per instance, a bit mask picks which
-// variants show (hidden ones collapse to a point in the vertex shader) and four colours paint them,
-// so a crowd of very different people still costs one draw call per body part.
+// Body-part kit for the instanced crowd. Each body part is a base geometry that holds the common
+// variants of that part (hair styles, sleeves, collars...), plus a few geometries for groups of
+// heavier, rarer variants (hats, bags, skirts and coat tails, boots...), drawn only for the people
+// who wear one of them. Per instance, a bit mask picks which variants show (hidden ones collapse to
+// a point in the vertex shader) and four colours paint them, so a crowd of very different people
+// costs a handful of draw calls per body part.
 //
 // Vertex attributes:  aPart = (colour slot 0-3 or 4 = fixed vertex colour, bit or -1 = always,
 //                     roughness); aMorph = offset to the female shape (torso, pelvis); aHair =
-//                     (cover 0..2, azimuth, noise) for the shader-shaped hair shell (-1 = not hair).
-// Instance data:      iColA..iColD, iBits = (mask, morph weight or hair part), iHair = (volume,
-//                     length, fringe, curl) on the head.
+//                     (cover 0..2, azimuth, noise) for the shader-shaped hair shell (-1 = not hair);
+//                     on body parts aHair.y = 1 marks cloth that bends with the thighs.
+// Instance data:      iColA..iColD, iBits = (mask, morph weight + 2 * thigh bend in centiradians,
+//                     or hair part on the head), iHair = (volume, length, fringe, curl) on the head.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ellipseLoft, limbGeo, place } from './bodyGeo.js';
@@ -48,7 +51,24 @@ export function tag(g, slot, bit = -1, rough = 0.8, hex = 0xffffff) {
   if (!g.getAttribute('normal')) g.computeVertexNormals();
   return g;
 }
-const kit = (parts) => mergeGeometries(parts, false);
+// Merge a part's pieces. Pieces whose bit is in one of `groups` get a geometry of their own.
+function kit(parts, groups = []) {
+  const base = [], extra = groups.map(() => []);
+  for (const g of parts) {
+    const k = groups.findIndex((gr) => gr.includes(g.getAttribute('aPart').getY(0)));
+    (k < 0 ? base : extra[k]).push(g);
+  }
+  return {
+    base: mergeGeometries(base, false),
+    extras: groups.map((gr, k) => ({ mask: gr.reduce((m, b) => m | (1 << b), 0), geo: extra[k].length ? mergeGeometries(extra[k], false) : null })).filter((e) => e.geo),
+  };
+}
+// mark cloth that swings up with the thighs when sitting (see pedBend)
+function bends(g) {
+  const h = g.getAttribute('aHair');
+  for (let i = 0; i < h.count; i++) h.setY(i, 1);
+  return g;
+}
 const sph = (r, w, h, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => place(new THREE.SphereGeometry(r, w, h), x, y, z, rx, ry, rz, sx, sy, sz);
 
 // ---- lofts with a second (female) shape, and cloth patches that lie over them ----------------
@@ -153,6 +173,8 @@ function limbSecs(len, r0, r1, flat = 0.92) {
   secs.push([r0 * 0.55, r0 * 0.62, r0 * 0.62 * flat]);
   return secs;
 }
+// far limbs: the tip, the wrist or ankle, mid-limb and the joint
+const farSecs = (secs) => [0, 1, 3, 5, 6, 7].map((i) => secs[i]);
 const band = (secs, y0, y1, rows, seg, grow, p = 1) => patch(secs, null, Array.from({ length: rows + 1 }, (_, i) => y0 + ((y1 - y0) * i) / rows), () => [0, Math.PI * 2], seg, p, grow);
 
 // ---- torso ---------------------------------------------------------------------------------
@@ -169,18 +191,28 @@ const M_TORSO = [
 const FRONT = Math.PI / 2, BACK = Math.PI * 1.5;
 const ys = (y0, y1, n) => Array.from({ length: n + 1 }, (_, i) => y0 + ((y1 - y0) * i) / n);
 
+// the far torso keeps the waist, chest and shoulder sections only
+const FAR_ROWS = [0, 2, 4, 6, 7, 9, 10];
 export function torsoKit(far = false) {
-  const S = far ? 10 : 22;
-  const P = (y0, y1, rows, range, cols, grow = 0.004) => patch(M_TORSO, F_TORSO, ys(y0, y1, rows), range, cols, 0.86, grow);
-  const parts = [tag(loft2(M_TORSO, F_TORSO, S), A, -1, 0.85)];
-  parts.push(tag(place(limbGeo(0.17, 0.052, 0.058, far ? 6 : 12, 1), 0, 0.62, -0.006), C, -1, 0.55));      // neck
+  const S = far ? 8 : 22;
+  const MT = far ? FAR_ROWS.map((i) => M_TORSO[i]) : M_TORSO, FT = far ? FAR_ROWS.map((i) => F_TORSO[i]) : F_TORSO;
+  const P = (y0, y1, rows, range, cols, grow = 0.004) => patch(MT, FT, ys(y0, y1, rows), range, cols, 0.86, grow);
+  const parts = [tag(loft2(MT, FT, S), A, -1, 0.85)];
+  parts.push(tag(far ? place(ellipseLoft([[-0.16, 0.058, 0.058], [0.02, 0.052, 0.052]], 5), 0, 0.62, -0.006) : place(limbGeo(0.17, 0.052, 0.058, 12, 1), 0, 0.62, -0.006), C, -1, 0.55));      // neck
   // hood lying on the shoulders, and the hoodie's front pocket
-  parts.push(tag(sph(0.15, far ? 8 : 16, far ? 5 : 10, 0, 0.47, -0.085, 1.05, 0.62, 0.75, -0.5), A, TORSO.HOOD, 0.9));
+  parts.push(tag(sph(0.15, far ? 6 : 16, far ? 4 : 10, 0, 0.47, -0.085, 1.05, 0.62, 0.75, -0.5), A, TORSO.HOOD, 0.9));
   if (!far) {
     parts.push(tag(P(0.0, 0.14, 2, () => [FRONT - 0.55, FRONT + 0.55], 6, 0.006), A, TORSO.POCKET, 0.9, 0xd8d8d8));
     for (const s of [-1, 1]) parts.push(tag(place(new THREE.CylinderGeometry(0.005, 0.005, 0.13, 4), s * 0.035, 0.39, 0.118, 0.12), FIXED, TORSO.STRINGS, 0.7, 0xeeeeee));
     parts.push(tag(P(0.22, 0.29, 1, () => [0, Math.PI * 2], S, 0.003), B, TORSO.STRIPE, 0.85));
-    parts.push(tag(P(0.19, 0.33, 2, () => [FRONT - 0.36, FRONT + 0.36], 5, 0.003), B, TORSO.PRINT, 0.7));
+    // print: a round emblem (a ring of the second colour) over a line of lettering
+    const disc = (yc, rr, grow, slot) => P(yc - rr, yc + rr, 6, (y) => {
+      const w = ((Math.sqrt(Math.max(0, rr * rr - (y - yc) ** 2)) / 0.2) ** 1.16);   // undoes the superellipse front
+      return [FRONT - w, FRONT + w];
+    }, 6, grow);
+    parts.push(tag(disc(0.315, 0.056, 0.003, B), B, TORSO.PRINT, 0.7));
+    parts.push(tag(disc(0.315, 0.032, 0.0045, A), A, TORSO.PRINT, 0.75));
+    for (const [y, w] of [[0.232, 0.36], [0.212, 0.24]]) parts.push(tag(P(y - 0.006, y + 0.006, 1, () => [FRONT - w, FRONT + w], 3, 0.003), B, TORSO.PRINT, 0.7));
     // tank top and sundress: bare skin around the straps (straps sit at x = +-0.1 on the shoulder)
     const bare = (bit, front, back, w) => {
       const st = 1.09, h = w / 2;
@@ -196,9 +228,14 @@ export function torsoKit(far = false) {
     parts.push(tag(P(-0.075, -0.035, 1, () => [0, Math.PI * 2], S, 0.007), B, TORSO.RIB, 0.9));
     parts.push(tag(place(ellipseLoft([[0, 0.078, 0.074], [0.035, 0.07, 0.066]], 14), 0, 0.465, -0.004), B, TORSO.RIB, 0.9));
     parts.push(tag(P(-0.075, 0.47, 6, () => [FRONT - 0.035, FRONT + 0.035], 1, 0.008), FIXED, TORSO.ZIP, 0.3, 0xb8bcc2));
-    // open front: the shirt underneath, with the jacket edges standing proud of it
+    // open front: the shirt underneath, and the two jacket fronts lying over it as a layer of their
+    // own, with a darker facing along the opening so the edge reads
     parts.push(tag(P(-0.075, 0.47, 6, () => [FRONT - 0.36, FRONT + 0.36], 4, 0.004), B, TORSO.OPEN, 0.85));
-    for (const s of [-1, 1]) parts.push(tag(P(-0.075, 0.46, 6, () => [FRONT + s * 0.36 - 0.06, FRONT + s * 0.36 + 0.06], 1, 0.011), A, TORSO.OPEN, 0.8));
+    for (const s of [-1, 1]) {
+      const r = (a0, a1) => () => (s < 0 ? [FRONT - a1, FRONT - a0] : [FRONT + a0, FRONT + a1]);
+      parts.push(tag(P(-0.08, 0.46, 6, r(0.33, 1.3), 5, 0.012), A, TORSO.OPEN, 0.8));
+      parts.push(tag(P(-0.08, 0.46, 6, r(0.31, 0.36), 1, 0.0125), A, TORSO.OPEN, 0.8, 0x8a8a8a));
+    }
     const vw = (y) => 0.04 + Math.max(0, (y - 0.06) / 0.44) * 0.5;
     parts.push(tag(P(0.04, 0.47, 6, (y) => [FRONT - vw(y), FRONT + vw(y)], 4, 0.004), B, TORSO.VNECK, 0.8));
     for (const s of [-1, 1]) parts.push(tag(P(0.04, 0.46, 6, (y) => s < 0 ? [FRONT - vw(y) - 0.13, FRONT - vw(y)] : [FRONT + vw(y), FRONT + vw(y) + 0.13], 2, 0.012), A, TORSO.LAPELS, 0.75));
@@ -219,19 +256,21 @@ export function torsoKit(far = false) {
     parts.push(tag(P(-0.075, 0.47, 3, () => [FRONT - 0.36, FRONT + 0.36], 2, 0.004), B, TORSO.OPEN, 0.85));
     const vw = (y) => 0.04 + Math.max(0, (y - 0.06) / 0.44) * 0.5;
     parts.push(tag(P(0.04, 0.47, 3, (y) => [FRONT - vw(y), FRONT + vw(y)], 2, 0.004), B, TORSO.VNECK, 0.8));
-    parts.push(tag(P(0.37, 0.5, 1, () => [0, Math.PI * 2], 10, 0.003), C, TORSO.TANK, 0.55));
+    parts.push(tag(P(0.37, 0.5, 1, () => [0, Math.PI * 2], 8, 0.003), C, TORSO.TANK, 0.55));
   }
   // backpack
   parts.push(tag(place(ellipseLoft([[-0.17, 0.13, 0.06], [-0.15, 0.15, 0.075], [0.12, 0.15, 0.08], [0.16, 0.12, 0.06]], far ? 6 : 14, 0.55), 0, 0.27, -0.2), D, TORSO.PACK, 0.75));
   if (!far) parts.push(tag(place(ellipseLoft([[-0.07, 0.1, 0.03], [0.05, 0.1, 0.035], [0.07, 0.085, 0.025]], 10, 0.55), 0, 0.17, -0.27), D, TORSO.PACK, 0.75, 0xc8c8c8));
-  return kit(parts);
+  const T = TORSO;
+  return kit(parts, far ? [] : [[T.TANK, T.STRAPS], [T.HOOD, T.POCKET, T.STRINGS, T.PACK, T.CROSS], [T.OPEN, T.COLLAR, T.RIB, T.ZIP, T.VNECK, T.LAPELS, T.POCKETS, T.BADGE, T.BUTTONS]]);
 }
 
 // ---- pelvis --------------------------------------------------------------------------------
-const M_HIPS = [[-0.27, 0.07, 0.07], [-0.22, 0.165, 0.108], [-0.12, 0.19, 0.122], [-0.02, 0.178, 0.116], [0.04, 0.17, 0.112]];
-const F_HIPS = [[-0.27, 0.075, 0.072], [-0.22, 0.18, 0.114], [-0.12, 0.205, 0.128], [-0.02, 0.18, 0.118], [0.04, 0.156, 0.108]];
+// the top of the hips stays inside the waist of the torso, so trousers never show through a top
+const M_HIPS = [[-0.27, 0.07, 0.07], [-0.22, 0.165, 0.108], [-0.12, 0.19, 0.122], [-0.02, 0.174, 0.113], [0.04, 0.156, 0.103]];
+const F_HIPS = [[-0.27, 0.075, 0.072], [-0.22, 0.18, 0.114], [-0.12, 0.205, 0.128], [-0.02, 0.176, 0.115], [0.04, 0.142, 0.097]];
 export function pelvisKit(far = false) {
-  const S = far ? 9 : 20;
+  const S = far ? 7 : 20;
   const parts = [tag(loft2(M_HIPS, F_HIPS, S, 0.88), A, -1, 0.85)];
   const flare = (y0, y1, r0, r1, z0, z1, rows) => {
     const sm = [], sf = [];
@@ -242,9 +281,9 @@ export function pelvisKit(far = false) {
     }
     return loft2(sm, sf, S, 0.92, false);
   };
-  parts.push(tag(flare(0.04, -0.42, 0.19, 0.25, 0.126, 0.2, far ? 2 : 5), A, PELVIS.SKIRT, 0.85));
-  parts.push(tag(flare(0.05, -0.17, 0.195, 0.205, 0.13, 0.138, far ? 1 : 3), C, PELVIS.HEM, 0.85));
-  parts.push(tag(flare(0.05, -0.68, 0.198, 0.26, 0.132, 0.19, far ? 2 : 6), C, PELVIS.COAT, 0.8));
+  parts.push(bends(tag(flare(0.04, -0.42, 0.19, 0.25, 0.126, 0.2, far ? 2 : 5), A, PELVIS.SKIRT, 0.85)));
+  parts.push(bends(tag(flare(0.05, -0.17, 0.195, 0.205, 0.13, 0.138, far ? 1 : 3), C, PELVIS.HEM, 0.85)));
+  parts.push(bends(tag(flare(0.05, -0.68, 0.198, 0.26, 0.132, 0.19, far ? 2 : 6), C, PELVIS.COAT, 0.8)));
   if (!far) {
     // belts sit just below the hem of the top, their upper edge tucked under it
     parts.push(tag(patch(M_HIPS, F_HIPS, ys(-0.105, -0.068, 1), () => [0, Math.PI * 2], S, 0.88, 0.005), B, PELVIS.BELT, 0.45));
@@ -253,18 +292,18 @@ export function pelvisKit(far = false) {
     // beach towel under someone lying on their back (pelvis space: the back faces the ground)
     parts.push(tag(place(new THREE.BoxGeometry(0.75, 1.75, 0.012), 0, 0.12, -0.15), D, PELVIS.TOWEL, 0.95));
   }
-  return kit(parts);
+  return kit(parts, far ? [] : [[PELVIS.SKIRT, PELVIS.HEM, PELVIS.COAT]]);
 }
 
 // ---- head ----------------------------------------------------------------------------------
 export function headKit(far = false) {
   const r = HR, parts = [];
   if (far) {
-    parts.push(tag(sph(r, 9, 7, 0, 0.012, 0, 0.92, 1.06, 1.0), A, -1, 0.55));
-    parts.push(tag(sph(r * 0.78, 7, 5, 0, -r * 0.46, r * 0.16, 0.86, 0.84, 0.9), A, -1, 0.55));
+    parts.push(tag(sph(r, 7, 5, 0, 0.012, 0, 0.92, 1.06, 1.0), A, -1, 0.55));
+    parts.push(tag(sph(r * 0.78, 6, 4, 0, -r * 0.46, r * 0.16, 0.86, 0.84, 0.9), A, -1, 0.55));
   } else {
-    parts.push(tag(sph(r, 22, 16, 0, 0.012, 0, 0.92, 1.06, 1.0), A, -1, 0.5));
-    parts.push(tag(sph(r * 0.78, 16, 10, 0, -r * 0.46, r * 0.16, 0.86, 0.84, 0.9), A, -1, 0.5));
+    parts.push(tag(sph(r, 20, 14, 0, 0.012, 0, 0.92, 1.06, 1.0), A, -1, 0.5));
+    parts.push(tag(sph(r * 0.78, 14, 9, 0, -r * 0.46, r * 0.16, 0.86, 0.84, 0.9), A, -1, 0.5));
     parts.push(tag(sph(r * 0.17, 8, 6, 0, -r * 0.14, r * 1.0, 0.76, 1.25, 1.05), A, -1, 0.45));
     parts.push(tag(sph(r * 0.2, 8, 5, 0, -r * 0.56, r * 0.86, 1.25, 0.35, 0.6), A, -1, 0.4, 0xc08680));    // lips
     for (const s of [-1, 1]) {
@@ -276,7 +315,7 @@ export function headKit(far = false) {
   }
   // the hair shell: positions are worked out in the vertex shader from aHair and iHair
   {
-    const nA = far ? 12 : 30, nX = far ? 9 : 22;
+    const nA = far ? 8 : 26, nX = far ? 6 : 18;
     const pos = [], hair = [], idx = [];
     for (let i = 0; i <= nX; i++) {
       const x = i <= nX / 2 ? (i / (nX / 2)) : 1 + (i - nX / 2) / (nX / 2);
@@ -299,9 +338,9 @@ export function headKit(far = false) {
     g.computeVertexNormals();
     parts.push(tag(g, B, HEAD.HAIR, 0.55));
   }
-  const W = far ? 6 : 12, H = far ? 4 : 8;
+  const W = far ? 5 : 12, H = far ? 3 : 8;
   parts.push(tag(sph(r * 0.4, W, H, 0, r * 0.82, -r * 0.62), B, HEAD.BUN, 0.6));
-  parts.push(tag(place(limbGeo(0.2, 0.042, 0.022, far ? 5 : 9), 0, r * 0.35, -r * 1.02, 0.42), B, HEAD.PONY, 0.6));
+  parts.push(tag(place(far ? ellipseLoft([[-0.2, 0.022, 0.022], [-0.1, 0.04, 0.038], [0.02, 0.042, 0.04]], 4) : limbGeo(0.2, 0.042, 0.022, 9), 0, r * 0.35, -r * 1.02, 0.42), B, HEAD.PONY, 0.6));
   if (!far) {
     parts.push(tag(place(ellipseLoft([[0, 0.03, 0.03], [0.018, 0.03, 0.03]], 8), 0, r * 0.3, -r * 1.02, 0.42), D, HEAD.PONY, 0.5));
     for (const s of [-1, 1]) parts.push(tag(place(limbGeo(0.24, 0.026, 0.016, 7), s * r * 0.55, -r * 0.15, -r * 0.7, 0.18, 0, s * 0.12), B, HEAD.BRAIDS, 0.6));
@@ -312,7 +351,7 @@ export function headKit(far = false) {
     // sunglasses
     const glass = [];
     for (const s of [-1, 1]) {
-      glass.push(sph(r * 0.2, 12, 8, s * r * 0.37, r * 0.1, r * 0.98, 1.2, 0.85, 0.32));
+      glass.push(sph(r * 0.2, 10, 6, s * r * 0.37, r * 0.1, r * 0.98, 1.2, 0.85, 0.32));
       glass.push(place(new THREE.BoxGeometry(0.008, 0.008, r * 0.95), s * r * 0.86, r * 0.14, r * 0.45));
     }
     glass.push(place(new THREE.BoxGeometry(r * 0.3, 0.008, 0.008), 0, r * 0.18, r * 1.02));
@@ -325,30 +364,31 @@ export function headKit(far = false) {
   const R = r * 1.1;
   const capParts = (k) => {
     const out = [];
-    const crown = new THREE.SphereGeometry(R, far ? 8 : 18, far ? 4 : 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
+    const crown = new THREE.SphereGeometry(R, far ? 7 : 16, far ? 3 : 7, 0, Math.PI * 2, 0, Math.PI * 0.5);
     out.push(place(crown, 0, r * 0.28, -r * 0.02, -0.1, 0, 0, 1, 0.84, 1.06));
-    out.push(place(new THREE.CylinderGeometry(R * 0.995, R * 1.0, r * 0.3, far ? 8 : 18, 1, true), 0, r * 0.22, -r * 0.02, -0.1));
-    out.push(place(new THREE.CylinderGeometry(R * 0.92, R * 0.92, r * 0.06, far ? 6 : 16, 1, false, -1.0, 2.0), 0, r * 0.13, r * 0.6, 0.12, 0, 0, 0.9, 1, 0.85));
+    out.push(place(new THREE.CylinderGeometry(R * 0.995, R * 1.0, r * 0.3, far ? 7 : 16, 1, true), 0, r * 0.22, -r * 0.02, -0.1));
+    out.push(place(new THREE.CylinderGeometry(R * 0.92, R * 0.92, r * 0.06, far ? 5 : 14, 1, false, -1.0, 2.0), 0, r * 0.13, r * 0.6, 0.12, 0, 0, 0.9, 1, 0.85));
     if (!far) out.push(place(new THREE.SphereGeometry(r * 0.08, 6, 4), 0, r * 1.2, -r * 0.1));
     return out.map((g) => tag(g, C, k, 0.8));
   };
   parts.push(...capParts(HEAD.CAP));
   parts.push(...capParts(HEAD.CAPBACK).map((g) => g.rotateY(Math.PI)));
-  parts.push(tag(place(new THREE.SphereGeometry(R * 1.02, far ? 8 : 18, far ? 5 : 10, 0, Math.PI * 2, 0, Math.PI * 0.56), 0, r * 0.12, -r * 0.04, -0.12, 0, 0, 0.98, 1.14, 1.06), C, HEAD.BEANIE, 0.95));
+  parts.push(tag(place(new THREE.SphereGeometry(R * 1.02, far ? 7 : 16, far ? 4 : 8, 0, Math.PI * 2, 0, Math.PI * 0.56), 0, r * 0.12, -r * 0.04, -0.12, 0, 0, 0.98, 1.14, 1.06), C, HEAD.BEANIE, 0.95));
   if (!far) {
-    parts.push(tag(place(new THREE.CylinderGeometry(R * 1.06, R * 1.08, r * 0.36, 18, 1, true), 0, r * 0.06, -r * 0.05, -0.12), C, HEAD.BEANIE, 0.95, 0xdcdcdc));
+    parts.push(tag(place(new THREE.CylinderGeometry(R * 1.06, R * 1.08, r * 0.36, 16, 1, true), 0, r * 0.06, -r * 0.05, -0.12), C, HEAD.BEANIE, 0.95, 0xdcdcdc));
     parts.push(tag(sph(r * 0.22, 8, 6, 0, r * 1.32, -r * 0.18), D, HEAD.BEANIE, 0.95));
   }
   const RL = r * 1.14;
-  parts.push(tag(place(lathe([[RL * 0.97, r * 0.32], [RL * 1.45, r * 0.1], [RL * 1.48, r * 0.14], [RL * 1.02, r * 0.4], [RL * 0.95, r * 1.05], [RL * 0.75, r * 1.22], [0.001, r * 1.25]], far ? 8 : 20), 0, 0, -r * 0.03, -0.08), C, HEAD.BUCKET, 0.9));
-  parts.push(tag(place(lathe([[RL * 0.97, r * 0.4], [RL * 2.05, r * 0.25], [RL * 2.08, r * 0.3], [RL * 1.02, r * 0.52], [RL * 0.93, r * 1.1], [RL * 0.72, r * 1.28], [0.001, r * 1.31]], far ? 8 : 24), 0, 0, -r * 0.03, -0.06), C, HEAD.SUNHAT, 0.85));
-  if (!far) parts.push(tag(place(new THREE.CylinderGeometry(RL * 1.0, RL * 1.01, r * 0.16, 20, 1, true), 0, r * 0.6, -r * 0.03, -0.06), D, HEAD.SUNHAT, 0.7));
+  parts.push(tag(place(lathe([[RL * 0.97, r * 0.32], [RL * 1.45, r * 0.1], [RL * 1.48, r * 0.14], [RL * 1.02, r * 0.4], [RL * 0.95, r * 1.05], [RL * 0.75, r * 1.22], [0.001, r * 1.25]], far ? 7 : 18), 0, 0, -r * 0.03, -0.08), C, HEAD.BUCKET, 0.9));
+  parts.push(tag(place(lathe([[RL * 0.97, r * 0.4], [RL * 2.05, r * 0.25], [RL * 2.08, r * 0.3], [RL * 1.02, r * 0.52], [RL * 0.93, r * 1.1], [RL * 0.72, r * 1.28], [0.001, r * 1.31]], far ? 7 : 20), 0, 0, -r * 0.03, -0.06), C, HEAD.SUNHAT, 0.85));
+  if (!far) parts.push(tag(place(new THREE.CylinderGeometry(RL * 1.0, RL * 1.01, r * 0.16, 18, 1, true), 0, r * 0.6, -r * 0.03, -0.06), D, HEAD.SUNHAT, 0.7));
   // police cap: flat crown, dark band, glossy peak
-  parts.push(tag(place(lathe([[RL * 0.99, r * 0.32], [RL * 1.0, r * 0.7], [RL * 1.12, r * 1.18], [RL * 1.09, r * 1.3], [0.001, r * 1.33]], far ? 8 : 20), 0, 0, -r * 0.02, -0.1), C, HEAD.COPCAP, 0.75));
-  parts.push(tag(place(new THREE.CylinderGeometry(RL * 1.005, RL * 1.0, r * 0.3, far ? 8 : 20, 1, true), 0, r * 0.5, -r * 0.02, -0.1), D, HEAD.COPCAP, 0.6));
-  parts.push(tag(place(new THREE.CylinderGeometry(R * 0.95, R * 0.95, r * 0.05, far ? 6 : 16, 1, false, -0.95, 1.9), 0, r * 0.36, r * 0.62, 0.22, 0, 0, 0.92, 1, 0.8), FIXED, HEAD.COPCAP, 0.15, 0x0c0d10));
+  parts.push(tag(place(lathe([[RL * 0.99, r * 0.32], [RL * 1.0, r * 0.7], [RL * 1.12, r * 1.18], [RL * 1.09, r * 1.3], [0.001, r * 1.33]], far ? 7 : 18), 0, 0, -r * 0.02, -0.1), C, HEAD.COPCAP, 0.75));
+  parts.push(tag(place(new THREE.CylinderGeometry(RL * 1.005, RL * 1.0, r * 0.3, far ? 7 : 18, 1, true), 0, r * 0.5, -r * 0.02, -0.1), D, HEAD.COPCAP, 0.6));
+  parts.push(tag(place(new THREE.CylinderGeometry(R * 0.95, R * 0.95, r * 0.05, far ? 5 : 16, 1, false, -0.95, 1.9), 0, r * 0.36, r * 0.62, 0.22, 0, 0, 0.92, 1, 0.8), FIXED, HEAD.COPCAP, 0.15, 0x0c0d10));
   if (!far) parts.push(tag(sph(r * 0.1, 6, 4, 0, r * 0.88, RL * 1.04, 1, 1.1, 0.35), FIXED, HEAD.COPCAP, 0.2, 0xd8b45a));
-  return kit(parts);
+  const E = HEAD, hats = [E.CAP, E.CAPBACK, E.BEANIE, E.BUCKET, E.SUNHAT, E.COPCAP];
+  return kit(parts, far ? [hats] : [[E.BUN, E.PONY, E.BRAIDS, E.BEARD, E.STACHE, E.EARRING, E.GLASSES, E.PHONES], hats]);
 }
 
 // ---- arms ----------------------------------------------------------------------------------
@@ -356,19 +396,22 @@ const UA_LEN = 0.28, FA_LEN = 0.25;
 export function upperArmKit() {
   const secs = limbSecs(UA_LEN, 0.056, 0.046);
   return kit([
-    tag(limbGeo(UA_LEN, 0.056, 0.046, 14), B, -1, 0.8),
-    tag(sph(0.06, 14, 10, 0, -0.014, -0.004, 1, 1.05, 0.98), B, -1, 0.8),                                // deltoid
-    tag(band(secs, -0.13, 0.02, 3, 16, 0.006), A, UARM.SLEEVE, 0.85),
-    tag(sph(0.065, 14, 8, 0, -0.012, -0.004, 1, 1.0, 0.98), A, UARM.SLEEVE, 0.85),
+    tag(limbGeo(UA_LEN, 0.056, 0.046, 12), B, -1, 0.8),
+    // deltoid and sleeve cap: no wider than the arm, so shoulders slope instead of ending in a ball
+    tag(sph(0.054, 12, 8, 0, -0.034, -0.004, 0.96, 1.05, 0.95), B, -1, 0.8),
+    tag(band(secs, -0.13, 0.0, 2, 14, 0.005), A, UARM.SLEEVE, 0.85),
+    tag(sph(0.058, 12, 7, 0, -0.036, -0.004, 0.97, 1.0, 0.96), A, UARM.SLEEVE, 0.85),
   ]);
 }
 // hand at -0.29 below the elbow, thumb forward (+z)
 function handParts(far) {
-  if (far) return [tag(sph(0.04, 6, 4, 0, -FA_LEN - 0.045, 0.004, 0.8, 1.3, 1.0), C, -1, 0.55)];
+  if (far) return [tag(sph(0.04, 5, 3, 0, -FA_LEN - 0.045, 0.004, 0.8, 1.3, 1.0), C, -1, 0.55)];
   return [
     tag(sph(0.041, 12, 9, 0, -FA_LEN - 0.04, 0.004, 0.62, 1.15, 1.0), C, -1, 0.5),
-    tag(sph(0.03, 10, 7, 0, -FA_LEN - 0.088, 0.01, 0.62, 1.0, 1.0), C, -1, 0.5),                         // fingers
-    tag(sph(0.016, 6, 5, 0.006, -FA_LEN - 0.036, 0.036, 0.85, 1.6, 0.9, 0.35), C, -1, 0.5),             // thumb
+    // fingers in two pairs, slightly curled, and a thumb that stands off the palm
+    tag(sph(0.019, 8, 6, 0, -FA_LEN - 0.086, 0.02, 0.62, 1.45, 0.9, 0.12), C, -1, 0.5),
+    tag(sph(0.018, 8, 6, 0, -FA_LEN - 0.082, -0.012, 0.62, 1.35, 0.9, 0.12), C, -1, 0.5),
+    tag(sph(0.016, 7, 5, 0.008, -FA_LEN - 0.042, 0.04, 0.85, 1.7, 0.9, 0.5), C, -1, 0.5),
   ];
 }
 export function forearmKit() {
@@ -384,13 +427,13 @@ export function forearmKit() {
     // tote bag hanging from the hand
     tag(place(ellipseLoft([[-0.34, 0.15, 0.04], [-0.33, 0.16, 0.045], [-0.04, 0.15, 0.04], [-0.03, 0.14, 0.035]], 12, 0.5), 0, -FA_LEN - 0.08, 0, 0, Math.PI / 2), D, FARM.TOTE, 0.85),
     tag(place(new THREE.TorusGeometry(0.06, 0.008, 5, 10, Math.PI), 0, -FA_LEN - 0.11, 0, 0, Math.PI / 2), D, FARM.TOTE, 0.7, 0xb8b8b8),
-  ]);
+  ], [[FARM.TOTE]]);
 }
 export function farArmKit() {
-  const len = UA_LEN + FA_LEN, secs = limbSecs(len, 0.056, 0.04);
+  const len = UA_LEN + FA_LEN, secs = farSecs(limbSecs(len, 0.056, 0.04));
   return kit([
-    tag(ellipseLoft(secs, 6), B, -1, 0.8),
-    tag(band(secs, -0.15, 0.04, 1, 6, 0.008), A, UARM.SLEEVE, 0.85),
+    tag(ellipseLoft(secs, 5), B, -1, 0.8),
+    tag(band(secs, -0.15, 0.04, 1, 5, 0.008), A, UARM.SLEEVE, 0.85),
     ...handParts(true).map((g) => g.translate(0, -UA_LEN + 0.03, 0)),
   ]);
 }
@@ -398,25 +441,25 @@ export function farArmKit() {
 // ---- legs ----------------------------------------------------------------------------------
 const TH_LEN = 0.38, SH_LEN = 0.35;
 export function thighKit(far = false) {
-  const secs = limbSecs(TH_LEN, 0.088, 0.064);
+  const secs = far ? farSecs(limbSecs(TH_LEN, 0.088, 0.064)) : limbSecs(TH_LEN, 0.088, 0.064);
   return kit([
-    tag(far ? ellipseLoft(secs, 6) : limbGeo(TH_LEN, 0.088, 0.064, 14), B, -1, 0.85),
-    tag(band(secs, -0.19, 0.06, far ? 1 : 3, far ? 6 : 16, 0.012), A, THIGH.SHORTS, 0.85),
+    tag(far ? ellipseLoft(secs, 5) : limbGeo(TH_LEN, 0.088, 0.064, 12), B, -1, 0.85),
+    tag(band(secs, -0.19, 0.06, far ? 1 : 2, far ? 5 : 14, 0.012), A, THIGH.SHORTS, 0.85),
   ]);
 }
 // shoe geometry around the ankle (toe +z, sole at -0.085)
 function shoe(len, w, hUp, sole) {
   const L = len;
-  const upper = ellipseLoft([[-0.068, w * 0.5, L * 0.5, L * 0.18], [-0.04, w * 0.55, L * 0.53, L * 0.19], [-0.005, w * 0.5, L * 0.4, L * 0.1], [hUp, w * 0.47, w * 0.6, 0]], 14, 0.85);
-  const s = ellipseLoft([[-0.085, w * 0.54, L * 0.53, L * 0.18], [-0.085 + sole, w * 0.56, L * 0.545, L * 0.18]], 14, 0.8);
+  const upper = ellipseLoft([[-0.068, w * 0.5, L * 0.5, L * 0.18], [-0.04, w * 0.55, L * 0.53, L * 0.19], [-0.005, w * 0.5, L * 0.4, L * 0.1], [hUp, w * 0.47, w * 0.6, 0]], 12, 0.85);
+  const s = ellipseLoft([[-0.085, w * 0.54, L * 0.53, L * 0.18], [-0.085 + sole, w * 0.56, L * 0.545, L * 0.18]], 12, 0.8);
   return [upper, s];
 }
 export function shinKit(far = false) {
-  const secs = limbSecs(SH_LEN, 0.064, 0.048);
-  const parts = [tag(far ? ellipseLoft(secs, 6) : limbGeo(SH_LEN, 0.064, 0.048, 12), A, -1, 0.85)];
+  const secs = far ? farSecs(limbSecs(SH_LEN, 0.064, 0.048)) : limbSecs(SH_LEN, 0.064, 0.048);
+  const parts = [tag(far ? ellipseLoft(secs, 5) : limbGeo(SH_LEN, 0.064, 0.048, 12), A, -1, 0.85)];
   if (far) {
-    parts.push(tag(ellipseLoft([[-0.085, 0.05, 0.13, 0.04], [-0.04, 0.053, 0.13, 0.04], [0.04, 0.045, 0.055, 0]], 6, 0.9).translate(0, -SH_LEN - 0.005, 0), C, -1, 0.6));
-    parts.push(tag(place(ellipseLoft(secs.filter((s) => s[0] < -0.15), 6), 0, 0, 0, 0, 0, 0, 1.18, 1, 1.18), C, SHIN.BOOT, 0.6));
+    parts.push(tag(ellipseLoft([[-0.085, 0.05, 0.13, 0.04], [-0.04, 0.053, 0.13, 0.04], [0.04, 0.045, 0.055, 0]], 5, 0.9).translate(0, -SH_LEN - 0.005, 0), C, -1, 0.6));
+    parts.push(tag(place(ellipseLoft(secs.filter((s) => s[0] < -0.15), 5), 0, 0, 0, 0, 0, 0, 1.18, 1, 1.18), C, SHIN.BOOT, 0.6));
     return kit(parts);
   }
   parts.push(tag(band(secs, -SH_LEN + 0.0, -SH_LEN + 0.07, 2, 14, 0.01), A, SHIN.CUFF, 0.9, 0xd0d0d0));
@@ -437,7 +480,7 @@ export function footKit() {
   for (const z of [0.1, 0.0]) parts.push(tag(place(ellipseLoft([[-0.06, 0.05, 0.012], [-0.02, 0.045, 0.012]], 10), 0, -0.002, z), C, FOOT.SANDAL, 0.6));
   const [du, ds] = shoe(0.27, 0.092, 0.03, 0.016);
   parts.push(tag(du, C, FOOT.DRESS, 0.3), tag(ds, FIXED, FOOT.DRESS, 0.7, 0x141312));
-  return kit(parts);
+  return kit(parts, [[FOOT.BOOT, FOOT.SANDAL, FOOT.DRESS]]);
 }
 
 export const LIMB = { UA_LEN, FA_LEN, TH_LEN, SH_LEN };
@@ -491,6 +534,21 @@ vec3 pedHair( inout vec3 nrm ) {
   vHairUv = vec2( ph, aHair.x );
   return p;
 }
+#else
+attribute vec3 aHair;
+// Skirts and coat tails follow the thighs up when sitting instead of hanging through the seat:
+// below the hips the cloth turns about the hip axis by the thigh angle a, its back flattens onto
+// the underside of the thighs and its front onto their tops, and whatever reaches past the knees
+// hangs down from them.
+vec3 pedBend( vec3 p, float a, inout vec3 nrm ) {
+  float along = -0.18 - p.y, w = smoothstep( -0.02, 0.06, along ), b = a * w;
+  float across = p.z, sq = smoothstep( 0.3, 0.9, a ) * w;
+  across = mix( across, clamp( across, -0.085, 0.105 ), sq );
+  float c = cos( b ), s = sin( b ), knee = max( 0.0, along - 0.4 ) * sq;
+  along -= knee;
+  nrm = vec3( nrm.x, nrm.y * c + nrm.z * s, nrm.z * c - nrm.y * s );
+  return vec3( p.x, -0.18 - along * c + across * s - knee, along * s + across * c );
+}
 #endif
 vec3 pedPos( inout vec3 nrm ) {
   float bit = aPart.y;
@@ -500,7 +558,10 @@ vec3 pedPos( inout vec3 nrm ) {
   if ( aHair.x >= 0.0 ) return pedHair( nrm );
   return position;
 #else
-  return position + aMorph * iBits.y;
+  vec3 p = position + aMorph * mod( iBits.y, 2.0 );
+  float bend = floor( iBits.y * 0.5 ) * 0.01;
+  if ( aHair.y > 0.5 && bend > 0.0 ) p = pedBend( p, bend, nrm );
+  return p;
 #endif
 }
 `;

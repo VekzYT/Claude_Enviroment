@@ -27,7 +27,7 @@ import { PIER } from '../world/landmarks.js';
 import { benchSpots } from '../world/city.js';
 import { breakables } from '../world/breakables.js';
 import { PED_LOOKS, SPORT_LOOKS, BEACH_LOOKS, COP_LOOK, fullLook, kitData, STRIDE, HEAD_STRIDE } from './pedlooks.js';
-import { makePedMaterials, torsoKit, pelvisKit, headKit, upperArmKit, forearmKit, farArmKit, thighKit, shinKit, footKit, FARM, PELVIS, LIMB } from './pedKit.js';
+import { makePedMaterials, torsoKit, pelvisKit, headKit, upperArmKit, forearmKit, farArmKit, thighKit, shinKit, footKit, TORSO, FARM, PELVIS, LIMB } from './pedKit.js';
 import { makeBlobTexture } from '../world/textures.js';
 import { clamp, wrapAngle, smoothstep } from '../util/math.js';
 import { rand, pick, chance } from '../util/rng.js';
@@ -35,6 +35,7 @@ import { rand, pick, chance } from '../util/rng.js';
 const MAX = 250;           // everyone, scripted people included
 const AMBIENT_MAX = 215;   // ambient civilians leave room for cops, goons and mission people
 const NEAR_MAX = 56;       // people drawn with the detailed parts
+const NEAR_IN = 18, NEAR_OUT = 22;   // metres: the detailed tier starts inside NEAR_IN, ends past NEAR_OUT
 const DENSITY = { strip: 1.3, downtown: 1.2, ocean: 1.2, midtown: 0.9, oldtown: 0.9, riverside: 0.6, uptown: 0.5, docks: 0.3 };
 const out = { x: 0, z: 0, broken: [] };
 const { UA_LEN, FA_LEN, TH_LEN, SH_LEN } = LIMB;
@@ -84,11 +85,16 @@ function rz(m, a) {
   return m;
 }
 
-// One instanced body part: matrices plus an interleaved buffer of per-instance colours and bits.
+// One instanced mesh of a body part: matrices plus an interleaved buffer of per-instance colours
+// and bits. A shadow-casting part can also take shadow proxies: people drawn with the detailed
+// parts cast their shadow with these cheap ones instead (the shadow map is ~10 cm a texel, so the
+// detail would be lost anyway). Proxies sit after the drawn instances and only the shadow pass
+// draws them.
 class Part {
   constructor(scene, geo, mat, cap, stride, shadow) {
-    this.cap = cap; this.stride = stride; this.n = 0;
+    this.cap = cap; this.stride = stride; this.n = 0; this.np = 0;
     this.data = new Float32Array(cap * stride);
+    if (shadow) { this.pm = new Float32Array(cap * 16); this.pd = new Float32Array(cap * stride); }
     const ib = new THREE.InstancedInterleavedBuffer(this.data, stride, 1);
     ib.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('iColA', new THREE.InterleavedBufferAttribute(ib, 3, 0));
@@ -103,30 +109,65 @@ class Part {
     m.count = 0; m.frustumCulled = false; m.castShadow = shadow; m.receiveShadow = false;
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     m.layers.set(DETAIL_LAYER);
+    if (shadow) {
+      m.onBeforeRender = () => { m.count = this.n; };
+      m.onBeforeShadow = () => { m.count = this.n + this.np; };
+    }
     scene.add(m);
     this.mesh = m; this.mat = m.instanceMatrix.array;
   }
-  add(M, sx, sy, sz, rec, flash) {
+  add(M, sx, sy, sz, rec, flash, bits, extra) {
     const k = this.n;
-    if (k >= this.cap) return -1;
-    const a = this.mat, o = k * 16;
-    a[o] = M[0] * sx; a[o + 1] = M[1] * sx; a[o + 2] = M[2] * sx; a[o + 3] = 0;
-    a[o + 4] = M[3] * sy; a[o + 5] = M[4] * sy; a[o + 6] = M[5] * sy; a[o + 7] = 0;
-    a[o + 8] = M[6] * sz; a[o + 9] = M[7] * sz; a[o + 10] = M[8] * sz; a[o + 11] = 0;
-    a[o + 12] = M[9]; a[o + 13] = M[10]; a[o + 14] = M[11]; a[o + 15] = 1;
-    const d = k * this.stride;
-    this.data.set(rec, d);
-    if (flash) this.data.fill(1, d, d + 12);
+    if (k >= this.cap) return;
+    write(this.mat, k * 16, this.data, k * this.stride, M, sx, sy, sz, rec, flash, bits, extra);
     this.n = k + 1;
-    return d;
+  }
+  proxy(M, sx, sy, sz, rec, bits, extra) {
+    const k = this.np;
+    if (k >= this.cap) return;
+    write(this.pm, k * 16, this.pd, k * this.stride, M, sx, sy, sz, rec, false, bits, extra);
+    this.np = k + 1;
   }
   flush() {
     const m = this.mesh, n = this.n;
-    m.count = n; m.visible = n > 0;
-    if (!n) return;
-    m.instanceMatrix.clearUpdateRanges(); m.instanceMatrix.addUpdateRange(0, n * 16); m.instanceMatrix.needsUpdate = true;
-    this.ib.clearUpdateRanges(); this.ib.addUpdateRange(0, n * this.stride); this.ib.needsUpdate = true;
+    const np = this.np = Math.min(this.np, this.cap - n);
+    if (np) { this.mat.set(this.pm.subarray(0, np * 16), n * 16); this.data.set(this.pd.subarray(0, np * this.stride), n * this.stride); }
+    const all = n + np;
+    m.count = all; m.visible = all > 0;
+    if (!all) return;
+    m.instanceMatrix.clearUpdateRanges(); m.instanceMatrix.addUpdateRange(0, all * 16); m.instanceMatrix.needsUpdate = true;
+    this.ib.clearUpdateRanges(); this.ib.addUpdateRange(0, all * this.stride); this.ib.needsUpdate = true;
   }
+}
+function write(a, o, data, d, M, sx, sy, sz, rec, flash, bits, extra) {
+  a[o] = M[0] * sx; a[o + 1] = M[1] * sx; a[o + 2] = M[2] * sx; a[o + 3] = 0;
+  a[o + 4] = M[3] * sy; a[o + 5] = M[4] * sy; a[o + 6] = M[5] * sy; a[o + 7] = 0;
+  a[o + 8] = M[6] * sz; a[o + 9] = M[7] * sz; a[o + 10] = M[8] * sz; a[o + 11] = 0;
+  a[o + 12] = M[9]; a[o + 13] = M[10]; a[o + 14] = M[11]; a[o + 15] = 1;
+  data.set(rec, d);
+  if (flash) data.fill(1, d, d + 12);
+  data[d + 12] = bits; data[d + 13] = extra;
+}
+// A body part: the base mesh everyone gets, plus one mesh per group of heavier variants, which
+// only the people wearing one of them are added to.
+class PartSet {
+  constructor(scene, kit, mat, cap, stride, shadow) {
+    this.base = new Part(scene, kit.base, mat, cap, stride, shadow);
+    this.extras = kit.extras.map((e) => ({ mask: e.mask, part: new Part(scene, e.geo, mat, cap, stride, shadow) }));
+    this.shadow = shadow;
+  }
+  get n() { return this.base.n; }
+  reset() { this.base.n = this.base.np = 0; for (const e of this.extras) e.part.n = e.part.np = 0; }
+  add(M, sx, sy, sz, rec, flash, bits = rec[12], extra = rec[13]) {
+    this.base.add(M, sx, sy, sz, rec, flash, bits, extra);
+    for (const e of this.extras) if (bits & e.mask) e.part.add(M, sx, sy, sz, rec, flash, bits, extra);
+  }
+  proxy(M, sx, sy, sz, rec, bits = rec[12], extra = rec[13]) {
+    if (!this.shadow) return;
+    this.base.proxy(M, sx, sy, sz, rec, bits, extra);
+    for (const e of this.extras) if (bits & e.mask) e.part.proxy(M, sx, sy, sz, rec, bits, extra);
+  }
+  flush() { this.base.flush(); for (const e of this.extras) e.part.flush(); }
 }
 
 const _fr = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere(), _bm = new THREE.Matrix4();
@@ -138,16 +179,17 @@ export class Peds {
     this.density = 1;
     this.frame = 0;
     const mats = makePedMaterials();
-    const P = (geo, mat, cap, stride = STRIDE, shadow = true) => new Part(scene, geo, mat, cap, stride, shadow);
-    // near: full-detail parts with elbows and feet; far: a fraction of the triangles, straight limbs
+    const P = (kit, mat, cap, stride = STRIDE, shadow = false) => new PartSet(scene, kit, mat, cap, stride, shadow);
+    // near: full-detail parts with elbows and feet; far: a fraction of the triangles, straight limbs.
+    // Shadows come from the far parts for everyone (arms are thinner than a shadow texel).
     this.near = {
       torso: P(torsoKit(false), mats.body, NEAR_MAX), pelvis: P(pelvisKit(false), mats.body, NEAR_MAX), head: P(headKit(false), mats.head, NEAR_MAX, HEAD_STRIDE),
       uarm: P(upperArmKit(), mats.body, NEAR_MAX * 2), farm: P(forearmKit(), mats.body, NEAR_MAX * 2),
       thigh: P(thighKit(false), mats.body, NEAR_MAX * 2), shin: P(shinKit(false), mats.body, NEAR_MAX * 2), foot: P(footKit(), mats.body, NEAR_MAX * 2),
     };
     this.far = {
-      torso: P(torsoKit(true), mats.body, MAX), pelvis: P(pelvisKit(true), mats.body, MAX), head: P(headKit(true), mats.head, MAX, HEAD_STRIDE),
-      arm: P(farArmKit(), mats.body, MAX * 2), thigh: P(thighKit(true), mats.body, MAX * 2), shin: P(shinKit(true), mats.body, MAX * 2),
+      torso: P(torsoKit(true), mats.body, MAX, STRIDE, true), pelvis: P(pelvisKit(true), mats.body, MAX, STRIDE, true), head: P(headKit(true), mats.head, MAX, HEAD_STRIDE, true),
+      arm: P(farArmKit(), mats.body, MAX * 2), thigh: P(thighKit(true), mats.body, MAX * 2, STRIDE, true), shin: P(shinKit(true), mats.body, MAX * 2, STRIDE, true),
     };
     this.parts = [...Object.values(this.near), ...Object.values(this.far)];
     const blobGeo = new THREE.PlaneGeometry(0.95, 0.95);
@@ -998,13 +1040,18 @@ export class Peds {
   }
 
   // ---- drawing ----------------------------------------------------------------------------------
+  // Add a body part in its tier; detailed people cast their shadow with the cheap part (see Part).
+  put(nearT, set, flash, M, sx, sy, sz, rec, bits, extra) {
+    if (nearT) { this.near[set].add(M, sx, sy, sz, rec, flash, bits, extra); this.far[set].proxy(M, sx, sy, sz, rec, bits, extra); }
+    else this.far[set].add(M, sx, sy, sz, rec, flash, bits, extra);
+  }
   draw(t) {
     const list = this.list, n = list.length;
     const camera = G.camera, cam = camera.position;
     camera.updateMatrixWorld();
     _fr.setFromProjectionMatrix(_pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     const dt = Math.min(0.1, G.dt || 1 / 60);
-    for (const P of this.parts) P.n = 0;
+    for (const P of this.parts) P.reset();
     const NT = this.near, FT = this.far;
     const blobs = this.blobs, ba = blobs.instanceMatrix.array;
     let nb = 0;
@@ -1015,7 +1062,7 @@ export class Peds {
       const L = p.look, K = p.kit, sc = L.scale;
       const dx = p.pos.x - cam.x, dz = p.pos.z - cam.z, d2 = dx * dx + dz * dz;
       // detail tier, with a little hysteresis so nobody flickers at the boundary
-      p.farLod = p.farLod ? d2 > 400 : d2 > 625;
+      p.farLod = p.farLod ? d2 > NEAR_IN * NEAR_IN : d2 > NEAR_OUT * NEAR_OUT;
       const nearT = !p.farLod && NT.torso.n < NEAR_MAX;
       // occasionally glance somewhere new
       p.lookT -= dt;
@@ -1071,33 +1118,40 @@ export class Peds {
       rz(ry(child(Mpel, r, F[SWAY], 1.0, 0), F[HIPY]), F[HIPR]);
       rz(rx(ry(child(Mtor, Mpel, 0, 0, 0), F[SY]), F[SP]), F[SR]);
       const build = L.build || 1, hipW = L.hipW || 1, depth = L.depth || 1;
-      const tier = nearT ? NT : FT;
-      tier.torso.add(Mtor, build, 1, depth, K.torso, flash);
-      const po = tier.pelvis.add(Mpel, build, 1, depth, K.pelvis, flash);
-      if (po >= 0 && p.restAct === 'lie' && p.act === 'lie' && nearT) tier.pelvis.data[po + 12] = K.pelvis[12] + (1 << PELVIS.TOWEL);
+      const act = p.act, seated = act === 'sit' || act === 'sitPhone' || act === 'sitGround' || act === 'lie';
+      // a backpack comes off to lie down
+      this.put(nearT, 'torso', flash, Mtor, build, 1, depth, K.torso, lie > 0.5 ? K.torso[12] & ~(1 << TORSO.PACK) : K.torso[12], K.torso[13]);
+      // skirts and coat tails bend with the thighs when sitting, not with a stride (the morph
+      // weight carries the angle, see pedKit)
+      const bend = Math.round(clamp((-(F[LTP] + F[RTP]) * 0.5 - 0.25) * 1.2, 0, 1.6) * 100);
+      this.put(nearT, 'pelvis', flash, Mpel, build, 1, depth, K.pelvis, p.restAct === 'lie' && act === 'lie' && nearT ? K.pelvis[12] | (1 << PELVIS.TOWEL) : K.pelvis[12], K.pelvis[13] + 2 * bend);
       rz(rx(ry(child(Mhead, Mtor, 0, 0.56, 0), F[HY]), F[HP]), F[HRL]);
       child(Mtmp, Mhead, 0, 0.065, 0.006);
-      tier.head.add(Mtmp, 1, 1, 1, K.head, flash);
-      // arms and legs
+      this.put(nearT, 'head', flash, Mtmp, 1, 1, 1, K.head, K.head[12], K.head[13]);
+      // arms and legs (narrower shoulders on the female torso)
+      const shX = (0.238 - (L.f ? 0.026 : 0)) * build;
       for (let side = 0; side < 2; side++) {
         const sg = side ? -1 : 1;
         const ap = F[side ? RAP : LAP], ar = F[side ? RAR : LAR], ay = F[side ? RAY : LAY], el = F[side ? REL : LEL];
-        ry(rx(rz(child(Mua, Mtor, sg * 0.238 * build, 0.405, -0.008), sg * ar), ap), -sg * ay);
+        ry(rx(rz(child(Mua, Mtor, sg * shX, 0.405, -0.008), sg * ar), ap), -sg * ay);
         if (nearT) {
           NT.uarm.add(Mua, 1, 1, 1, K.uarm, flash);
           rx(child(Mfa, Mua, 0, -UA_LEN, 0), el);
           const rec = side ? K.farmR : K.farmL;
-          const o = NT.farm.add(Mfa, 1, 1, 1, rec, flash);
-          if (o >= 0 && side && (p.act === 'phone' || p.act === 'sitPhone') && J[REL] < -1.1) NT.farm.data[o + 12] = rec[12] + (1 << FARM.PHONE);
+          // the phone shows once it is up in the hand; a tote is put down to sit
+          let fb = rec[12];
+          if (side && (act === 'phone' || act === 'sitPhone') && J[REL] < -1.1) fb |= 1 << FARM.PHONE;
+          if (seated) fb &= ~(1 << FARM.TOTE);
+          NT.farm.add(Mfa, 1, 1, 1, rec, flash, fb);
         } else {
           rx(Mua, el * 0.45);
           FT.arm.add(Mua, 1, 1, 1, K.farArm, flash);
         }
         const tp = F[side ? RTP : LTP], tr = F[side ? RTR : LTR], kn = F[side ? RKN : LKN], ft = F[side ? RFT : LFT];
         rx(rz(child(Mth, Mpel, sg * 0.092 * hipW, -0.18, 0), sg * tr), tp);
-        tier.thigh.add(Mth, 1, 1, 1, K.thigh, flash);
+        this.put(nearT, 'thigh', flash, Mth, 1, 1, 1, K.thigh, K.thigh[12], K.thigh[13]);
         rx(child(Msh, Mth, 0, -TH_LEN, 0), kn);
-        tier.shin.add(Msh, 1, 1, 1, K.shin, flash);
+        this.put(nearT, 'shin', flash, Msh, 1, 1, 1, K.shin, K.shin[12], K.shin[13]);
         if (nearT) {
           rx(child(Mft, Msh, 0, -0.355, 0), ft);
           NT.foot.add(Mft, 1, 1, 1, K.foot, flash);
