@@ -4,6 +4,7 @@
 // traffic
 
 // driving
+import './drive/drift.js';
 
 // people
 
