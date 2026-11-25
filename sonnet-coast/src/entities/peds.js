@@ -14,8 +14,9 @@
 //            'lie', 'cower'. The seated and lying poses keep the person in place.
 //   p.talkT: while > 0 (seconds, counts down) the person stands still, turns to face p.faceH when
 //            it is set, and talks with their hands. Works on ambient and scripted people alike.
-//   p.keep:  never removed for distance. Ambient spawning pauses while G.indoors is set; people
-//            who already exist are left alone.
+//   p.keep:  never removed for distance (otherwise civilians go beyond 150 m from the player and
+//            other roles except cops beyond 220 m). Ambient spawning pauses while G.indoors is set;
+//            people who already exist are left alone.
 import * as THREE from 'three';
 import { G, emit, DETAIL_LAYER } from '../state.js';
 import { groundHeight, surfaceAt } from '../world/roads.js';
