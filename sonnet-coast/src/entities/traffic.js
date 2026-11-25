@@ -20,7 +20,7 @@ const P = {}, Q = {};
 // Moving traffic appears 40-150 m out, likelier nearer, but no closer than 115 m in plain view, and goes
 // beyond 160 m (240 m while still in view): the streets around the player are the busy ones.
 const SPAWN_HIDDEN = 40, SPAWN_VIEW = 115, SPAWN_MAX = 150, DESPAWN = 160, DESPAWN_SEEN = 240, ABANDON = 370;
-const CITY_CARS = 70, OUT_CARS = 24, BUSES = 3, LOT_CARS = 44, KERB_CARS = 40;
+const CITY_CARS = 70, OUT_CARS = 24, BUSES = 3, LOT_CARS = 36, KERB_CARS = 32;
 const SLOT_CELL = 60;   // parking slots are bucketed on this grid
 // what parks in a bay (nothing longer than the bay)
 const PARK_POOL = TRAFFIC_POOL.filter((id) => VEHICLES[id].len < 5.5);

@@ -72,6 +72,16 @@ class Pool {
     G.scene.add(im);
     this.mesh = im; this.cap = cap;
   }
+  // a ground decal under the vehicle's transform e: lifted by ty, pushed forward by tz, scaled by sx, sz
+  // (the product e * translate * scale, written out)
+  decal(e, ty, tz, sx, sz) {
+    if (this.n >= this.cap) this.grow();
+    const a = this.mesh.instanceMatrix.array, o = this.n++ * 16;
+    a[o] = e[0] * sx; a[o + 1] = e[1] * sx; a[o + 2] = e[2] * sx; a[o + 3] = 0;
+    a[o + 4] = e[4]; a[o + 5] = e[5]; a[o + 6] = e[6]; a[o + 7] = 0;
+    a[o + 8] = e[8] * sz; a[o + 9] = e[9] * sz; a[o + 10] = e[10] * sz; a[o + 11] = 0;
+    a[o + 12] = e[12] + e[4] * ty + e[8] * tz; a[o + 13] = e[13] + e[5] * ty + e[9] * tz; a[o + 14] = e[14] + e[6] * ty + e[10] * tz; a[o + 15] = 1;
+  }
   push(matrix, color, light = 0) {
     if (this.n >= this.cap) this.grow();
     const i = this.n++;
@@ -90,7 +100,7 @@ class Pool {
   }
 }
 
-const _m = new THREE.Matrix4(), _o = new THREE.Matrix4(), _s = new THREE.Matrix4(), _pm = new THREE.Matrix4();
+const _m = new THREE.Matrix4(), _pm = new THREE.Matrix4();
 const _fr = new THREE.Frustum(), _sph = new THREE.Sphere();
 
 export class VehicleLod {
@@ -151,7 +161,7 @@ export class VehicleLod {
       if (m.wheels.length && m.wheels[0].mesh.visible) for (const w of m.wheels) w.mesh.visible = false;
       // out of view: nothing to draw (a margin keeps shadows cast into view)
       if (!this.seen(v.pos.x, v.pos.y, v.pos.z, T.len * 0.5 + (lod === 2 ? 4 : 9))) continue;
-      v.mesh.updateMatrix();
+      if (!v.asleep) v.mesh.updateMatrix();   // a sleeping vehicle has not moved
       const M = v.mesh.matrix;
       if (lod) {
         const braking = npc && ((v.inThrottle < -0.1 && v.fwd > 1) || v.inHandbrake);
@@ -165,12 +175,8 @@ export class VehicleLod {
       }
       if (v.sunk || v.cls === 'boat') continue;
       const gy = (v.groundY ?? v.pos.y) - v.pos.y;
-      _o.makeTranslation(0, gy + 0.06, 0); _s.makeScale(T.wid * 1.7, 1, T.len * 1.35);
-      this.blobs.push(_m.multiplyMatrices(M, _o).multiply(_s));
-      if (v.lightsOn && !v.destroyed && v !== mine) {
-        _o.makeTranslation(0, gy + 0.07, T.len / 2 + 6.5); _s.makeScale(T.wid * 3.6, 1, 15);
-        this.beams.push(_m.multiplyMatrices(M, _o).multiply(_s));
-      }
+      this.blobs.decal(M.elements, gy + 0.06, 0, T.wid * 1.7, T.len * 1.35);
+      if (v.lightsOn && !v.destroyed && v !== mine) this.beams.decal(M.elements, gy + 0.07, T.len / 2 + 6.5, T.wid * 3.6, 15);
     }
     for (const p of this.all) p.end();
   }
