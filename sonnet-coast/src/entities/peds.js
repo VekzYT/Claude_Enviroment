@@ -971,6 +971,9 @@ export class Peds {
         break;
       }
     }
+    // a glance at the player walking close by
+    const pl = G.player;
+    if (!p.lookAt && !pl.vehicle && p.role === 'civ' && (act === 'idle' || act === 'listen' || act === 'cross' || act === 'sit') && (pl.pos.x - p.pos.x) ** 2 + (pl.pos.z - p.pos.z) ** 2 < 20) p.lookAt = pl;
     if (p.lookAt && act !== 'talk') {
       const q = p.lookAt;
       o[HY] = clamp(wrapAngle(Math.atan2(q.pos.x - p.pos.x, q.pos.z - p.pos.z) - p.heading), -1.1, 1.1);

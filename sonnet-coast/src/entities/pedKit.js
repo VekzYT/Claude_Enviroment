@@ -73,6 +73,8 @@ const _P = { x: 0, z: 0 }, _Q = { x: 0, z: 0 };
 // Rows at heights ys, columns from a0(y) to a1(y) (angle 0 = +x, PI/2 = front). Open surface.
 function patch(secsM, secsF, ys, range, cols, p = 0.86, grow = 0.004) {
   const pos = [], mor = [], idx = [];
+  // a row at every section of the body underneath too, or the cloth would cut through its curves
+  ys = [...new Set([...ys, ...secsM.map((q) => q[0]).filter((y) => y > ys[0] && y < ys[ys.length - 1])])].sort((u, v) => u - v);
   for (const y of ys) {
     const [a0, a1] = range(y);
     const m = secAt(secsM, y), f = secAt(secsF || secsM, y);
@@ -244,9 +246,10 @@ export function pelvisKit(far = false) {
   parts.push(tag(flare(0.05, -0.17, 0.195, 0.205, 0.13, 0.138, far ? 1 : 3), C, PELVIS.HEM, 0.85));
   parts.push(tag(flare(0.05, -0.68, 0.198, 0.26, 0.132, 0.19, far ? 2 : 6), C, PELVIS.COAT, 0.8));
   if (!far) {
-    parts.push(tag(patch(M_HIPS, F_HIPS, ys(-0.03, 0.01, 1), () => [0, Math.PI * 2], S, 0.88, 0.006), B, PELVIS.BELT, 0.45));
-    parts.push(tag(patch(M_HIPS, F_HIPS, ys(-0.035, 0.015, 1), () => [0, Math.PI * 2], S, 0.88, 0.012), FIXED, PELVIS.DUTY, 0.5, 0x15161a));
-    parts.push(tag(place(new THREE.BoxGeometry(0.05, 0.04, 0.02), 0, -0.01, 0.128), FIXED, PELVIS.BELT, 0.3, 0xb0a890));
+    // belts sit just below the hem of the top, their upper edge tucked under it
+    parts.push(tag(patch(M_HIPS, F_HIPS, ys(-0.105, -0.068, 1), () => [0, Math.PI * 2], S, 0.88, 0.005), B, PELVIS.BELT, 0.45));
+    parts.push(tag(patch(M_HIPS, F_HIPS, ys(-0.115, -0.07, 1), () => [0, Math.PI * 2], S, 0.88, 0.014), FIXED, PELVIS.DUTY, 0.5, 0x15161a));
+    parts.push(tag(place(new THREE.BoxGeometry(0.05, 0.034, 0.02), 0, -0.088, 0.13), FIXED, PELVIS.BELT, 0.3, 0xb0a890));
     // beach towel under someone lying on their back (pelvis space: the back faces the ground)
     parts.push(tag(place(new THREE.BoxGeometry(0.75, 1.75, 0.012), 0, 0.12, -0.15), D, PELVIS.TOWEL, 0.95));
   }
@@ -460,7 +463,7 @@ vec3 pedHair( inout vec3 nrm ) {
   float vol = iHair.x, len = iHair.y, fringe = iHair.z, curl = iHair.w, part = iBits.y;
   float ph = aHair.y, w = abs( ph ) / 3.14159265, sd = sin( ph );
   float frontL = 0.6 + fringe * 0.3 + part * sd * 0.1;
-  float sideL = 1.1 + len * 1.4;
+  float sideL = 0.97 + len * 1.6 + vol * 0.3;
   float backL = 1.28 + len * 2.2;
   float lim = mix( frontL, sideL, smoothstep( 0.17, 0.42, w ) );
   lim = mix( lim, backL, smoothstep( 0.5, 0.88, w ) );

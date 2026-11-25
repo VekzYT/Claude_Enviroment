@@ -35,7 +35,7 @@ const shade = (hex, k) => { const r = Math.min(255, ((hex >> 16) & 255) * k), g 
 
 // Hair styles: shell shape (volume, length, fringe, curl) plus optional extra pieces.
 export const HAIR = {
-  crop: { v: [0.05, 0, 0.25, 0] }, buzz: { v: [0.0, 0, 0.05, 0] }, long: { v: [0.07, 0.3, 0.55, 0] },
+  crop: { v: [0.05, 0, 0.12, 0] }, buzz: { v: [0.0, 0, 0.05, 0] }, long: { v: [0.07, 0.3, 0.55, 0] },
   bob: { v: [0.1, 0.12, 0.6, 0] }, pony: { v: [0.04, 0.02, 0.35, 0], bits: [HEAD.PONY] }, bun: { v: [0.04, 0, 0.25, 0], bits: [HEAD.BUN] },
   afro: { v: [0.5, 0, 0.55, 1] }, curls: { v: [0.2, 0.1, 0.65, 0.8] }, side: { v: [0.09, 0.02, 0.75, 0], part: 1 },
   wavy: { v: [0.12, 0.28, 0.6, 0.4] }, braids: { v: [0.03, 0, 0.2, 0], bits: [HEAD.BRAIDS] }, bald: { v: [0, 0, 0, 0], none: true },
