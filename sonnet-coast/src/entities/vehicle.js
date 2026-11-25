@@ -473,7 +473,7 @@ export class Vehicle {
       this.airTime += dt;
     }
     // attitude
-    let tp, tr = 0;
+    let tp, tr = 0, high = 1;
     if (this.onGround) {
       tp = -Math.atan2(gF - gR, T.wheelbase);
       if (!this.far && this.cls === 'car') {
@@ -484,12 +484,14 @@ export class Vehicle {
     } else {
       // the pedals pitch the nose in the air: throttle dips it, brake lifts it
       // (gently for the throttle, which most players hold through a jump anyway)
-      if (this.driver === 'player' && this.disabled <= 0 && !this.destroyed) this.airPitch = clamp(this.airPitch + this.inThrottle * dt * (this.inThrottle > 0 ? 0.8 : 1.5), -0.6, 0.6);
-      tp = clamp(-this.vel.y * 0.02 + this.airPitch, -0.9, 0.9);
+      if (this.driver === 'player' && this.disabled <= 0 && !this.destroyed) this.airPitch = clamp(this.airPitch + this.inThrottle * dt * (this.inThrottle > 0 ? 0.45 : 1.5), -0.6, 0.35);
+      // and the car levels out on the way down, so it lands on its wheels rather than its nose
+      high = clamp((this.pos.y - rest) / 2.5, 0, 1);
+      tp = clamp(-this.vel.y * 0.02 + this.airPitch * high, -0.9, 0.9);
       tr = this.roll;
     }
     if (this.onGround) this.airPitch = 0;
-    const k = Math.min(1, dt * (this.onGround ? 10 : 2));
+    const k = Math.min(1, dt * (this.onGround ? 10 : 2 + 6 * (1 - high)));
     this.pitch += (tp - this.pitch) * k;
     this.roll += (tr - this.roll) * k;
 
