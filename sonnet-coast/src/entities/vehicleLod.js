@@ -103,7 +103,7 @@ class Pool {
 const _m = new THREE.Matrix4(), _pm = new THREE.Matrix4();
 const _fr = new THREE.Frustum(), _sph = new THREE.Sphere();
 
-export class VehicleLod {
+class VehicleLod {
   constructor() {
     this.mats = [lodMaterial(false), lodMaterial(true)];
     this.pools = new Map();   // type -> { r, rr, p, pr, w }: rest / proxy, ridden or not, and wheels

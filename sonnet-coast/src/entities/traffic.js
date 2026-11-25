@@ -29,7 +29,7 @@ const ROAD_WEIGHT = { blvd: 4, highway: 2, city: 1, road: 0.9, dirt: 0.05 };
 
 // Which side of a street has kerbside parking (that lane is then closed to traffic): edge -> [dir +1, dir -1]
 const kerbSides = new Map();
-export const kerbParked = (edge, dir) => { const k = kerbSides.get(edge); return !!k && k[dir > 0 ? 0 : 1]; };
+const kerbParked = (edge, dir) => { const k = kerbSides.get(edge); return !!k && k[dir > 0 ? 0 : 1]; };
 // Bus stops: edge -> [s along the edge for dir +1 or null, same for dir -1]
 const busStops = new Map();
 
