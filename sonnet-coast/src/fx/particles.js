@@ -7,8 +7,8 @@ import { G } from '../state.js';
 
 // What a sliding tyre throws up, by surface: colour, alpha, start/end size, life, rise, gravity, drag.
 const TYRE = {
-  asphalt: [0.9, 0.9, 0.92, 0.6, 1.3, 4.2, 2.6, 0.85, -0.2, 1.3],
-  concrete: [0.92, 0.91, 0.9, 0.6, 1.3, 4.2, 2.6, 0.85, -0.2, 1.3],
+  asphalt: [0.9, 0.9, 0.92, 0.46, 1.3, 3.8, 2.6, 0.85, -0.2, 1.3],
+  concrete: [0.92, 0.91, 0.9, 0.46, 1.3, 3.8, 2.6, 0.85, -0.2, 1.3],
   dirt: [0.56, 0.45, 0.32, 0.6, 1.4, 5.0, 1.8, 1.0, 0.15, 1.6],
   sand: [0.8, 0.7, 0.52, 0.58, 1.4, 4.8, 1.7, 1.1, 0.2, 1.6],
   grass: [0.42, 0.42, 0.28, 0.3, 0.9, 3.6, 1.2, 0.9, 0.4, 1.8],
@@ -22,8 +22,14 @@ const VERT = /* glsl */`
   void main() {
     vColor = aColor;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_Position = projectionMatrix * mv;
     gl_PointSize = aSize * uScale / max(-mv.z, 0.5);
+    #ifdef PULL
+      // a sprite is depth-tested at one depth, so the ground cut a low puff along a hard line; test it at the
+      // front of its ball instead (same spot on screen, size from the real depth)
+      float d = length(mv.xyz);
+      mv.xyz *= (d - min(min(aSize * 0.55, 4.0), max(d - 0.6, 0.0))) / max(d, 1e-3);
+    #endif
+    gl_Position = projectionMatrix * mv;
   }`;
 const FRAG = /* glsl */`
   uniform sampler2D uMap; varying vec4 vColor;
@@ -69,7 +75,7 @@ class Cloud {
     g.setAttribute('aSize', new THREE.BufferAttribute(this.s, 1).setUsage(THREE.DynamicDrawUsage));
     this.mat = new THREE.ShaderMaterial({
       uniforms: { uMap: { value: tex }, uScale: { value: 600 } },
-      vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false,
+      vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false, defines: additive ? {} : { PULL: 1 },
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
     });
     this.points = new THREE.Points(g, this.mat);

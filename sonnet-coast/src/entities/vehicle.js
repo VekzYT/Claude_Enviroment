@@ -543,7 +543,7 @@ export class Vehicle {
         for (let side = -1; side <= 1; side += 2) {
           const wx = this.pos.x + s * rz + -c * hw * side, wz = this.pos.z + c * rz + s * hw * side;
           if (this.surface !== 'water' && this.surface !== 'grass') fx.skid(this.id * 2 + (side > 0 ? 1 : 0), wx, this.groundY, wz, dx, dz, 0.26, hard ? 0.25 + k * 0.4 : 0.16);
-          for (let n = rate * dt + Math.random(); n >= 1; n--) fx.tyreSmoke(wx, this.groundY + 0.2, wz, this.vel.x * 0.3, this.vel.z * 0.3, this.surface, k);
+          for (let n = rate * dt + Math.random(); n >= 1; n--) fx.tyreSmoke(wx, this.groundY + 0.4, wz, this.vel.x * 0.3, this.vel.z * 0.3, this.surface, k);
         }
       } else if (!hard && this.speed > 9 && this.surface !== 'water' && Math.random() < dt * 14) {
         const col = this.surface === 'sand' ? [0.78, 0.68, 0.48] : this.surface === 'mud' ? [0.24, 0.2, 0.13] : this.surface === 'grass' ? [0.36, 0.4, 0.22] : [0.5, 0.4, 0.28];
