@@ -93,6 +93,7 @@ export class PlayerAnim {
       case 'vault': return this.vaultPose(o);
       case 'climb': return this.climbPose(o);
       case 'entering': return this.enterPose(o, t);
+      case 'parachute': return this.chutePose(o, t);
       case 'busted':
         // kneeling, hands raised over the head
         o[DROP] = -0.36; o[LTP] = o[RTP] = 0.02; o[LKN] = o[RKN] = 1.62; o[LFT] = o[RFT] = 0.5; o[LTR] = o[RTR] = 0.12;
@@ -187,6 +188,20 @@ export class PlayerAnim {
       if (this.guardT > 1.5) return 20;
     }
     return 11;
+  }
+
+  // hanging in the harness: legs together and a little forward, hands up on the toggles, the one on
+  // the side of the turn pulled down
+  chutePose(o, t) {
+    const pl = this.pl, turn = pl.chuteTurn || 0, open = smoothstep(0.3, 1.2, pl.stateT);
+    if (open < 0.5) return this.airPose(o, t);
+    o[LOCO] = 0; o[SWL] = o[SWR] = 0;
+    const sw = Math.sin(t * 1.7) * 0.06;
+    o[LTP] = -0.32 + sw; o[RTP] = -0.26 - sw; o[LKN] = o[RKN] = 0.42; o[LFT] = o[RFT] = 0.35; o[LTR] = o[RTR] = 0.04;
+    o[SP] = -0.05; o[HP] = -0.12; o[BANK] = -turn * 0.12;
+    _tL.set(0.3, 2.02 - 0.32 * Math.max(0, -turn), 0.06); _tR.set(-0.3, 2.02 - 0.32 * Math.max(0, turn), 0.06);
+    this.ikL = this.ikR = 1; this.ikSpace = 'model';
+    return 6;
   }
 
   airPose(o, t) {
@@ -382,6 +397,17 @@ export class PlayerAnim {
       // grips on the bars (model space: about 0.9 m ahead of the saddle and 0.28 m above it), turning
       // with the steering
       _tL.set(0.38, 0.98 - tuck * 0.04, 0.8 + st * 0.05); _tR.set(-0.38, 0.98 - tuck * 0.04, 0.8 - st * 0.05);
+      this.ikL = this.ikR = 1; this.ikSpace = 'model';
+      return 10;
+    }
+    if (v.cls === 'heli') {
+      // at the controls: right hand on the cyclic between the knees, left on the collective lever, feet
+      // on the pedals (stick positions in model space, see heliMesh.js)
+      o[LTP] = o[RTP] = -1.4; o[LKN] = o[RKN] = 1.15; o[LFT] = o[RFT] = -0.15; o[LTR] = 0.1; o[RTR] = 0.08; o[SP] = 0.12;
+      const lift = (v.inHandbrake ? 1 : 0) - (v.inNitro ? 1 : 0), yaw = clamp(v.inSteer, -1, 1);
+      o[HY] = -yaw * 0.3; o[HP] = 0.05;
+      _tR.set(-0.02 - yaw * 0.04, 0.95, 0.38 + clamp(v.inThrottle, -1, 1) * 0.05);
+      _tL.set(0.33, 0.8 + lift * 0.06, 0.16);
       this.ikL = this.ikR = 1; this.ikSpace = 'model';
       return 10;
     }

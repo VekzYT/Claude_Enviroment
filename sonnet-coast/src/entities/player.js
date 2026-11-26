@@ -47,6 +47,7 @@ export class Player {
     this.rollQueued = 0;       // C pressed in the air: break the fall with a roll
     this.landSeq = 0; this.landImpact = 0;
     this.standOn = null;       // vehicle whose roof we stand on
+    this.clearOf = null; this.clearT = 0;   // a helicopter just bailed out of, not collided with for a moment
     this.camDip = 0;
     this.dustT = 0;
     this.scan = 0;
@@ -204,11 +205,21 @@ export class Player {
     }
     if (!placed) this.pos.set(v.pos.x, v.pos.y + v.T.hgt + 0.2, v.pos.z);
     const g = groundHeight(this.pos.x, this.pos.z, v.pos.y + 2);
-    this.pos.y = v.cls === 'boat' ? Math.max(g, v.pos.y + 0.6) : Math.max(g, Math.min(this.pos.y, g + 2.5));
+    // out of a helicopter: onto the roof or pad it stands on, or out of the door into the air
+    const heli = v.cls === 'heli', air = heli && !v.onGround;
+    if (heli) this.pos.y = v.pos.y + (air ? 0.6 : 0.05);
+    else this.pos.y = v.cls === 'boat' ? Math.max(g, v.pos.y + 0.6) : Math.max(g, Math.min(this.pos.y, g + 2.5));
     this.heading = v.heading;
-    this.vel.set(v.vel.x, 0, v.vel.z);
+    this.vel.set(v.vel.x, air ? v.vel.y : 0, v.vel.z);
     emit('leftVehicle', v);
-    if (!forced && speed > 9) {
+    if (air) {
+      // jump clear of the door (and of the machine as it falls); a high bail-out opens the
+      // parachute after a moment of free fall
+      this.onGround = false;
+      this.vel.x += Math.cos(v.heading) * 3; this.vel.z -= Math.sin(v.heading) * 3;
+      this.clearOf = v; this.clearT = G.time + 3;
+      if (v.agl > 18) { this.state = 'parachute'; this.stateT = 0; }
+    } else if (!forced && speed > 9) {
       this.hurt((speed - 9) * 1.6, 'bail');
       if (this.alive) this.knockDown(v.vel.x * 0.8, 2.5, v.vel.z * 0.8, 1.2 + speed * 0.03);
     } else if (!forced) this.vel.multiplyScalar(0.3);
@@ -260,6 +271,7 @@ export class Player {
       case 'roll': case 'dodge': case 'slide': this.groundMove(dt); break;
       case 'vault': this.vaultUpdate(); break;
       case 'climb': this.climbUpdate(dt); break;
+      case 'parachute': this.chuteUpdate(dt); break;
       default:
         this.footInput(dt, t);
     }
@@ -356,7 +368,7 @@ export class Player {
     if (pushOut(this.pos.x, this.pos.z, 0.36, this.pos.y, low ? 0.8 : 1.7, out)) { this.pos.x = out.x; this.pos.z = out.z; }
     // vehicles are solid; fast ones hurt
     for (const v of G.vehicles) {
-      if (v === this.standOn) continue;
+      if (v === this.standOn || (v === this.clearOf && G.time < this.clearT)) continue;
       const dx = this.pos.x - v.pos.x, dz = this.pos.z - v.pos.z;
       const rr = v.radius + 0.5;
       if (dx * dx + dz * dz > rr * rr) continue;
@@ -416,6 +428,24 @@ export class Player {
     if (!G.fx) return;
     const c = DUST[surfaceAt(this.pos.x, this.pos.z, this.pos.y)] || DUST.concrete;
     for (let i = 0; i < n; i++) G.fx.dust(this.pos.x, this.pos.y + 0.1, this.pos.z, c[0], c[1], c[2], 1.1);
+  }
+
+  // Under a parachute: the canopy fills over the first second, then a slow, steerable glide. A / D
+  // turn, W speeds the glide up and S flares it; touching down (or water) ends it.
+  chuteUpdate(dt) {
+    const open = smoothstep(0.45, 1.3, this.stateT);
+    const turn = Input.axis('KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight'), trim = Input.axis('KeyS', 'KeyW', 'ArrowDown', 'ArrowUp');
+    this.heading -= turn * 1.25 * open * dt;
+    this.chuteTurn = turn * open;
+    const glide = 7 + trim * 3.5, fx = Math.sin(this.heading), fz = Math.cos(this.heading);
+    // drag takes over from gravity as the canopy opens (physics() then takes gravity off again)
+    this.vel.y += ((-4.6 + trim * 1.2) - this.vel.y) * Math.min(1, dt * 3 * open) + GRAV * dt * open;
+    this.physics(dt, lerp(this.vel.x, fx * glide, open), lerp(this.vel.z, fz * glide, open), false, 4);
+    if (this.onGround || this.swimming) {
+      this.state = 'foot'; this.stateT = 0;
+      this.vel.x *= 0.4; this.vel.z *= 0.4;
+      emit('chuteLanded');
+    }
   }
 
   // ---- moves ---------------------------------------------------------------------------------------
