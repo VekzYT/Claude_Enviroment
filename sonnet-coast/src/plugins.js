@@ -13,6 +13,7 @@ import './drive/drift.js';
 import './entities/playerControls.js';
 
 // helicopter
+import './entities/heliWorld.js';
 
 // interiors
 

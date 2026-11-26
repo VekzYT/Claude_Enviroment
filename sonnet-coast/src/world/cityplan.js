@@ -259,6 +259,21 @@ function buildPlan() {
 }
 buildPlan();
 
+// A few of the tallest flat-topped towers, well apart, carry a helipad too (heliWorld.js parks
+// helicopters on every helipad). Only roofs whose fittings city.js lays out without its random
+// generator (pools, water tanks) are swapped, so every other building stays exactly as it was.
+(function moreHelipads() {
+  const pads = buildings.filter((b) => b.roof === 'helipad');
+  const wide = (b) => { const t = b.tiers[b.tiers.length - 1], i = t.ins || 0; return t.x1 - t.x0 - 2 * i > 19 && t.z1 - t.z0 - 2 * i > 19; };
+  const cand = buildings.filter((b) => b.kind === 'generic' && b.h > 30 && (b.roof === 'pool' || b.roof === 'tank') && (b.shape === 'box' || b.shape === 'taper') && !b.spire && !b.billboard && wide(b)).sort((a, b) => b.h - a.h);
+  let added = 0;
+  for (const b of cand) {
+    if (added >= 4) break;
+    if (pads.some((p) => Math.hypot(p.cx - b.cx, p.cz - b.cz) < 180)) continue;
+    b.roof = 'helipad'; pads.push(b); added++;
+  }
+})();
+
 // Where pedestrians walk: a rectangle loop just inside each block's kerb.
 export function sidewalkLoop(block) {
   const m = 3.3;
