@@ -176,7 +176,8 @@ export class Weapons {
     const R = 14;
     let police = 0;
     for (const v of G.vehicles) {
-      if (Math.hypot(v.pos.x - x, v.pos.z - z) > R + v.radius) continue;
+      // the pulse reaches a storey or so up and down: not a helicopter hovering overhead
+      if (Math.hypot(v.pos.x - x, v.pos.z - z) > R + v.radius || Math.abs(v.pos.y - y) > 10) continue;
       v.emp(v === G.player.vehicle ? 2.5 : 8);
       if (v.isPolice) police++;
     }
@@ -350,7 +351,7 @@ export class Weapons {
       p.x += c.vel.x * dt; p.y += c.vel.y * dt; p.z += c.vel.z * dt;
       c.mesh.rotation.x += dt * 9;
       let boom = c.life <= 0 || p.y <= groundHeight(p.x, p.z, p.y + 1) + 0.1;
-      if (!boom) for (const v of G.vehicles) { if (v === G.player.vehicle) continue; if (Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < v.radius && p.y < v.pos.y + v.T.hgt + 0.3) { boom = true; break; } }
+      if (!boom) for (const v of G.vehicles) { if (v === G.player.vehicle) continue; if (Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < v.radius && p.y < v.pos.y + v.T.hgt + 0.3 && p.y > v.pos.y - 0.5) { boom = true; break; } }
       if (!boom && rayBoxes(p.x, p.y, p.z, c.vel.x, 0, c.vel.z, 0.02) < 0.02) boom = true;
       if (boom) {
         this.scene.remove(c.mesh);
