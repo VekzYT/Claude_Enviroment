@@ -109,6 +109,17 @@ export function supportAt(x, z, feet, out = null) {
 // over, or whose underside is more than `under` above the feet, are ignored): entry and exit
 // distance, top, and its normal.
 const _r = { c: null, tIn: 0, tOut: 0, top: 0, nx: 0, nz: 0, veh: null };
+// Slab test: narrows the ray's [t0, t1] to where o + d t lies in [lo, hi] on one axis, noting the
+// axis it entered through and the sign of that face's normal. False for a parallel miss.
+const _s = { t0: 0, t1: 0, ax: -1, n: 0 };
+function slab(o, d, lo, hi, ax) {
+  if (Math.abs(d) < 1e-6) return o >= lo && o <= hi;
+  let a = (lo - o) / d, b = (hi - o) / d;
+  if (a > b) { const q = a; a = b; b = q; }
+  if (a > _s.t0) { _s.t0 = a; _s.ax = ax; _s.n = -Math.sign(d); }
+  if (b < _s.t1) _s.t1 = b;
+  return true;
+}
 function probe(x, z, dx, dz, maxD, feet, under = 1.75) {
   _r.c = null; _r.veh = null; _r.tIn = maxD;
   const list = near(x + dx * maxD * 0.5, z + dz * maxD * 0.5, maxD * 0.5 + 0.5);
@@ -117,15 +128,10 @@ function probe(x, z, dx, dz, maxD, feet, under = 1.75) {
     if (top < feet + STEP_UP || c.y0 > feet + under) continue;
     let t0, t1, nx = 0, nz = 0;
     if (c.type === 'box') {
-      t0 = -Infinity; t1 = Infinity;
-      for (const [o, d, lo, hi, ax] of [[x, dx, c.x0, c.x1, 0], [z, dz, c.z0, c.z1, 1]]) {
-        if (Math.abs(d) < 1e-6) { if (o < lo || o > hi) { t0 = Infinity; break; } continue; }
-        let a = (lo - o) / d, b = (hi - o) / d, n = -Math.sign(d);
-        if (a > b) { const q = a; a = b; b = q; }
-        if (a > t0) { t0 = a; nx = ax ? 0 : n; nz = ax ? n : 0; }
-        if (b < t1) t1 = b;
-      }
-      if (t0 > t1) continue;
+      _s.t0 = -Infinity; _s.t1 = Infinity; _s.ax = -1;
+      if (!slab(x, dx, c.x0, c.x1, 0) || !slab(z, dz, c.z0, c.z1, 1) || _s.t0 > _s.t1) continue;
+      t0 = _s.t0; t1 = _s.t1;
+      if (_s.ax === 0) nx = _s.n; else if (_s.ax === 1) nz = _s.n;
     } else {
       const fx = x - c.x, fz = z - c.z, b = fx * dx + fz * dz, cc = fx * fx + fz * fz - c.r * c.r, disc = b * b - cc;
       if (disc < 0) continue;
@@ -141,6 +147,7 @@ function probe(x, z, dx, dz, maxD, feet, under = 1.75) {
 }
 // The same against parked or slow vehicles. Vaulting goes over the bonnet or boot where they are
 // lower than at the roof; climbing ends up on the roof.
+const _vr = { c: null, veh: null, tIn: 0, tOut: 0, top: 0, nx: 0, nz: 0 };
 function probeVehicles(x, z, dx, dz, maxD, feet, roof = false) {
   let best = null;
   for (const v of G.vehicles) {
@@ -150,19 +157,15 @@ function probeVehicles(x, z, dx, dz, maxD, feet, roof = false) {
     const s = Math.sin(v.heading), c = Math.cos(v.heading);
     // ray in the vehicle's frame: a = along its length, b = across
     const a0 = ox * s + oz * c, b0 = -ox * c + oz * s, da = dx * s + dz * c, db = -dx * c + dz * s;
-    let t0 = -Infinity, t1 = Infinity, na = 0, nb = 0;
-    for (const [o, d, h, ax] of [[a0, da, v.T.len / 2, 0], [b0, db, v.T.wid / 2, 1]]) {
-      if (Math.abs(d) < 1e-6) { if (Math.abs(o) > h) { t0 = Infinity; break; } continue; }
-      let p = (-h - o) / d, q = (h - o) / d, n = -Math.sign(d);
-      if (p > q) { const w = p; p = q; q = w; }
-      if (p > t0) { t0 = p; na = ax ? 0 : n; nb = ax ? n : 0; }
-      if (q < t1) t1 = q;
-    }
+    _s.t0 = -Infinity; _s.t1 = Infinity; _s.ax = -1;
+    if (!slab(a0, da, -v.T.len / 2, v.T.len / 2, 0) || !slab(b0, db, -v.T.wid / 2, v.T.wid / 2, 1)) continue;
+    const t0 = _s.t0, t1 = _s.t1, na = _s.ax === 0 ? _s.n : 0, nb = _s.ax === 1 ? _s.n : 0;
     if (t0 > t1 || t0 < -0.05 || t0 > maxD || (best && t0 >= best.tIn)) continue;
     const mid = Math.abs(a0 + da * (t0 + t1) * 0.5);
     const top = v.pos.y + v.T.hgt * (!roof && mid > v.T.len * 0.22 ? 0.72 : 1);
     if (top < feet + STEP_UP) continue;
-    best = { c: null, veh: v, tIn: Math.max(0, t0), tOut: t1, top, nx: na * s - nb * c, nz: na * c + nb * s };
+    best = _vr;
+    best.veh = v; best.tIn = Math.max(0, t0); best.tOut = t1; best.top = top; best.nx = na * s - nb * c; best.nz = na * c + nb * s;
   }
   return best;
 }

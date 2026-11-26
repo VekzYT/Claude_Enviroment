@@ -34,8 +34,29 @@ export const DEFAULT_OUTFIT = {
   body: 0, skin: 3, hair: 0, 'hair colour': 0, headwear: 0, shades: 1, jacket: 0, 'jacket colour': 0, shirt: 0,
   trousers: 0, 'trouser colour': 1, sneakers: 0, accent: 0, gloves: 0, vest: 0, pack: 2,
 };
+// The first wardrobe had six keys: jacket (a colour, each with its own cut), pants, accent (glowing
+// colours), head, vest and pack. Map such a save onto the nearest new choices, so a returning
+// player keeps their look; one still in that wardrobe's default never chose it, and gets the new one.
+const LEGACY_DEFAULT = { jacket: 0, pants: 0, accent: 0, head: 1, vest: 1, pack: 1 };
+const LEGACY = {
+  jacket: [[1, 0], [0, 2], [0, 1], [0, 2], [0, 3], [0, 7]],   // [style, colour]
+  pants: [[0, 0], [0, 1], [2, 2], [0, 4]],                     // [trousers, trouser colour]
+  accent: [0, 1, 4, 3, 2],
+  head: [0, 1, 4, 5],
+};
+function fromLegacy(o) {
+  if (Object.keys(LEGACY_DEFAULT).every((k) => (Number(o[k]) || 0) === LEGACY_DEFAULT[k])) return DEFAULT_OUTFIT;
+  const r = { ...DEFAULT_OUTFIT, vest: o.vest, pack: o.pack };
+  const at = (list, i) => { const n = list.length, v = Math.trunc(+i) || 0; return list[((v % n) + n) % n]; };
+  [r.jacket, r['jacket colour']] = at(LEGACY.jacket, o.jacket);
+  [r.trousers, r['trouser colour']] = at(LEGACY.pants, o.pants);
+  r.accent = at(LEGACY.accent, o.accent);
+  r.headwear = at(LEGACY.head, o.head);
+  return r;
+}
 // An outfit with every key present and every index in range (saves from older versions name fewer keys).
 export function fullOutfit(o = {}) {
+  if (('pants' in o || 'head' in o) && !('jacket colour' in o)) o = fromLegacy(o);
   const r = {};
   for (const k of Object.keys(OUTFITS)) {
     const n = OUTFITS[k].length, v = Number(o[k]);

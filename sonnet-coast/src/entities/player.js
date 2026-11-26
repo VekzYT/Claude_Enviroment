@@ -19,6 +19,7 @@ const sup = { vehicle: null };
 const GRAV = 24;
 // what a dodge makes you untouchable by
 const DODGEABLE = new Set(['shot', 'punch', 'melee', 'gator']);
+const MOVES = new Set(['roll', 'dodge', 'slide', 'vault', 'climb']);
 const DUST = { asphalt: [0.5, 0.49, 0.47], concrete: [0.62, 0.6, 0.56], sand: [0.82, 0.74, 0.58], dirt: [0.55, 0.45, 0.32], grass: [0.42, 0.46, 0.3], mud: [0.36, 0.3, 0.22] };
 
 export class Player {
@@ -109,12 +110,20 @@ export class Player {
     this.onGround = false;
   }
   respawn(x, z, heading = 0) {
-    this.pos.set(x, groundHeight(x, z, 9999), z);
-    this.vel.set(0, 0, 0);
-    this.heading = heading;
-    this.health = this.maxHealth; this.state = 'foot'; this.stateT = 0; this.mv = null;
+    this.teleport(x, groundHeight(x, z, 9999), z, heading);
+    this.health = this.maxHealth; this.state = 'foot'; this.stateT = 0;
     this.invuln = 3;
     this.model.visible = true;
+  }
+  // The way to move the player on foot from outside (respawns, doors into interiors...): ends any
+  // move in progress, which would otherwise keep placing the body along its own plan.
+  teleport(x, y, z, heading = this.heading) {
+    if (MOVES.has(this.state)) this.endMove();
+    this.mv = null;
+    this.pos.set(x, y, z);
+    this.vel.set(0, 0, 0); this.speed = 0;
+    this.heading = heading;
+    this.standOn = null; this.onGround = true;
   }
 
   // ---- vehicles ------------------------------------------------------------
