@@ -535,7 +535,7 @@ export class PlayerAnim {
         m.quaternion.setFromAxisAngle(_y, pl.heading).multiply(_q.setFromAxisAngle(_x, TAU * su + F[PITCH]));
         m.quaternion.multiply(_q.setFromEuler(_e.set(0, 0.5 * w, F[BANK] - 0.55 * w, 'YXZ')));
       }
-      // turn about the pivot (feet by default; the body's middle for rolls)
+      // turn about the pivot (feet by default; the body's middle for rolls and vaults)
       const py = F[PIVY] * (1 - lie), pz = F[PIVZ];
       _w.set(0, py, pz).applyAxisAngle(_y, pl.heading);
       _v.set(0, py * this.scale, pz).applyQuaternion(m.quaternion);
