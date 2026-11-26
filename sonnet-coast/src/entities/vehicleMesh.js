@@ -18,6 +18,8 @@ function sharedMats() {
   shared = {
     trim: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.25 }),
     glass: new THREE.MeshPhysicalMaterial({ color: 0x0d151c, roughness: 0.03, metalness: 0.0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.6, side: THREE.DoubleSide }),
+    // big flat side windows (bus, lorry cab) mirror the street too brightly at a glancing angle: tinted glass
+    glassTint: new THREE.MeshPhysicalMaterial({ color: 0x091016, roughness: 0.04, metalness: 0.0, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 0.65, side: THREE.DoubleSide }),
     chrome: new THREE.MeshStandardMaterial({ color: 0xd4d8dc, roughness: 0.16, metalness: 1.0, envMapIntensity: 1.4 }),
     gloss: new THREE.MeshPhysicalMaterial({ color: 0x08090b, roughness: 0.2, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.05 }),
     wheel: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.35 }),
@@ -618,6 +620,11 @@ const SHAPES = {
     const top = B.info(-0.25).yt, sz = -0.25;
     return {
       B, glowHex: 0xffc560,
+      // the roof sign holds the lit strips, so the distant proxy keeps it too
+      bulk(b) {
+        rbox(b, 0.98, 0.05, 0.4, 0, top + 0.02, sz, DARK, 0.02);
+        rbox(b, 0.88, 0.26, 0.3, 0, top + 0.17, sz, 0x1d1e22, 0.06);
+      },
       trim(b) {
         carFittings(b, B, { mirrorZ: 1.04, handles: [-0.62, 0.2] });
         // checker band along the doors, just under the waist
@@ -625,9 +632,6 @@ const SHAPES = {
           const z = -1.0 + i * 0.1, m = B.info(z);
           for (let r = 0; r < 2; r++) for (const s of [-1, 1]) b.cbox(0.012, 0.058, 0.1, s * (m.w * 1.004 + 0.006), m.yb - 0.1 - r * 0.058, z, (i + r) % 2 ? 0x16171a : 0xf4f1ea);
         }
-        // roof sign
-        rbox(b, 0.98, 0.05, 0.4, 0, top + 0.02, sz, DARK, 0.02);
-        rbox(b, 0.88, 0.26, 0.3, 0, top + 0.17, sz, 0x1d1e22, 0.06);
       },
       glowParts(b) { for (const s of [-1, 1]) rbox(b, 0.74, 0.15, 0.02, 0, top + 0.18, sz + s * 0.152, 0xffffff, 0.01); },
       head: [[W * 0.62, 0.76, 2.29, 0.44, 0.13, 0.2], [-W * 0.62, 0.76, 2.29, 0.44, 0.13, 0.2]],
@@ -721,17 +725,19 @@ const SHAPES = {
     });
     const BOX = 0xeeeae0, roof = B.info(2.1).yt;
     return {
-      B, wheelW: 0.3,
+      B, wheelW: 0.3, tint: true,
       bulk(b) {
         rbox(b, 2.44, 2.26, 5.2, 0, 2.17, -1.1, BOX, 0.06);                                  // cargo box
         rbox(b, 1.9, 0.34, 0.9, 0, roof + 0.14, 2.05, 0x3a3c40, 0.1, 0, -0.2);               // roof deflector
+        for (const s of [-1, 1]) {
+          rbox(b, 0.02, 0.4, 4.4, s * 1.226, 2.06, -1.2, PAL.terracottaLight, 0.008);        // livery
+          rbox(b, 0.02, 0.08, 4.4, s * 1.226, 1.76, -1.2, 0x2f7f86, 0.008);
+        }
       },
       trim(b) {
         carFittings(b, B, { mirrorZ: 2.7, handles: [2.0], handleColor: DARK, exhaust: false });
         rbox(b, W * 2.04, 0.3, 0.22, 0, 0.62, hl - 0.04, 0x1c1c20, 0.07); rbox(b, W * 2.04, 0.26, 0.22, 0, 0.62, -hl + 0.04, 0x1c1c20, 0.07);
         for (const s of [-1, 1]) {
-          rbox(b, 0.02, 0.4, 4.4, s * 1.226, 2.06, -1.2, PAL.terracottaLight, 0.008);        // livery
-          rbox(b, 0.02, 0.08, 4.4, s * 1.226, 1.76, -1.2, 0x2f7f86, 0.008);
           rbox(b, 0.08, 0.16, 5.1, s * 1.18, 0.98, -1.1, 0x2a2c30, 0.02);                    // box rails
           tube(b, s * (W - 0.05), 1.3, 2.6, s * (W + 0.18), 1.6, 2.75, 0.02, DARK, 5);       // mirror arms
         }
@@ -759,7 +765,7 @@ const SHAPES = {
     const roof = B.info(0).yt, DOOR = 0x1a2026;
     const doors = [[4.35, 5.2], [0.2, 1.5]];
     return {
-      B, altColor: [0xf0ece2, 0.5, 0.05], glowHex: 0xffb648, wheelW: 0.32,
+      B, altColor: [0xf0ece2, 0.5, 0.05], glowHex: 0xffb648, wheelW: 0.32, tint: true,
       bulk(b) {
         rbox(b, 1.6, 0.3, 2.8, 0, roof + 0.13, -1.2, 0xdcd8ce, 0.08);                        // roof units
         rbox(b, 1.3, 0.22, 1.3, 0, roof + 0.09, 2.8, 0xdcd8ce, 0.08);
@@ -922,6 +928,7 @@ function shapeData(T) {
   const data = {
     paint: G.paint,
     glass: glassParts.length ? (glassParts.length > 1 ? mergeGeometries(glassParts, false) : glassParts[0]) : null,
+    tint: !!S.tint,
     detail: parts.length ? (parts.length > 1 ? mergeGeometries(parts, false) : parts[0]) : null,
     wheels4,
     glow: glow.empty ? null : glow.merged(),
@@ -932,7 +939,7 @@ function shapeData(T) {
     siren: S.siren || null,
     seat: S.seat || [0.4, 0.6, 0],
     headPos: S.head,
-    riders: T.open && (S.bars || S.wheelAt) ? RIDERS.map((C) => riderGeo(S, C, false)) : null,
+    riders: T.open && (S.bars || S.wheelAt) ? riderLooks(T).map((C) => riderGeo(S, C, false)) : null,
   };
   cache.set(T.id, data);
   return data;
@@ -941,12 +948,18 @@ function shapeData(T) {
 // ---- riders --------------------------------------------------------------------------------------
 // Whoever drives an open vehicle, other than the player (whose own model takes the seat), is a
 // figure baked into one mesh: astride for bikes (S.bars: right grip), seated for cars and boats
-// (S.wheelAt: steering wheel centre).
+// (S.wheelAt: steering wheel centre). Each vehicle picks one look (m.riderIdx) and keeps it in every tier.
 const RIDERS = [
   { top: 0xd97757, legs: 0x2a3340, skin: 0xc68863, lid: 0xf2f3f4, hair: 0x2a1d16 },
   { top: 0x2f7f86, legs: 0x1f2226, skin: 0xe0ac8a, lid: 0x1b1b1f, hair: 0x6b4a2e },
   { top: 0xe3b54f, legs: 0x3a3d45, skin: 0x9a6645, lid: 0xd97757, hair: 0x101012 },
 ];
+// officers in uniform, for the police boat
+const POLICE_RIDERS = [
+  { top: 0x243246, legs: 0x1a1f28, skin: 0xc68863, lid: 0x243246, hair: 0x2a1d16 },
+  { top: 0x243246, legs: 0x1a1f28, skin: 0x9a6645, lid: 0x243246, hair: 0x101012 },
+];
+const riderLooks = (T) => (T.police ? POLICE_RIDERS : RIDERS);
 const _dn = new THREE.Vector3(0, -1, 0), _col = new THREE.Color();
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 function limbFrom(a, b, r0, r1, hex, far) {
@@ -1006,7 +1019,7 @@ export function buildVehicleMesh(T, paintHex) {
   const paint = new THREE.Mesh(D.paint, paintMat);
   paint.castShadow = true; paint.receiveShadow = true;
   body.add(paint);
-  if (D.glass) body.add(new THREE.Mesh(D.glass, M.glass));
+  if (D.glass) body.add(new THREE.Mesh(D.glass, D.tint ? M.glassTint : M.glass));
   if (D.detail) { const t = new THREE.Mesh(D.detail, M.detail); t.castShadow = true; body.add(t); }
   const glowHex = T.police ? 0xbfdcff : D.glowHex || T.glow || (T.shape === 'van' ? 0xffe6c4 : null);
   let glow = null;
@@ -1015,9 +1028,10 @@ export function buildVehicleMesh(T, paintHex) {
   const tail = new THREE.Mesh(D.tail, M.tail);
   body.add(head, tail);
   // shown by vehicleLod.js while someone other than the player drives
-  let rider = null;
+  let rider = null, riderIdx = -1;
   if (D.riders) {
-    rider = new THREE.Mesh(D.riders[Math.floor(Math.random() * D.riders.length)], M.rider);
+    riderIdx = Math.floor(Math.random() * D.riders.length);
+    rider = new THREE.Mesh(D.riders[riderIdx], M.rider);
     rider.castShadow = true; rider.visible = false;
     body.add(rider);
   }
@@ -1065,16 +1079,18 @@ export function buildVehicleMesh(T, paintHex) {
     body.add(L, Rm, fl, fr);
     siren = { L, R: Rm, fl, fr };
   }
-  return { group, body, paintMat, head, tail, wheels, wheelRest, siren, glow, under, rider, seat: D.seat, headPos: D.headPos, baseColor: new THREE.Color(paintHex) };
+  return { group, body, paintMat, head, tail, wheels, wheelRest, siren, glow, under, rider, riderIdx, seat: D.seat, headPos: D.headPos, baseColor: new THREE.Color(paintHex) };
 }
 
 export function vehicleMats() { return sharedMats(); }
 export function wheelGeometry(T) { return shapeData(T).wheel; }
+// how many rider looks an open vehicle chooses from (0: it never shows a rider)
+export function riderCount(T) { const r = shapeData(T).riders; return r ? r.length : 0; }
 
 // ---- instanced models for vehicleLod.js ------------------------------------------------------------
 // Each is one merged mesh per type, drawn once for every vehicle of that type in its tier.
 // aProxy per vertex = (roughness, metalness, paint, lamp): paint 1 takes the instance colour,
-// lamp 1 = headlight, 2 = tail light, 3 = always lit.
+// lamp 1 = headlight, 2 = tail light, 3 = always lit, 4 = tinted glass (dimmer reflections).
 function proxyPart(geo, color, rough, metal, paint, lamp) {
   const g = geo.index ? geo.toNonIndexed() : geo.clone();
   for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'color') g.deleteAttribute(k);
@@ -1085,12 +1101,12 @@ function proxyPart(geo, color, rough, metal, paint, lamp) {
   return g;
 }
 // The full model (parked, or 40-88 m away): the same paint, glass, trim and lamps, on wheels that
-// no longer need to turn and are built lighter.
-export function restGeometry(T, ridden = false) {
+// no longer need to turn and are built lighter. rider: the index of a rider look to seat, or -1.
+export function restGeometry(T, rider = -1) {
   const D = shapeData(T), parts = [];
   const P = (geo, color, rough, metal, paint = 0, lamp = 0) => { const g = proxyPart(geo, color, rough, metal, paint, lamp); parts.push(g); return g; };
   P(D.paint, null, 0.42, 0.5, 1);
-  if (D.glass) P(D.glass, 0x0d151c, 0.03, 0);
+  if (D.glass) P(D.glass, D.tint ? 0x091016 : 0x0d151c, 0.03, 0, 0, D.tint ? 4 : 0);
   if (D.detail) {
     // keep the trim's own roughness and metalness
     const g = P(D.detail, null, 0, 0), a = g.getAttribute('aProxy').array, pbr = D.detail.getAttribute('aPbr').array;
@@ -1109,7 +1125,7 @@ export function restGeometry(T, ridden = false) {
     }
     P(b.merged(), null, 0.5, 0.4);
   }
-  if (ridden && D.riders) P(D.riders[0], null, 0.72, 0.04);
+  if (rider >= 0 && D.riders) P(D.riders[rider], null, 0.72, 0.04);
   return finish(T, D, parts);
 }
 // Parts every instanced model shares: the dark lightbar of a police car, and a hover-bike's body
@@ -1127,7 +1143,7 @@ function finish(T, D, parts) {
 }
 // The distant stand-in: a coarser loft of the same body, its glass and trim colours, the big fittings
 // (S.bulk), plain wheels and lamp lenses, plus a rider when asked.
-export function proxyGeometry(T, ridden = false) {
+export function proxyGeometry(T, rider = -1) {
   const D = shapeData(T);
   let S;
   LOD = true;
@@ -1135,7 +1151,7 @@ export function proxyGeometry(T, ridden = false) {
   const G = S.B.geos, parts = [];
   const P = (geo, color, rough, metal, paint = 0, lamp = 0) => parts.push(proxyPart(geo, color, rough, metal, paint, lamp));
   P(G.paint, null, 0.4, 0.45, 1);
-  if (G.glass) P(G.glass, 0x0d151c, 0.06, 0.2);
+  if (G.glass) P(G.glass, D.tint ? 0x091016 : 0x0d151c, 0.06, 0.2, 0, D.tint ? 4 : 0);
   if (G.chrome) P(G.chrome, 0xd4d8dc, 0.2, 1);
   if (G.gloss) P(G.gloss, 0x08090b, 0.2, 0.2);
   const alt = S.altColor || [0x2a2c30, 0.6, 0.2], dark = S.darkColor || [0x101114, 0.7, 0.1];
@@ -1159,6 +1175,6 @@ export function proxyGeometry(T, ridden = false) {
   };
   lamps(S.head, 0xdfe6ea, 1);
   lamps(S.tail, 0xb01218, 2);
-  if (ridden && D.riders) P(riderGeo(S, RIDERS[0], true), null, 0.7, 0.04);
+  if (rider >= 0 && D.riders) P(riderGeo(S, riderLooks(T)[rider], true), null, 0.7, 0.04);
   return finish(T, D, parts);
 }

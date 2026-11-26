@@ -575,12 +575,6 @@ export class Vehicle {
     this.bodyPitch += (pitchT - this.bodyPitch) * k;
     m.body.rotation.set(this.bodyPitch, 0, this.bodyRoll);
     if (this.cls === 'hover') m.body.position.y = Math.sin(t * 3 + this.id) * 0.05 - T.hover * 0.55;
-    // wheels: only the ones near the camera cast their own shadows; further off the four tiny
-    // patches under the body cannot be told from the body's own shadow
-    if (m.wheels.length) {
-      const c = G.camera.position, near = (c.x - this.pos.x) ** 2 + (c.z - this.pos.z) ** 2 < 55 * 55;
-      if (near !== m.wheelShadows) { m.wheelShadows = near; for (const w of m.wheels) w.mesh.castShadow = near; }
-    }
     if (m.wheels.length) {
       // in a slide the front wheels point along the direction of travel (opposite lock) and the rears spin up
       const yawT = this.drift ? clamp(-(this.slideAngle * 0.7 + this.steer * T.steer * 0.3), -T.steer, T.steer) : -this.steer * T.steer * 0.75;

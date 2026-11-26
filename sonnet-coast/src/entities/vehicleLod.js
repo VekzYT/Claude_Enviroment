@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { G, addPlugin, DETAIL_LAYER } from '../state.js';
 import { VEHICLES, TRAFFIC_POOL } from './vehicleTypes.js';
-import { proxyGeometry, restGeometry, wheelGeometry, vehicleMats } from './vehicleMesh.js';
+import { proxyGeometry, restGeometry, wheelGeometry, riderCount, vehicleMats } from './vehicleMesh.js';
 import { headlightBeamMaterial } from './vehicle.js';
 import { makeBlobTexture } from '../world/textures.js';
 
@@ -30,9 +30,20 @@ function lodMaterial(physical) {
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n  roughnessFactor = vProxy.x; metalnessFactor = vProxy.y;')
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
   float lampsOn = mod(vLight, 2.0), braking = step(1.5, vLight);
-  if (vProxy.w > 2.5) totalEmissiveRadiance += diffuseColor.rgb * 1.4;
+  if (vProxy.w > 3.5) {}
+  else if (vProxy.w > 2.5) totalEmissiveRadiance += diffuseColor.rgb * 1.4;
   else if (vProxy.w > 1.5) totalEmissiveRadiance += vec3(0.75, 0.04, 0.06) * (1.0 + 1.5 * lampsOn + 3.0 * braking);
   else if (vProxy.w > 0.5) totalEmissiveRadiance += vec3(2.2, 2.09, 1.87) * lampsOn;`);
+    // tinted glass reflects about as much as the full model's (glassTint)
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
+#if defined( USE_ENVMAP ) && defined( RE_IndirectSpecular )
+  if (vProxy.w > 3.5) {
+    radiance *= 0.45;
+#ifdef USE_CLEARCOAT
+    clearcoatRadiance *= 0.45;
+#endif
+  }
+#endif`);
     // the clear coat sits on the glossy parts only (paint, glass), as on the full model
     if (physical) sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  material.clearcoat *= step(vProxy.x, 0.45);');
   };
@@ -106,7 +117,7 @@ const _fr = new THREE.Frustum(), _sph = new THREE.Sphere();
 class VehicleLod {
   constructor() {
     this.mats = [lodMaterial(false), lodMaterial(true)];
-    this.pools = new Map();   // type -> { r, rr, p, pr, w }: rest / proxy, ridden or not, and wheels
+    this.pools = new Map();   // type -> { r, p, w, r0, p0, ... }: rest / proxy, then with rider look k seated, and wheels
     const quad = new THREE.PlaneGeometry(1, 1);
     quad.rotateX(-Math.PI / 2);
     const blobMat = new THREE.MeshBasicMaterial({ map: makeBlobTexture(), transparent: true, depthWrite: false, opacity: 0.75, polygonOffset: true, polygonOffsetFactor: -7, polygonOffsetUnits: -7 });
@@ -114,18 +125,21 @@ class VehicleLod {
     const beam = headlightBeamMaterial();
     G.env.nightLerp(beam, 'opacity', 0, 0.3);
     this.beams = new Pool(quad, beam, { order: 2 });
-    // build the everyday types up front so the first car to drive off does not hitch
+    // build everything traffic drives up front (with its riders), so the first one to show does not hitch
     this.all = [this.blobs, this.beams];
-    for (const id of new Set(TRAFFIC_POOL)) for (const kind of ['r', 'p']) this.pool(kind, VEHICLES[id], false);
+    for (const id of new Set([...TRAFFIC_POOL, 'bus', 'police', 'policeOffroad', 'swat'])) {
+      const T = VEHICLES[id], riders = riderCount(T);
+      for (const kind of ['r', 'p']) for (let k = -1; k < riders; k++) this.pool(kind, T, k);
+    }
   }
-  pool(kind, T, ridden) {
+  pool(kind, T, rider = -1) {
     let set = this.pools.get(T);
     if (!set) this.pools.set(T, (set = {}));
-    const key = ridden ? kind + 'r' : kind;
+    const key = rider >= 0 ? kind + rider : kind;
     let p = set[key];
     if (!p) {
       if (kind === 'w') p = new Pool(wheelGeometry(T), vehicleMats().wheel, { shadow: true });
-      else p = new Pool(kind === 'r' ? restGeometry(T, ridden) : proxyGeometry(T, ridden), this.mats[kind === 'r' ? 1 : 0], { shadow: true, lamps: true });
+      else p = new Pool(kind === 'r' ? restGeometry(T, rider) : proxyGeometry(T, rider), this.mats[kind === 'r' ? 1 : 0], { shadow: true, lamps: true });
       set[key] = p;
       this.all.push(p);
     }
@@ -165,9 +179,9 @@ class VehicleLod {
       const M = v.mesh.matrix;
       if (lod) {
         const braking = npc && ((v.inThrottle < -0.1 && v.fwd > 1) || v.inHandbrake);
-        this.pool(lod === 1 ? 'r' : 'p', T, npc && !!m.rider).push(M, m.paintMat.color, (v.lightsOn && !v.destroyed ? 1 : 0) + (braking ? 2 : 0));
+        this.pool(lod === 1 ? 'r' : 'p', T, npc && m.rider ? m.riderIdx : -1).push(M, m.paintMat.color, (v.lightsOn && !v.destroyed ? 1 : 0) + (braking ? 2 : 0));
       } else if (m.wheels.length && m.wheels[0].pivot.visible) {
-        const wp = this.pool('w', T, false);
+        const wp = this.pool('w', T);
         for (const w of m.wheels) {
           w.pivot.updateMatrix(); w.mesh.updateMatrix();
           wp.push(_m.multiplyMatrices(M, w.pivot.matrix).multiply(w.mesh.matrix));
