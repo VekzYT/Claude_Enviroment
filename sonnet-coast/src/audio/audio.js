@@ -6,6 +6,7 @@ const MAX_VOICES = 24;        // simultaneous one-shot voices; the quietest / mo
 const MAX_SAME = 5;           // simultaneous copies of one sound name
 const HEAR_DIST = 160;        // metres at which a positional one-shot has faded to nothing
 const SIREN_DIST = 240;       // sirens carry further than ordinary sounds
+const ROTOR_DIST = 420;       // and a helicopter further still
 const CONTROL_DT = 0.022;     // continuous sounds are re-targeted at ~30-45 Hz, not every frame
 const STALE_FRAMES = 15;      // engine()/skid()/sirens()/ambient() not called for this many updates = off
 
@@ -850,6 +851,7 @@ export class AudioSystem {
     this._skidLevel = 0; this._skidSurface = 'asphalt'; this._skidFrame = -1e9;
     this._sirNear = [{ id: null, x: 0, z: 0, d2: 0, slot: null }, { id: null, x: 0, z: 0, d2: 0, slot: null }, { id: null, x: 0, z: 0, d2: 0, slot: null }];
     this._sirCount = 0; this._sirenFrame = -1e9;
+    this._rotS = { on: false, x: 0, z: 0, level: 0 }; this._rotFrame = -1e9; this._rot = null;
     this._amb = { city: 0, forest: 0, swamp: 0, beach: 0, night: 0, rain: 0, wind: 0 };
     this._ambFrame = -1e9;
     this._chimeT = 1.5; this._chimeLevel = 0;
@@ -957,7 +959,7 @@ export class AudioSystem {
       this._engFrame = this._frame;
       if (!state || typeof state !== 'object') { this._engOn = false; return; }
       const s = this._engS;
-      s.cls = state.cls === 'hover' || state.cls === 'boat' ? state.cls : 'car';
+      s.cls = state.cls === 'hover' || state.cls === 'boat' || state.cls === 'heli' ? state.cls : 'car';
       s.rpm = c01(state.rpm);
       s.throttle = c01(state.throttle);
       s.speed = clamp(Math.abs(fin(state.speed, 0)), 0, 150);
@@ -965,6 +967,16 @@ export class AudioSystem {
       s.heavy = c01(state.heavy);
       s.damaged = c01(state.damaged);
       this._engOn = true;
+    } catch (e) { /* never throw */ }
+  }
+
+  /** The nearest helicopter with its rotor turning (not the one the player flies): { x, z, level } or null. */
+  rotor(state) {
+    try {
+      this._rotFrame = this._frame;
+      const R = this._rotS;
+      R.on = !!state && typeof state === 'object';
+      if (R.on) { R.x = fin(state.x, R.x); R.z = fin(state.z, R.z); R.level = c01(state.level); }
     } catch (e) { /* never throw */ }
   }
 
@@ -1027,6 +1039,7 @@ export class AudioSystem {
         this._applyEngine(now);
         this._applySkid();
         this._applySirens();
+        this._applyRotor();
       }
       if (now - this._ambT >= 0.1) {
         this._ambT = now;
@@ -1301,6 +1314,7 @@ export class AudioSystem {
     this._buildEngine();
     this._buildSkid();
     this._buildSirens();
+    this._buildRotor();
     this._buildAmbient();
     this._built = true;
   }
@@ -1372,7 +1386,20 @@ export class AudioSystem {
     const set = (p, v, tc) => this._set(p, v, tc);
     const FM = this._fmax;
     let f0, fB, fC, gA, gB, gC, pre, cut, q, lfoF, lfoD, jit, tone, whF, whG, nF, nQ, nG, nGm;
-    if (E.cls === 'hover') {
+    if (E.cls === 'heli') {
+      // turboshaft and rotor: a low drone and air rush chopped at the blade-pass rate, a thin turbine
+      // whine over the top that climbs as the engine spools up
+      f0 = 28 + 34 * rpm; fB = f0 * 0.5; fC = f0 * 3.02;
+      gA = 0.3; gB = 0.35; gC = 0.06 + 0.06 * thr;
+      pre = 0.2 + 0.2 * thr;
+      cut = 260 + 900 * rpm + 400 * thr; q = 0.9;
+      lfoF = 2 + 21 * rpm; lfoD = 0.15 + 0.65 * rpm + 0.1 * dmg;
+      jit = 5 + 40 * dmg;
+      tone = 0.55 + 0.25 * thr + 0.2 * rpm;
+      whF = 1500 + 2900 * rpm; whG = 0.008 + 0.03 * rpm;
+      nF = 300 + 320 * rpm + 120 * thr; nQ = 0.75;
+      nG = 0.02 + 0.06 * Math.min(1, spd / 50); nGm = 0.25 + 0.75 * rpm;
+    } else if (E.cls === 'hover') {
       // turbine: two beating saws through a resonant filter; pitch climbs with speed
       f0 = (170 + 5.5 * spd + 230 * rpm) * (1 - 0.3 * heavy);
       fB = (66 + 30 * rpm) * (1 - 0.3 * heavy); fC = f0 * 1.011;
@@ -1433,7 +1460,7 @@ export class AudioSystem {
   _engShape(cls) {
     const E = this._eng;
     E.cls = cls; E.pendingCls = null;
-    E.oscB.type = cls === 'hover' ? 'sine' : 'square';
+    E.oscB.type = cls === 'hover' || cls === 'heli' ? 'sine' : 'square';
   }
 
   // ---- tyre skid -----------------------------------------------------------------------------
@@ -1549,6 +1576,33 @@ export class AudioSystem {
     for (let k = 0; k < 3; k++) {
       if (!S[k].keep) { S[k].id = null; this._set(S[k].g.gain, 0, 0.1); }
     }
+  }
+
+  // ---- a helicopter passing: pink noise chopped at the blade rate, placed and filtered by distance --
+
+  _buildRotor() {
+    const R = {};
+    const bp = this._bq('bandpass', 260, 0.8);
+    R.am = this._g(0.5);
+    R.lfo = this._o('sine', 16);
+    const d = this._g(0.5);
+    R.lfo.connect(d); d.connect(R.am.gain);
+    this._pink.connect(bp); bp.connect(R.am);
+    R.lp = this._bq('lowpass', 3000, 0.5);
+    R.g = this._g(0);
+    R.pan = this._pn(0);
+    R.am.connect(R.lp); R.lp.connect(R.g); R.g.connect(R.pan); R.pan.connect(this._sirenBus);
+    this._rot = R;
+  }
+
+  _applyRotor() {
+    const R = this._rot, s = this._rotS;
+    const sp = s.on && this._frame - this._rotFrame <= STALE_FRAMES ? this._spatial(s.x, s.z, 40, ROTOR_DIST) : null;
+    if (!sp) { this._set(R.g.gain, 0, 0.2); return; }
+    if (R.pan.pan) this._set(R.pan.pan, sp.pan, 0.08);
+    this._set(R.lp.frequency, clamp(5000 / (1 + sp.d / 70), 400, 5000), 0.1);
+    this._set(R.lfo.frequency, 3 + 14 * s.level, 0.2);
+    this._set(R.g.gain, sp.gain * 0.7 * s.level, 0.12);
   }
 
   // ---- ambience ------------------------------------------------------------------------------

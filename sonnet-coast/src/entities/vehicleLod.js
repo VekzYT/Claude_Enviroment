@@ -146,7 +146,8 @@ class VehicleLod {
     return p;
   }
   tier(v, d) {
-    if (v === G.player.vehicle || v.sirenOn) return 0;
+    // helicopters have no merged or proxy models (heli.js hides their small parts at a distance)
+    if (v === G.player.vehicle || v.sirenOn || v.cls === 'heli') return 0;
     const cur = v.lod || 0;
     if (d > (cur === 2 ? FAR - HYST * 3 : FAR)) return 2;
     const near = v.m.under ? FAR : v.asleep ? FULL_PARKED : FULL_MOVING;   // underglow only on the full model
@@ -187,7 +188,7 @@ class VehicleLod {
           wp.push(_m.multiplyMatrices(M, w.pivot.matrix).multiply(w.mesh.matrix));
         }
       }
-      if (v.sunk || v.cls === 'boat') continue;
+      if (v.sunk || v.cls === 'boat' || v.hideBlob) continue;
       const gy = (v.groundY ?? v.pos.y) - v.pos.y;
       this.blobs.decal(M.elements, gy + 0.06, 0, T.wid * 1.7, T.len * 1.35);
       if (v.lightsOn && !v.destroyed && v !== mine) this.beams.decal(M.elements, gy + 0.07, T.len / 2 + 6.5, T.wid * 3.6, 15);

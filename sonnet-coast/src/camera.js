@@ -39,7 +39,19 @@ export class GameCamera {
     if (Input.hit('KeyV')) this.zoom = this.zoom < 0.9 ? 1 : this.zoom < 1.2 ? 1.45 : 0.75;
 
     let dist, height, side = 0, fovT = 62;
-    if (v) {
+    if (v && v.cls === 'heli') {
+      // high and well back, swinging round to look the way the machine is flying
+      dist = (10.5 + clamp(v.speed / 60, 0, 1) * 4) * this.zoom;
+      height = 3.4;
+      _t.set(v.pos.x, v.pos.y + height, v.pos.z);
+      this.slide = 0;
+      if (this.idle > 1.2 && (v.speed > 4 || Math.abs(v.angVel) > 0.3)) {
+        const goal = v.speed > 8 ? Math.atan2(v.vel.x, v.vel.z) : v.heading;
+        this.yaw += wrapAngle(goal - this.yaw) * Math.min(1, dt * 1.6);
+        this.pitch += (0.3 - clamp(v.vel.y / 40, -0.15, 0.15) - this.pitch) * Math.min(1, dt * 1.2);
+      }
+      fovT = 64 + clamp(v.speed / 60, 0, 1) * 10;
+    } else if (v) {
       const T = v.T;
       dist = (T.len * 1.15 + 3.4) * this.zoom;
       height = T.hgt * 0.55 + 0.9;
@@ -66,6 +78,11 @@ export class GameCamera {
       fovT = aiming ? 46 : 62 + (p.sprinting ? 6 : 0) + (p.state === 'slide' ? 8 : 0);
       this.low += ((p.state === 'slide' ? 0.6 : p.state === 'roll' ? 0.4 : 0) - this.low) * Math.min(1, dt * 7);
       _t.set(p.pos.x, p.pos.y + height - this.low + (p.swimming ? 0.5 : 0), p.pos.z);
+      if (p.state === 'parachute') {
+        // under the canopy: back and up, so the wing and the ground below both show
+        dist = 8.5 * this.zoom; _t.y = p.pos.y + 3; fovT = 66;
+        if (this.idle > 1) this.yaw += wrapAngle(p.heading - this.yaw) * Math.min(1, dt * 1.5);
+      }
       if (p.state === 'dead' || p.state === 'busted') { this.yaw += dt * 0.25; this.pitch += (0.55 - this.pitch) * Math.min(1, dt); dist = 6 + Math.min(p.stateT, 4); }
       // a menu over the game (the wardrobe, a shop): the player close up, beside the panel on the right
       if (G.mode === 'menu') { dist = 2.7; _t.y = p.pos.y + 1.15; side = 0.95; fovT = 50; }

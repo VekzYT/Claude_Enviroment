@@ -92,7 +92,7 @@ export class Game {
       for (const o of G.vehicles) {
         if (o === v || o.destroyed) continue;
         const d = Math.hypot(o.pos.x - v.pos.x, o.pos.z - v.pos.z);
-        if (d < R2) {
+        if (d < R2 && Math.abs(o.pos.y - v.pos.y) < R2) {
           o.damage((1 - d / R2) * 70, source);
           const k = ((1 - d / R2) * 9) / Math.max(d, 1);
           o.vel.x += (o.pos.x - v.pos.x) * k; o.vel.z += (o.pos.z - v.pos.z) * k; o.vel.y += 3;
@@ -105,7 +105,7 @@ export class Game {
       G.peds.scare(v.pos.x, v.pos.z, 60, 12);
       const d = Math.hypot(pl.worldPos.x - v.pos.x, pl.worldPos.z - v.pos.z);
       if (pl.vehicle === v) { pl.hurt(85, 'explosion'); if (pl.alive) pl.knockDown(rand(-3, 3), 7, rand(-3, 3), 2); }
-      else if (d < R2 && !pl.vehicle) {
+      else if (d < R2 && !pl.vehicle && Math.abs(pl.pos.y - v.pos.y) < R2) {
         pl.hurt((1 - d / R2) * 90, 'explosion');
         if (pl.alive) pl.knockDown(((pl.pos.x - v.pos.x) / (d + 0.5)) * 8, 6, ((pl.pos.z - v.pos.z) / (d + 0.5)) * 8, 1.8);
       }
@@ -295,6 +295,7 @@ export class Game {
       const ratio = clamp(Math.abs(v.fwd) / v.T.maxSpeed, 0, 1.3);
       let rpm;
       if (v.cls === 'car') { const g = Math.min(4, Math.floor(ratio * 5)); rpm = clamp(0.22 + 0.78 * (ratio * 5 - g) * (g < 4 ? 1 : 0.8) + (g === 4 ? 0.2 : 0), 0, 1); if (!v.onGround) rpm = 1; }
+      else if (v.cls === 'heli') rpm = v.spool;
       else rpm = clamp(ratio, 0, 1);
       A.engine({ cls: v.cls, rpm: v.disabled > 0 ? 0 : rpm, throttle: v.disabled > 0 ? 0 : Math.abs(v.inThrottle), speed: v.speed, nitro: v.boosting, heavy: clamp((v.T.mass - 1000) / 4000, 0, 1), damaged: 1 - v.healthFrac });
       A.skid(v.slip, v.surface === 'hover' ? 'water' : v.surface);

@@ -62,7 +62,7 @@ export class Vehicle {
     this.coastT = 0; this.powerT = 0; this.pushT = 0; this.trailT = 0; this.liftT = 9; this.brakeT = 9; this.burn = false; this.burnT = 0; this.launchT = 0; this.load = 0; this.airPitch = 0; this.wheelYaw = 0;
     this.fireT = 0; this.smokeT = 0;
     this.paint = opts.paint ?? pick(T.paints);
-    this.m = buildVehicleMesh(T, this.paint);
+    this.m = this.buildMesh(T, this.paint, opts);
     this.mesh = this.m.group;
     this.mesh.rotation.order = 'YXZ';
     this.cr = T.wid * 0.5;
@@ -80,6 +80,8 @@ export class Vehicle {
     G.vehicles.push(this);
   }
 
+  // subclasses with their own models (helicopters) override this
+  buildMesh(T, paint) { return buildVehicleMesh(T, paint); }
   get occupied() { return this.driver !== null; }
   get isPolice() { return !!this.T.police; }
   get healthFrac() { return clamp(this.health / this.maxHealth, 0, 1); }

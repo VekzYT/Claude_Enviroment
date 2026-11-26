@@ -125,6 +125,24 @@ export const VEHICLES = {
     mass: 1500, maxSpeed: 39, accel: 14, brake: 8, grip: 2.6, steer: 0.5, offroad: 1.0, health: 160, open: true,
     paints: [0x2b2d33], police: true, traffic: 0, value: 0,
   },
+  // helicopters (heli.js): maxSpeed is the cruise, accel how hard they change speed, climb / descend the
+  // vertical rates (m/s), steer the yaw rate in the hover (rad/s); len and wid cover the cabin (the tail boom
+  // and the rotors collide on their own), hgt reaches the rotor head
+  heli: {
+    name: 'Stanza Lark', cls: 'heli', shape: 'heli', len: 5.4, wid: 2.3, hgt: 2.95, wheelR: 0, wheelbase: 3.2,
+    mass: 1500, maxSpeed: 62, accel: 12, brake: 12, grip: 0, steer: 1.6, offroad: 1, health: 160, open: true, climb: 11, descend: 10,
+    paints: [0xe8e2d4, 0x5c7f6b, 0x2f5d73, PAL.terracotta, 0xd9b26a, 0x3f6b4f], livery: 'civil', traffic: 0, value: 2500,
+  },
+  medHeli: {
+    name: 'Stanza Lark Care', cls: 'heli', shape: 'heli', len: 5.4, wid: 2.3, hgt: 2.95, wheelR: 0, wheelbase: 3.2,
+    mass: 1500, maxSpeed: 62, accel: 12, brake: 12, grip: 0, steer: 1.6, offroad: 1, health: 160, open: true, climb: 11, descend: 10,
+    paints: [0xf2f3f4], livery: 'medic', traffic: 0, value: 2500,
+  },
+  policeHeli: {
+    name: 'Safety Hawk', cls: 'heli', shape: 'heli', len: 5.4, wid: 2.3, hgt: 2.95, wheelR: 0, wheelbase: 3.2,
+    mass: 1700, maxSpeed: 60, accel: 13, brake: 13, grip: 0, steer: 1.5, offroad: 1, health: 90, open: true, climb: 11, descend: 9,
+    paints: [0x2b2d33], livery: 'police', police: true, traffic: 0, value: 0,
+  },
 };
 for (const k of Object.keys(VEHICLES)) VEHICLES[k].id = k;
 
