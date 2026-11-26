@@ -7,7 +7,8 @@ import { G } from '../state.js';
 import { Room, terrazzoTex, woodTex, labelTex, sofa, roundTable, plant } from './kit.js';
 import { look, jobTip, weightRumour } from './people.js';
 import { blocks } from '../world/cityplan.js';
-import { allColliders, removeCollider, addCircle } from '../world/colliders.js';
+import { allColliders, removeCollider, addCircle, addBox } from '../world/colliders.js';
+import { Batch } from '../world/geom.js';
 import { CITY } from '../world/layout.js';
 import { pick } from '../util/rng.js';
 
@@ -131,7 +132,7 @@ function buildDeck(T) {
   r.cyl('matte', 2.64, 2.64, 0.5, 0, 2.9, 0, 0xc8643b, 40);
   for (const s of [1, -1]) { r.box('metal', 1.7, 2.9, 0.12, 0, 0, s * 2.58, BRASS); r.box('gloss', 1.4, 2.7, 0.06, 0, 0, s * 2.64, 0x2a2b2f); r.box('glow', 0.5, 0.12, 0.03, 0, 3.1, s * 2.66, 0xffb070); }
   r.solid(-2.6, -2.6, 2.6, 2.6, 0, Hd + 1);
-  r.quad(labelTex('deck-sign', 512, 128, null, [{ t: 'SKY DECK · 212', size: 54, color: '#f0e8d8', y: 50, spacing: 8 }, { t: 'please do not feed the drones', size: 24, color: '#e9b39a', y: 100, weight: 600 }]), 2.4, 0.6, 0, 3.15, 2.67, 0, { basic: true });
+  r.quad(labelTex('deck-sign', 512, 128, null, [{ t: 'SKY DECK · 212', size: 54, color: '#f0e8d8', y: 50, spacing: 8 }, { t: 'please do not feed the drones', size: 24, color: '#e9b39a', y: 100, weight: 600 }]), 2.0, 0.5, 0, 3.15, 2.72, 0, { basic: true });
   r.extra[r.extra.length - 1].material.transparent = true;
   // benches facing out, coin binoculars at the glass, planters
   for (let i = 0; i < 6; i++) {
@@ -175,11 +176,33 @@ function walker(route) {
 export const LOBBY = {
   id: 'lobby', name: 'Claude Tower', shop: null, color: 0xd97757, css: '#c8643b', icon: '✳', sub: 'lobby · sky deck',
   signText: 'CLAUDE TOWER', signSub: 'LOBBY · SKY DECK',
-  // the door is on the tower's round base, facing the boulevard a little east of the sculpture
+  noSign: true,
+  // the door is on the tower's round base, facing the boulevard a little east of the sculpture,
+  // in a portal that stands out past the plinth round the foot of the tower
   door() {
-    const T = tower(), a = 0.36, R = T.r + 2.45;
+    const T = tower(), a = 0.36, R = T.r + 3.1;
     const nx = Math.sin(a), nz = Math.cos(a), x = T.cx + nx * R, z = T.cz + nz * R;
-    return { x, z, y: GY, nx, nz, mx: x + nx * 1.1, mz: z + nz * 1.1 };
+    return { x, z, y: GY, nx, nz, mx: x + nx * 1.2, mz: z + nz * 1.2 };
+  },
+  decorate(scene, d) {
+    const b = new Batch(), tx = d.nz, tz = -d.nx, ry = Math.atan2(d.nx, d.nz);
+    const at = (s, n) => [d.x + tx * s + d.nx * n, d.z + tz * s + d.nz * n];
+    const put = (sx, sy, sz, s, y, n, c) => { const [x, z] = at(s, n); b.box(sx, sy, sz, x, GY + y, z, c, ry); };
+    put(0.32, 3.2, 3.0, -2.2, 0, 1.2, 0xf3f1ec); put(0.32, 3.2, 3.0, 2.2, 0, 1.2, 0xf3f1ec);     // side walls
+    put(4.9, 0.36, 3.3, 0, 3.2, 1.3, 0xf3f1ec);                                               // canopy
+    put(4.92, 0.12, 0.06, 0, 3.22, 2.96, 0xc8643b);                                           // terracotta fascia line
+    put(4.1, 0.06, 3.0, 0, 0, 1.2, 0xbdb6aa);                                                 // stone floor
+    put(2.8, 2.7, 0.12, 0, 0.05, -0.1, 0x2a2c30);                                             // door frame
+    for (const s of [-0.66, 0.66]) { put(1.22, 2.5, 0.05, s, 0.1, -0.03, 0x1e2a32); put(0.04, 0.9, 0.06, s * 0.15, 0.85, 0.02, 0xc9a24a); }
+    for (const s of [-1.6, 1.6]) put(0.5, 0.04, 0.5, s, 3.16, 2.2, 0xfff1dc);                 // downlights
+    const m = new THREE.Mesh(b.merged(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.15 }));
+    m.castShadow = true; m.receiveShadow = true;
+    scene.add(m);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.5), new THREE.MeshBasicMaterial({ map: labelTex('tower-door', 512, 72, '#f3f1ec', [{ t: 'CLAUDE TOWER · LOBBY · SKY DECK', size: 30, color: '#2b2622', y: 38, spacing: 4 }]) }));
+    const [sx, sz] = at(0, 2.97);
+    sign.position.set(sx, GY + 3.38, sz); sign.rotation.y = ry;
+    scene.add(sign);
+    for (const s of [-2.2, 2.2]) for (const n of [0.2, 1.2, 2.2]) { const [x, z] = at(s, n); addBox(x - 0.4, z - 0.4, x + 0.4, z + 0.4, 0, GY + 3.2); }
   },
   make(origin, rooms) {
     const room = buildLobby(origin);

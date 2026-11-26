@@ -7,7 +7,7 @@ import { Input } from '../input.js';
 import { addTokens, writeSave } from '../save.js';
 
 const CSS = `
-#rhythm { position: absolute; left: 50%; bottom: 4vh; transform: translateX(-50%); width: min(460px, 92vw); pointer-events: auto; display: none; }
+#rhythm { position: absolute; left: 4vw; bottom: 4vh; width: min(420px, 60vw); pointer-events: auto; display: none; }
 #rhythm.on { display: block; }
 #rhythm .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
 #rhythm .top b { font-size: 30px; font-weight: 900; color: var(--ivory); }
@@ -20,7 +20,10 @@ const CSS = `
 #rhythm .judge { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-size: 30px; font-weight: 900; letter-spacing: .1em; opacity: 0; transition: opacity .2s; pointer-events: none; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
 #rhythm .judge.on { opacity: 1; transition: none; }
 #rhythm .hint { margin-top: 8px; text-align: center; font-size: 12px; letter-spacing: .12em; color: rgba(240,232,216,.6); text-transform: uppercase; }
-body.touch #rhythm { width: min(520px, 96vw); }
+@media (max-height: 640px) { #rhythm { zoom: 0.78; } }
+@media (max-height: 430px) { #rhythm { zoom: 0.62; } }
+body.rhythm .hud-bl, body.rhythm .hud-bc { visibility: hidden; }
+body.touch #rhythm { width: min(480px, 62vw); }
 body.touch #rhythm .lanes { height: 230px; }
 body.touch #rhythm .pad { height: 64px; }
 `;
@@ -98,6 +101,7 @@ class RhythmGame {
     G.mode = 'talk';
     Input.unlock();
     this.el.classList.add('on');
+    document.body.classList.add('rhythm');
     this.el.querySelector('.hint').textContent = Input.touch.on ? 'Tap the pads on the beat' : 'A S W D or arrow keys on the beat · Esc to stop';
     this.on = true;
     this.shot = 0;
@@ -173,13 +177,13 @@ class RhythmGame {
     if (now > this.end) this.stop(false);
     else this.camera(dt);
   }
-  // from beside the decks, over the DJ's shoulder onto the crowd
+  // over your shoulder at the decks (you on the right, the pads on the left), the crowd beyond
   camera(dt) {
     const cam = G.camera, o = this.room.origin, sp = this.rooms.cur.inst.djSpot;
     this.shot = Math.min(1, this.shot + dt * 2);
-    _p.set(o.x + sp.x + 1.6, o.y + 2.75, o.z + sp.z - 0.75);
+    _p.set(o.x + sp.x + 0.95, o.y + 2.35, o.z + sp.z - 0.8);
     cam.position.lerp(_p, this.shot);
-    cam.lookAt(o.x + 0.2, o.y + 0.9, o.z - 0.5);
+    cam.lookAt(o.x + sp.x + 0.35, o.y + 1.05, o.z + sp.z + 5);
     if (Math.abs(cam.fov - 58) > 0.05) { cam.fov = 58; cam.updateProjectionMatrix(); }
   }
 
@@ -187,6 +191,7 @@ class RhythmGame {
     if (!this.on) { this.pending = null; return; }
     this.on = false; this.hype = 0;
     this.el.classList.remove('on');
+    document.body.classList.remove('rhythm');
     for (const n of this.notes) if (n.el) n.el.remove();
     const b = this.back, o = this.room.origin, sp = this.rooms.cur && this.rooms.cur.inst.djSpot;
     if (b && sp) G.player.teleport(b.x, b.y, b.z, b.h);

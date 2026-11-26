@@ -47,7 +47,7 @@ class Interiors {
   constructor() {
     this.places = new Map();      // id -> { def, door, inst }
     this.cur = null;              // the place we are in
-    this.fade = null;             // { t, then }
+    this.fade = null;             // { t, to, spot } while the screen is fading out
     this.colliders = [];
     this.platform = null;
     this.npcs = [];
@@ -71,6 +71,7 @@ class Interiors {
       const P = { def, door, inst: null, y: ROOM_Y + 34 * k++ };
       this.places.set(def.id, P);
       if (def.hidden) continue;
+      if (def.decorate) def.decorate(G.scene, door);
       G.missions.addMarker({
         id: 'door:' + def.id, x: door.mx, z: door.mz, r: 1.25, color: def.color, label: `Enter ${def.name}`, blip: 'door', name: def.name, foot: true,
         show: () => !G.indoors, use: () => this.tryEnter(def.id),
@@ -165,6 +166,7 @@ class Interiors {
     if (to === null && spot && spot.heli) {
       // the lift to the roof: the helicopter service takes it from here
       G.heliTeleport(spot.heli);
+      this.refreshProbe();
       G.menus.fadeTo(false);
       return;
     }
@@ -173,6 +175,7 @@ class Interiors {
       const x = d.mx + d.nx * 0.8, z = d.mz + d.nz * 0.8, h = Math.atan2(d.nx, d.nz);
       G.player.teleport(x, groundHeight(x, z, d.y + 2), z, h);
       G.cam.yaw = h; G.cam.pitch = 0.18; G.cam.first = true;
+      this.refreshProbe();
       emit('sfx', 'doorClose');
       G.menus.fadeTo(false);
       return;
@@ -185,6 +188,7 @@ class Interiors {
     const w = I.room.world(e.x, e.z);
     G.player.teleport(w.x, I.room.origin.y, w.z, e.h);
     G.cam.yaw = e.h; G.cam.pitch = 0.16; G.cam.first = true; G.cam.zoom = Math.min(G.cam.zoom, 1);
+    this.refreshProbe();
     G.menus.fadeTo(false);
     emit('sfx', 'doorClose');
     const S = G.save.interiors;
@@ -200,7 +204,7 @@ class Interiors {
     for (const b of R.boxes) this.colliders.push(addBox(o.x + b[0], o.z + b[1], o.x + b[2], o.z + b[3], o.y + b[4], o.y + b[5], { interior: P.def.id }));
     this.platform = { x0: o.x - R.W / 2 - 1, z0: o.z - R.D / 2 - 1, x1: o.x + R.W / 2 + 1, z1: o.z + R.D / 2 + 1, y: o.y };
     platforms.push(this.platform);
-    setLamps(I.lamps || R.lamps.map((L) => ({ ...L, x: o.x + L.x, y: o.y + L.y, z: o.z + L.z })));
+    setLamps(R.lamps.map((L) => ({ ...L, x: o.x + L.x, y: o.y + L.y, z: o.z + L.z })));
     this.prev.suppressed = G.police.suppressed;
     G.police.suppressed = true;
     if (I.tower) I.tower(true);
@@ -208,7 +212,6 @@ class Interiors {
     // the view stops at the walls; nothing outside needs drawing or a fresh shadow map
     const cam = G.camera;
     if (!I.outdoorView) { cam.far = INDOOR_FAR; cam.updateProjectionMatrix(); G.renderer.shadowMap.autoUpdate = false; }
-    this.refreshProbe();
     if (I.music) this.playMusic(I.music);
     document.body.classList.add('indoors');
     if (this.card) {
@@ -236,18 +239,24 @@ class Interiors {
     G.renderer.shadowMap.autoUpdate = true;
     this.cur = null; G.indoors = null;
     this.stopMusic();
-    this.refreshProbe();
+    this.probeFar();
     document.body.classList.remove('indoors');
     this.blob.visible = false;
     this.hot = null;
   }
   // change one of the room's lamps (room-local position)
   setLamp(i, L) { const o = this.cur.inst.room.origin; updateLamp(i, { ...L, x: o.x + L.x, y: o.y + L.y, z: o.z + L.z }); }
-  // a fresh reflection capture where the camera now is (the old one shows the other side of the door)
+  // a fresh reflection capture where the player now is (the old one shows the other side of the door)
   refreshProbe() {
+    this.probeFar();
     const P = G.env.probe;
     if (!P.every) return;
     P.face = 0; P.pos.copy(G.player.pos); P.pos.y += 1.6;
+  }
+  // inside, the probe only needs to see the room, not the city far below
+  probeFar() {
+    const P = G.env.probe, far = this.cur && !this.cur.inst.outdoorView ? 60 : 900;
+    if (P.cam && P.cam.children[0].far !== far) for (const c of P.cam.children) { c.far = far; c.updateProjectionMatrix(); }
   }
 
   // ---- people ------------------------------------------------------------------------------------
@@ -325,7 +334,7 @@ class Interiors {
     const I = this.cur.inst, R = I.room, pl = G.player;
     // moved out by something else (a respawn after flatlining, a test): tidy up without a door
     if (Math.hypot(pl.pos.x - R.origin.x, pl.pos.z - R.origin.z) > Math.max(R.W, R.D) + 20 || Math.abs(pl.pos.y - R.origin.y) > 30) { this.leaveRoom(); return; }
-    if (!I.outdoorView) this.light();
+    if (!I.outdoorView) { this.light(); this.probeFar(); }
     if (I.update) I.update(dt, t);
     for (const m of R.views || []) m.color.setScalar(1.05 - G.env.night * 0.8);
     this.blob.position.set(pl.pos.x, R.origin.y + 0.015, pl.pos.z);
@@ -366,8 +375,9 @@ class Interiors {
     this.radio.setActive(true);
     this.music = m;
   }
-  stopMusic() { if (this.radio) this.radio.setActive(false); this.music = null; }
-  // the music's clock in beats (for the dance mini-game): null until the music is really playing
+  stopMusic() { if (this.radio) this.radio.setActive(false); this.music = null; this.vol = null; }
+  // the music's clock in beats (for the dance mini-game and the lights): null until the music is
+  // really playing. Reads the radio's sequencer: the step it will play next and when.
   beat() {
     const r = this.radio;
     if (!r || !r._built || !r._song || !this.music) return null;
@@ -378,7 +388,12 @@ class Interiors {
 
   // ---- after the camera ---------------------------------------------------------------------------
   lateUpdate(dt, t) {
-    if (this.radio) { this.radio.update(); if (this.music) this.radio.out?.gain.setTargetAtTime(G.audio.paused ? 0 : this.music.volume ?? 1, this.radio.ctx.currentTime, 0.2); }
+    if (this.radio) {
+      this.radio.update();
+      // the room's music level (the radio itself only knows on and off)
+      const v = this.music ? (G.audio.paused ? 0 : this.music.volume ?? 1) : null;
+      if (v !== null && v !== this.vol && this.radio.out) { this.vol = v; this.radio.out.gain.setTargetAtTime(v, this.radio.ctx.currentTime, 0.2); }
+    }
     // a drink or two: the view sways and the edges swim for a while
     if (this.drunk > 0) {
       this.drunk = Math.max(0, this.drunk - dt);

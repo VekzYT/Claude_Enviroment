@@ -26,6 +26,8 @@ const CSS = `
 #dlg .ch i { font-style: normal; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; background: var(--cream); color: var(--ink); font-weight: 900; font-size: 12px; flex: none; }
 #dlg .ch em { margin-left: auto; font-style: normal; font-size: 13px; color: var(--amber); white-space: nowrap; }
 #dlg .more { margin-top: 8px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: rgba(240,232,216,.45); text-align: right; }
+@media (max-height: 640px) { #dlg { zoom: 0.8; } }
+@media (max-height: 430px) { #dlg { zoom: 0.68; } }
 body.touch #dlg { bottom: 3vh; width: min(640px, 96vw); }
 body.touch #dlg .txt { font-size: 16px; }
 body.touch #dlg .ch button { padding: 11px 14px; font-size: 15px; }
@@ -166,7 +168,8 @@ class DialogueBox {
       const hit = rayBoxes(_a.x, _a.y, _a.z, ox / ol, 0.28 / ol, oz / ol, ol + 0.3);
       const k = Math.min(1, Math.max(0.35, (hit - 0.3) / ol));
       _p.set(_a.x + ox * k, _a.y + 0.28 * k, _a.z + oz * k);
-      _l.set(_a.x * 0.35 + _b.x * 0.65, _a.y * 0.3 + _b.y * 0.7 - 0.05, _a.z * 0.35 + _b.z * 0.65);
+      // aimed a little low, so the face sits in the upper part of the frame, above the box
+      _l.set(_a.x * 0.35 + _b.x * 0.65, _a.y * 0.3 + _b.y * 0.7 - 0.45, _a.z * 0.35 + _b.z * 0.65);
       if (!this.shot) { this.shot = { t: 0 }; this.from.p.copy(cam.position); this.from.q.copy(cam.quaternion); }
       this.shot.t = Math.min(1, this.shot.t + dt / 0.5);
       const e = this.shot.t * this.shot.t * (3 - 2 * this.shot.t);

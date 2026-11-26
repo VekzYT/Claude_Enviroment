@@ -90,7 +90,7 @@ function build(origin) {
     }
     r.solid(x - 0.6, -7.7, x + 0.6, -6.7, 0, by + 2.6);
   }
-  r.quad(labelTex('club-screen', 1024, 384, '#0c0b10', [{ t: 'LATENT SPACE', size: 128, color: '#ff8a5c', y: 150, spacing: 18 }, { t: 'BAR · CLUB · TOKENS WELCOME', size: 40, color: '#b48cff', y: 270, spacing: 10, weight: 700 }]), 7.2, 2.7, 0.5, by + 2.9, -D / 2 + 0.07, 0, { basic: true });
+  r.quad(labelTex('club-screen', 1024, 384, '#0c0b10', [{ t: 'LATENT SPACE', size: 104, color: '#ff8a5c', y: 150, spacing: 10 }, { t: 'BAR · CLUB · TOKENS WELCOME', size: 40, color: '#b48cff', y: 270, spacing: 10, weight: 700 }]), 7.2, 2.7, 0.5, by + 2.9, -D / 2 + 0.07, 0, { basic: true });
   r.box('metal', 7.5, 3.0, 0.08, 0.5, by + 1.4, -D / 2 + 0.01, 0x1a191d);
   // the bar: a long counter down the right side with backlit shelves of bottles behind
   r.rbox('gloss', 1.0, 1.08, 8.6, BAR.x, 0, 0.6, 0x241f26, 0.04);
@@ -196,7 +196,7 @@ export const CLUB = {
     return {
       room, people, entry: { x: -6.5, z: D / 2 - 1.1, h: Math.PI },
       spots: [{ x: room.door.x, z: room.door.z + 0.4, r: 1.2, label: 'Leave', use: () => rooms.go(null) }],
-      ambience: { sky: 0x9a7ab0, ground: 0x3a2430, hemi: 0.26, env: 0.45, exposure: 1.12, bloom: [0.82, 0.55] },
+      ambience: { sky: 0x9a7ab0, ground: 0x3a2430, hemi: 0.32, env: 0.45, exposure: 1.12, bloom: [0.82, 0.55] },
       music: { station: 4, volume: 0.9 },
       djSpot, stage: STAGE, rhythm: Rhythm,
       onEnter: (n) => {
