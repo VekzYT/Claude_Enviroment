@@ -9,26 +9,23 @@ import { breakables, breakProp } from '../world/breakables.js';
 import { WATER_Y, WORLD_MIN, WORLD_MAX } from '../world/layout.js';
 import { clamp, lerp } from '../util/math.js';
 import { pick, rand } from '../util/rng.js';
-import { makeBlobTexture, makeGlowTexture } from '../world/textures.js';
+import { makeGlowTexture } from '../world/textures.js';
 
 let nextId = 1;
 const out = { x: 0, z: 0, broken: [] };
 const GRAVITY = 24;
-let blobMat = null, beamMat = null, quadGeo = null;
+let beamMat = null;
 const _charcoal = new THREE.Color(0x121212);
 
-function sharedDecals() {
-  if (blobMat) return;
-  quadGeo = new THREE.PlaneGeometry(1, 1);
-  quadGeo.rotateX(-Math.PI / 2);
-  blobMat = new THREE.MeshBasicMaterial({ map: makeBlobTexture(), transparent: true, depthWrite: false, opacity: 0.75, polygonOffset: true, polygonOffsetFactor: -7, polygonOffsetUnits: -7 });
-  beamMat = new THREE.MeshBasicMaterial({ map: makeGlowTexture(), color: 0xfff0d0, transparent: true, depthWrite: false, opacity: 0.0, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -9, polygonOffsetUnits: -9 });
+// The pool of light a vehicle throws on the road at night. vehicleLod.js draws it, and every
+// vehicle's ground shadow, as instanced decals.
+export function headlightBeamMaterial() {
+  if (!beamMat) beamMat = new THREE.MeshBasicMaterial({ map: makeGlowTexture(), color: 0xfff0d0, transparent: true, depthWrite: false, opacity: 0.0, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -9, polygonOffsetUnits: -9 });
+  return beamMat;
 }
-export function headlightBeamMaterial() { sharedDecals(); return beamMat; }
 
 export class Vehicle {
   constructor(typeId, x, z, heading = 0, opts = {}) {
-    sharedDecals();
     const T = VEHICLES[typeId];
     this.T = T;
     this.id = nextId++;
@@ -73,20 +70,10 @@ export class Vehicle {
     this.cOff = [e, 0, -e];
     this.radius = T.len / 2 + 0.3;
     this.far = false;          // simplified update when far from the camera
-
-    this.blob = new THREE.Mesh(quadGeo, blobMat);
-    this.blob.scale.set(T.wid * 1.7, 1, T.len * 1.35);
-    this.blob.position.y = 0.06;
-    this.blob.renderOrder = 2;
-    this.mesh.add(this.blob);
-    if (T.cls !== 'boat') {
-      this.beam = new THREE.Mesh(quadGeo, beamMat);
-      this.beam.scale.set(T.wid * 3.6, 1, 15);
-      this.beam.position.set(0, 0.07, T.len / 2 + 6.5);
-      this.beam.renderOrder = 2;
-      this.beam.visible = false;
-      this.mesh.add(this.beam);
-    }
+    this.lite = 0;             // ground and walls read every frame (0), one in four (3) or one in eight (7); traffic.js sets it
+    this.farStep = 0;
+    this.proxied = false;      // drawn by vehicleLod.js as one instance of its type's model
+    this.lean = T.bike ? -0.16 : 0;
     this.snapToGround();
     this.syncMesh();
     G.scene.add(this.mesh);
@@ -191,6 +178,7 @@ export class Vehicle {
     } else this.idleT = 0;
     if (this.disabled > 0) this.disabled -= dt;
     if (this.alarm > 0) this.alarm -= dt;
+    this.farStep = (this.farStep + 1) & this.lite;
     if (this.ai && !this.destroyed) this.ai.control(this, dt, t);
 
     const sinH = Math.sin(this.heading), cosH = Math.cos(this.heading);
@@ -236,7 +224,7 @@ export class Vehicle {
       let S;
       if (this.cls === 'hover') { surf = 'hover'; S = { grip: 0.9, speed: 1, roll: 0.2 }; }
       else {
-        surf = gy < WATER_Y - 0.4 ? 'water' : surfaceAt(this.pos.x, this.pos.z, gy);
+        surf = this.farStep ? this.surface : gy < WATER_Y - 0.4 ? 'water' : surfaceAt(this.pos.x, this.pos.z, gy);
         S = SURFACES[surf];
       }
       const off = T.offroad;
@@ -340,7 +328,7 @@ export class Vehicle {
     if (this.pos.x < -lim || this.pos.x > lim) { this.pos.x = clamp(this.pos.x, -lim, lim); this.vel.x *= -0.3; }
     if (this.pos.z < -lim || this.pos.z > lim) { this.pos.z = clamp(this.pos.z, -lim, lim); this.vel.z *= -0.3; }
 
-    this.collideStatic();
+    if (!(this.farStep & (this.lite >> 1))) this.collideStatic();
     this.vertical(dt, t);
     this.effects(dt, t);
     this.syncMesh(dt, t);
@@ -446,6 +434,7 @@ export class Vehicle {
       this.groundY = WATER_Y;
       return;
     }
+    if (this.farStep && this.onGround) { this.pos.y += this.vel.y * dt; return; }   // carry on along the slope
     const s = Math.sin(this.heading), c = Math.cos(this.heading);
     const hb = T.wheelbase / 2;
     const ref = this.pos.y + 1.2 - (this.cls === 'hover' ? T.hover : 0);
@@ -476,7 +465,7 @@ export class Vehicle {
     let tp, tr = 0, high = 1;
     if (this.onGround) {
       tp = -Math.atan2(gF - gR, T.wheelbase);
-      if (!this.far && this.cls === 'car') {
+      if (!this.far && !this.lite && this.cls === 'car') {
         const hw = T.wid / 2;
         const gL = groundHeight(this.pos.x + c * hw, this.pos.z - s * hw, ref), gRt = groundHeight(this.pos.x - c * hw, this.pos.z + s * hw, ref);
         tr = Math.atan2(gL - gRt, T.wid);
@@ -574,7 +563,10 @@ export class Vehicle {
     const T = this.T, m = this.m;
     this.mesh.position.copy(this.pos);
     const wob = this.wobble ? Math.sin(t * 17 + this.id) * this.wobble * clamp(this.speed / 12, 0, 1) : 0;
-    this.mesh.rotation.set(this.pitch, this.heading, this.roll + wob);
+    // a two-wheeler leans into its turns, and onto its stand when nobody is on it
+    if (T.bike) this.lean += (clamp(-this.latAccel * 0.06, -0.8, 0.8) - (this.driver ? 0 : 0.16 * clamp(1 - this.speed / 3, 0, 1)) - this.lean) * Math.min(1, dt * 8);
+    this.mesh.rotation.set(this.pitch, this.heading, this.roll + wob + this.lean);
+    if (this.proxied) return;
     // body lean and squat
     const rollT = this.cls === 'hover' ? clamp(-this.latAccel * 0.035 - this.slideAngle * 0.5, -0.6, 0.6) : clamp(this.latAccel * 0.006, -0.09, 0.09);
     const pitchT = clamp(-(this.accelLong || 0) * 0.0035, -0.07, 0.07);
@@ -583,12 +575,6 @@ export class Vehicle {
     this.bodyPitch += (pitchT - this.bodyPitch) * k;
     m.body.rotation.set(this.bodyPitch, 0, this.bodyRoll);
     if (this.cls === 'hover') m.body.position.y = Math.sin(t * 3 + this.id) * 0.05 - T.hover * 0.55;
-    // wheels: only the ones near the camera cast their own shadows; further off the four tiny
-    // patches under the body cannot be told from the body's own shadow
-    if (m.wheels.length) {
-      const c = G.camera.position, near = (c.x - this.pos.x) ** 2 + (c.z - this.pos.z) ** 2 < 55 * 55;
-      if (near !== m.wheelShadows) { m.wheelShadows = near; for (const w of m.wheels) w.mesh.castShadow = near; }
-    }
     if (m.wheels.length) {
       // in a slide the front wheels point along the direction of travel (opposite lock) and the rears spin up
       const yawT = this.drift ? clamp(-(this.slideAngle * 0.7 + this.steer * T.steer * 0.3), -T.steer, T.steer) : -this.steer * T.steer * 0.75;
@@ -599,17 +585,12 @@ export class Vehicle {
         if (w.front) w.pivot.rotation.y = this.wheelYaw;
       }
     }
-    // shadow blob stays on the ground
-    const gy = this.groundY ?? this.pos.y;
-    this.blob.position.y = (this.cls === 'boat' ? 0 : gy - this.pos.y) + 0.06;
-    this.blob.visible = this.cls !== 'boat';
     // lights
     const M = vehicleMats();
     const lit = this.lightsOn && !this.destroyed;
     m.head.material = lit ? M.head : M.headOff;
     const braking = !this.destroyed && this.driver && ((this.inThrottle < -0.1 && this.fwd > 1) || this.inHandbrake);
     m.tail.material = braking ? M.tailBrake : M.tail;
-    if (this.beam) { this.beam.visible = lit && this.driver !== 'player'; this.beam.position.y = gy - this.pos.y + 0.07; }
     if (m.siren) {
       const on = this.sirenOn && !this.destroyed;
       const ph = on && Math.floor(t * 7 + this.id) % 2 === 0;
@@ -617,7 +598,7 @@ export class Vehicle {
       m.siren.R.material = on && !ph ? M.sirenBlue : M.sirenOff;
       m.siren.fl.visible = on && ph; m.siren.fr.visible = on && !ph;
     }
-    if (m.under) m.under.position.y = gy - this.pos.y + 0.08;
+    if (m.under) m.under.position.y = (this.groundY ?? this.pos.y) - this.pos.y + 0.08;
   }
 
   dispose() {
