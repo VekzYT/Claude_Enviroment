@@ -589,7 +589,8 @@ export class Peds {
     for (let cx = cx0; cx <= cx1; cx++) for (let cz = cz0; cz <= cz1; cz++) {
       for (let j = head[((cx * 73856093) ^ (cz * 19349663)) & 1023]; j >= 0; j = next[j]) {
         const p = list[j];
-        if (!p || p.state === 'down') continue;
+        // the hash is flat: people in a room high above the street share its cells
+        if (!p || p.state === 'down' || Math.abs(p.pos.y - v.pos.y) > 4) continue;
         const dx = p.pos.x - x0, dz = p.pos.z - z0;
         const f = dx * fx + dz * fz;
         if (f < 0 || f > 15) continue;
@@ -818,7 +819,7 @@ export class Peds {
       for (let j = head[(((cx + ox) * 73856093) ^ ((cz + oz) * 19349663)) & 1023]; j >= 0; j = next[j]) {
         if (j === idx) continue;
         const q = list[j];
-        if (!q || q === p) continue;
+        if (!q || q === p || Math.abs(p.pos.y - q.pos.y) > 3) continue;
         const dx = p.pos.x - q.pos.x, dz = p.pos.z - q.pos.z, d2 = dx * dx + dz * dz;
         const min = p.group && p.group === q.group ? 0.5 : 0.62;
         if (d2 >= min * min || d2 < 1e-6) continue;

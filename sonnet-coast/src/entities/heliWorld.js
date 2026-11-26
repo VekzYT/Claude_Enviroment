@@ -102,7 +102,14 @@ class HeliWorld {
     this.findPads();
     for (const p of this.pads) this.spawnAt(p);
     G.heliPads = this.pads.map((p) => ({ id: p.id, name: p.name, x: p.x, y: p.y, z: p.z, heading: p.heading, onRoof: p.onRoof }));
-    G.heliTeleport = (id) => this.teleport(this.pads.find((p) => p.id === id), true);
+    // instant: the caller has already faded out (a lift) and fades back in itself
+    G.heliTeleport = (id, instant = false) => {
+      const pad = this.pads.find((p) => p.id === id);
+      if (!instant) return this.teleport(pad, true);
+      if (!pad || this.fade || G.player.vehicle || !G.player.alive) return false;
+      this.arrive(pad, true);
+      return true;
+    };
     this.canopy = buildCanopy();
     G.scene.add(this.canopy);
     // pads show on the map with the other places

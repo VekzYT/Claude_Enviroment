@@ -24,7 +24,8 @@ function towerPad() {
   if (!Array.isArray(pads) || !pads.length || typeof G.heliTeleport !== 'function') return null;
   let best = null, bd = Infinity;
   for (const p of pads) { const d = Math.hypot(p.x - T.cx, p.z - T.cz); if (d < bd) { bd = d; best = p; } }
-  return best;
+  // a lift only reaches a pad on or right beside the tower, not one across the park
+  return bd < 60 ? best : null;
 }
 function liftMenu(rooms, here) {
   const pad = towerPad();

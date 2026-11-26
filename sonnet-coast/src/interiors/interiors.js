@@ -189,9 +189,8 @@ class Interiors {
       return;
     }
     if (from) this.leaveRoom();
-    if (to === null && spot && spot.heli) {
-      // the lift to the roof: the helicopter service takes it from here
-      G.heliTeleport(spot.heli);
+    // the lift to the roof: the helicopter service places the player while the screen is still dark
+    if (to === null && spot && spot.heli && G.heliTeleport(spot.heli, true)) {
       this.refreshProbe();
       G.menus.fadeTo(false);
       return;
