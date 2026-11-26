@@ -134,7 +134,8 @@ async function boot() {
     Touch.update(dt);
     Input.setEnabled(G.mode === 'play');
     if (!window.__dbg.freeze) {
-      if (G.mode === 'play') { t += dt; game.update(dt, t); }
+      // a conversation (ui/dialogue.js) keeps the world running with gameplay input switched off
+      if (G.mode === 'play' || G.mode === 'talk') { t += dt; game.update(dt, t); }
       else if (G.mode === 'title' || G.mode === 'loading') { t += dt; game.titleUpdate(dt, t); }
       else if (G.mode === 'map') G.menus.drawMap();
     }

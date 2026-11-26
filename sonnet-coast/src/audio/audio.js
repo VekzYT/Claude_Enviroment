@@ -839,6 +839,7 @@ export class AudioSystem {
     this._curves = new Map();
     this._lis = { x: 0, y: 0, z: 0, yaw: 0, fx: 0, fz: 1, rx: -1, rz: 0 };
     this._sp = { d: 0, gain: 0, pan: 0, lp: 0 };
+    this._indoor = 0;           // 1 while the listener is inside a room: the world outside is muffled
     this._voices = [];
     this._dying = [];
     this._nodeCount = 0;
@@ -943,6 +944,9 @@ export class AudioSystem {
   }
 
   // ---- per-frame inputs (cheap: they only record what the game wants) ------------------------
+
+  /** Inside a room (interiors): positional sounds and the outdoor beds come through the walls. */
+  setIndoor(on) { this._indoor = on ? 1 : 0; }
 
   setListener(x, y, z, yaw) {
     try {
@@ -1214,6 +1218,7 @@ export class AudioSystem {
     sp.gain = (ref / (ref + d)) * (1 - k * k) * (1 - 0.15 * behind);
     sp.pan = clamp(side * Math.min(1, d / 6) * 0.85, -0.85, 0.85);
     sp.lp = clamp((17000 / (1 + d / 30)) * (1 - 0.35 * behind), 500, 17000);
+    if (this._indoor) { sp.gain *= 0.12; sp.lp = Math.min(sp.lp, 650); }
     return sp;
   }
 
@@ -1678,7 +1683,7 @@ export class AudioSystem {
 
   _applyAmbient() {
     const A = this._ambN, m = this._amb;
-    const live = this._frame - this._ambFrame <= STALE_FRAMES ? 1 : 0;
+    const live = (this._frame - this._ambFrame <= STALE_FRAMES ? 1 : 0) * (1 - 0.85 * this._indoor);
     const city = m.city * live, forest = m.forest * live, swamp = m.swamp * live, beach = m.beach * live;
     const night = m.night * live, rain = m.rain * live, wind = m.wind * live;
     // Night life belongs to the wild places: full strength in forest and swamp, faint downtown.

@@ -16,6 +16,7 @@ import './entities/playerControls.js';
 import './entities/heliWorld.js';
 
 // interiors
+import './interiors/interiors.js';
 
 // world
 
