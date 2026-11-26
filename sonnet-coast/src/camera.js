@@ -22,6 +22,7 @@ export class GameCamera {
     this.cinematic = null;
     this.slide = 0;      // smoothed drift angle of the player's vehicle
     this.low = 0;        // how far the on-foot view has dropped for a slide or roll
+    this.side = 0;       // sideways offset of the view (over the shoulder when aiming), smoothed
   }
   forward(out = new THREE.Vector3()) { return this.cam.getWorldDirection(out); }
 
@@ -66,21 +67,26 @@ export class GameCamera {
       this.low += ((p.state === 'slide' ? 0.6 : p.state === 'roll' ? 0.4 : 0) - this.low) * Math.min(1, dt * 7);
       _t.set(p.pos.x, p.pos.y + height - this.low + (p.swimming ? 0.5 : 0), p.pos.z);
       if (p.state === 'dead' || p.state === 'busted') { this.yaw += dt * 0.25; this.pitch += (0.55 - this.pitch) * Math.min(1, dt); dist = 6 + Math.min(p.stateT, 4); }
+      // a menu over the game (the wardrobe, a shop): the player close up, beside the panel on the right
+      if (G.mode === 'menu') { dist = 2.7; _t.y = p.pos.y + 1.15; side = 0.95; fovT = 50; }
     }
-    if (this.first) { this.target.copy(_t); this.first = false; }
+    // the view is set once when a menu opens, so it goes straight there; easing back out after
+    const snap = G.mode === 'menu';
+    this.side += (side - this.side) * (snap ? 1 : Math.min(1, dt * 8));
+    if (this.first || snap) { this.target.copy(_t); this.first = false; }
     if (v || (p.aiming && p.state === 'foot')) this.target.lerp(_t, 1 - Math.exp(-dt * (v ? 14 : 18)));
     else {
       // on foot the view trails the body a touch, and lags more vertically so jumps and climbs stay smooth
       const kh = 1 - Math.exp(-dt * 11), kv = 1 - Math.exp(-dt * 8);
       this.target.x += (_t.x - this.target.x) * kh; this.target.z += (_t.z - this.target.z) * kh; this.target.y += (_t.y - this.target.y) * kv;
     }
-    this.dist += (dist - this.dist) * Math.min(1, dt * 6);
+    this.dist += (dist - this.dist) * (snap ? 1 : Math.min(1, dt * 6));
 
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
     // unit vector from the target back towards the camera
     _d.set(-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp);
     // landings dip the view (the player's landing squash sets camDip)
-    const ox = this.target.x + -Math.cos(this.yaw) * side, oy = this.target.y - (v ? 0 : p.camDip), oz = this.target.z + Math.sin(this.yaw) * side;
+    const ox = this.target.x + -Math.cos(this.yaw) * this.side, oy = this.target.y - (v ? 0 : p.camDip), oz = this.target.z + Math.sin(this.yaw) * this.side;
     let d = this.dist;
     const hit = rayBoxes(ox, oy, oz, _d.x, _d.y, _d.z, d + 0.4);
     if (hit < d + 0.4) d = Math.max(0.6, hit - 0.4);
@@ -92,7 +98,7 @@ export class GameCamera {
     this.cam.position.set(cx, cy, cz);
     _look.set(ox - _d.x * 30, oy - _d.y * 30 + (v ? 0 : 0), oz - _d.z * 30);
     this.cam.lookAt(_look);
-    this.fov += (fovT - this.fov) * Math.min(1, dt * 5);
+    this.fov += (fovT - this.fov) * (snap ? 1 : Math.min(1, dt * 5));
     if (Math.abs(this.cam.fov - this.fov) > 0.05) { this.cam.fov = this.fov; this.cam.updateProjectionMatrix(); }
   }
 }

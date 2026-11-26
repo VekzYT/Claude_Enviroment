@@ -5,7 +5,8 @@ import { addTouchButtons } from '../touch.js';
 import { addControls } from '../ui/menus.js';
 
 const onFoot = (c) => c === 'f' && !G.player.swimming;
-// one spot above the weapon button: ROLL, or SLIDE while sprinting (both press C)
+// one spot above USE, left of AIM, below the tokens and the weapon readout even on short screens:
+// ROLL, or SLIDE while sprinting (both press C)
 addTouchButtons([
   { id: 'roll', icon: 'back', cap: 'ROLL', key: 'KeyC', on: 'f', when: (c) => onFoot(c) && !G.player.sprinting },
   { id: 'slide', icon: 'brake', cap: 'SLIDE', key: 'KeyC', on: 'f', when: (c) => onFoot(c) && G.player.sprinting },
@@ -17,7 +18,7 @@ addControls(
 
 const css = document.createElement('style');
 css.textContent = `
-#t-roll, #t-slide { width: 54px; height: 54px; right: calc(28px + var(--sr)); bottom: calc(172px + var(--sb)); }
+#t-roll, #t-slide { width: 52px; height: 52px; right: calc(170px + var(--sr)); bottom: calc(150px + var(--sb)); }
 #t-roll svg, #t-slide svg { width: 24px; height: 24px; }
 `;
 document.head.appendChild(css);
