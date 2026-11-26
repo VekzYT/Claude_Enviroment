@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { G, on, emit } from '../state.js';
 import { Vehicle } from './vehicle.js';
+import { spawnPoliceHeli } from './heli.js';
 import { LaneDriver } from './traffic.js';
 import { driveToward, stopVehicle } from '../ai/driver.js';
 import { roadAt, nodes, edges, nearestNode, findPath, edgePoint, groundHeight, terrainHeight } from '../world/roads.js';
@@ -35,7 +36,7 @@ const CRIMES = {
   checkpoint: { min: 3, heat: 0, label: 'Checkpoint breach' },
 };
 const WANT = {
-  cars: [0, 1, 2, 3, 3, 4], swat: [0, 0, 0, 0, 1, 2], drones: [0, 0, 0, 1, 2, 3], boats: [0, 1, 1, 2, 2, 3],
+  cars: [0, 1, 2, 3, 3, 4], swat: [0, 0, 0, 0, 1, 2], drones: [0, 0, 0, 1, 2, 3], boats: [0, 1, 1, 2, 2, 3], helis: [0, 0, 0, 0, 1, 1],
 };
 const P = {};
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _dn = new THREE.Vector3(0, -1, 0), _dir = new THREE.Vector3();
@@ -124,6 +125,7 @@ export class Police {
     this.suppressed = false;   // missions can switch the police off
     this.lastCrime = '';
     this.cones = [];
+    this.heli = null; this.heliT = 0;   // the police helicopter (heli.js flies it), and when another may come
     this.buildDroneAssets();
     this.wire();
   }
@@ -218,6 +220,7 @@ export class Police {
     for (const f of this.foot) { f.ped.brain = null; f.ped.role = 'gone'; f.ped.aim = 0; f.ped.state = 'flee'; f.ped.fleeFrom = { x: G.player.worldPos.x, z: G.player.worldPos.z }; f.ped.stateT = 30; }
     this.foot.length = 0;
     for (const d of this.drones) if (d.state === 'chase') d.state = 'leave';
+    this.releaseHeli();
     for (const b of this.blocks) { b.keep = false; b.sirenOn = false; b.lastUsed = -999; }
     this.blocks.length = 0;
     if (had) emit('wantedCleared', reason);
@@ -502,6 +505,19 @@ export class Police {
     }
   }
 
+  // ---- the helicopter ----------------------------------------------------------------
+  releaseHeli() {
+    const h = this.heli;
+    this.heli = null;
+    if (h && !h.removed) { h.keep = false; if (h.ai) h.ai.leaving = true; }
+  }
+  upkeepHeli(t) {
+    const h = this.heli;
+    if (h && (h.removed || h.destroyed || h.downing || h.sunk)) { this.heli = null; this.heliT = t + 45; h.keep = false; }
+    if (this.heli && this.stars < 4) this.releaseHeli();
+    else if (!this.heli && WANT.helis[this.stars] && t > this.heliT) { this.heli = spawnPoliceHeli(); this.heliT = t + 20; emit('toast', 'Police helicopter inbound'); }
+  }
+
   // ---- roadblocks ----------------------------------------------------------------
   tryRoadblock(t) {
     const pl = G.player;
@@ -568,6 +584,9 @@ export class Police {
       if ((d < 12 || (d < 55 && ang < 1.2)) && this.senseT <= 0 && !segmentBlocked(p.pos.x, p.pos.z, pp.x, pp.z, p.pos.y + 1.4)) seenNow = true;
     }
     for (const d of this.drones) { if (d.sees) seenNow = true; if (d.state === 'chase') this.cones.push({ x: d.pos.x, z: d.pos.z, heading: 0, range: 60, fov: Math.PI, alert: true, drone: true }); }
+    // the helicopter crew calls the player's position down to everyone else
+    const H = this.heli;
+    if (H && !H.removed) { if (H.sees) seenNow = true; this.cones.push({ x: H.pos.x, z: H.pos.z, heading: 0, range: 90, fov: Math.PI, alert: true, drone: true }); }
     for (const b of this.blocks) if (!b.destroyed && Math.hypot(pp.x - b.pos.x, pp.z - b.pos.z) < 60) seenNow = true;
     if (this.senseT <= 0) { this.senseT = 0.2; this.seen = seenNow; }
     else if (seenNow) this.seen = true;
@@ -655,6 +674,7 @@ export class Police {
       let live = 0;
       for (const d of this.drones) if (d.state === 'chase') live++;
       if (live < WANT.drones[s]) this.spawnDrone();
+      this.upkeepHeli(t);
     }
     if (this.stars >= 4) {
       this.blockT -= dt;
