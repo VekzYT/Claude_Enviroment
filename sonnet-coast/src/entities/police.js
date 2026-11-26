@@ -609,7 +609,7 @@ export class Police {
       const p = f.ped;
       if (p.state !== 'walk') continue;
       const d = Math.hypot(pp.x - p.pos.x, pp.z - p.pos.z);
-      if (d < 2.6 && (pl.worldSpeed < 2.4 || pl.state === 'ragdoll')) contact = true;
+      if (d < 2.6 && Math.abs(pp.y - p.pos.y) < 2.5 && (pl.worldSpeed < 2.4 || pl.state === 'ragdoll')) contact = true;
     }
     if (contact) {
       this.arrestT += dt * (pl.vehicle ? 0.6 : 1);
