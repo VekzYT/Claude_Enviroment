@@ -42,13 +42,18 @@ export function surfaceBelow(x, z, top, res = _sb) {
   return g;
 }
 
-// Highest roof within `r` of (x, z), for pilots keeping clear of the skyline.
+// Highest roof within `r` of (x, z), for pilots keeping clear of the skyline. The collider grid
+// hands back whole cells, so each candidate is measured against (x, z) itself.
 export function roofTop(x, z, r) {
   let top = -Infinity;
   const list = queryColliders(x, z, r);
   for (let i = 0; i < list.length; i++) {
     const c = list[i];
-    if (!c.removed && (c.type === 'box' || c.r > 2) && c.y1 > top) top = c.y1;
+    if (c.removed || c.y1 <= top) continue;
+    const box = c.type === 'box';
+    if (!box && c.r <= 2) continue;
+    const d = box ? Math.hypot(Math.max(c.x0 - x, 0, x - c.x1), Math.max(c.z0 - z, 0, z - c.z1)) : Math.hypot(c.x - x, c.z - z) - c.r;
+    if (d <= r) top = c.y1;
   }
   return top;
 }
@@ -363,7 +368,7 @@ function searchMats() {
 // Circles the player at altitude (over the rooftops), keeps the searchlight on them and tells the
 // ground units where they are, fires now and then from the door, and flies off when the flag drops.
 export class HeliPilot {
-  constructor() { this.leaving = false; this.orbit = rand(0, TAU); this.shootT = rand(3, 5); this.lookT = 0; this.seen = false; }
+  constructor() { this.leaving = false; this.orbit = rand(0, TAU); this.shootT = rand(3, 5); this.lookT = 0; this.seen = false; this.stuckT = 0; }
   control(v, dt, t) {
     const PS = G.police, pl = G.player, pp = pl.worldPos;
     let tx, tz, alt;
@@ -381,20 +386,40 @@ export class HeliPilot {
       alt = Math.max(groundHeight(tx, tz, 9999), WATER_Y) + 46;
       // the player flying: stay level with them, a little above
       if (pl.vehicle && pl.vehicle.cls === 'heli') alt = Math.max(alt, pp.y + 14);
+      // a circle that would run into a tower is drawn in tighter there
+      for (let k = 0; k < 2 && roofTop(tx, tz, ROTOR_R + 10) > alt + 12; k++) { tx = cx + (tx - cx) * 0.5; tz = cz + (tz - cz) * 0.5; }
     }
-    // keep clear of the skyline: climb over low roofs ahead (braking until clear), fly round towers
+    // keep clear of the skyline: climb over a roof ahead that is only a little above the wanted
+    // height, or already below the machine (braking until clear); fly round anything taller, holding
+    // height meanwhile. Judging by the wanted height rather than the current one stops each roof
+    // climbed over from making the next, taller one look low enough to climb over too.
     let vx = (tx - v.pos.x) * 0.45, vz = (tz - v.pos.z) * 0.45;
     const sp = Math.hypot(vx, vz), cap = this.leaving ? 40 : 36;
     if (sp > cap) { vx *= cap / sp; vz *= cap / sp; }
-    let roof = roofTop(v.pos.x, v.pos.z, 10);
+    let roof = roofTop(v.pos.x, v.pos.z, ROTOR_R + 1);
     const ob = blocker(v, vx, vz);
-    if (ob && ob.top > v.pos.y + 30) {
+    if (ob && ob.top > Math.max(alt + 12, v.pos.y - 4)) {
       // slide along the tower's side, towards the side the target is on
       const ax = v.pos.x - ob.x, az = v.pos.z - ob.z, l = Math.hypot(ax, az) || 1, into = -(vx * ax + vz * az) / l;
       if (into > 0) { vx += (ax / l) * into; vz += (az / l) * into; }
       const sx = -az / l, sz = ax / l, side = Math.sign((tx - v.pos.x) * sx + (tz - v.pos.z) * sz) || 1;
       vx += sx * side * 16; vz += sz * side * 16;
-    } else if (ob) roof = Math.max(roof, ob.top);
+      // held up by a tower: move on round the circle to the far side of it, and if that does not
+      // help either, climb until there is a way over
+      this.stuckT = v.speed < 6 ? this.stuckT + dt : Math.max(0, this.stuckT - dt);
+      if (this.stuckT > 1.5) this.orbit += dt * 0.6;
+      alt = Math.max(alt, v.pos.y + (this.stuckT > 6 ? 12 : 0));
+    } else if (ob) { roof = Math.max(roof, ob.top); this.stuckT = 0; }
+    // and whatever it is doing, the rotors (the tail one reaches 7.6 m back) stay off the walls:
+    // judged from where the machine will be in a moment, as it cannot stop on the spot
+    const px = v.pos.x + v.vel.x * 0.7, pz = v.pos.z + v.vel.z * 0.7;
+    const wall = nearestWall(px, pz, v.pos.y, 15);
+    if (wall) {
+      const ax = px - wall.x, az = pz - wall.z, l = Math.hypot(ax, az) || 1, nx = ax / l, nz = az / l, into = -(vx * nx + vz * nz);
+      if (into > 0) { vx += nx * into; vz += nz * into; }
+      const slow = clamp(l / 15, 0.35, 1);
+      vx = vx * slow + nx * (15 - l) * 4; vz = vz * slow + nz * (15 - l) * 4;
+    }
     alt = Math.max(alt, roof + 18);
     if (roof > v.pos.y - 10) { const k = clamp((v.pos.y - roof) / 10, 0.1, 1); vx *= k; vz *= k; }
     v.cmd.vx = vx; v.cmd.vz = vz;
@@ -423,23 +448,45 @@ export class HeliPilot {
   }
 }
 
-// The first building in the way along (vx, vz) that stands above the machine: its centre and top.
+// The tallest building in the way along (vx, vz) that stands above the machine, at the nearest probe
+// that finds one: its top and the point of it nearest the machine (which way is out, even beside a
+// long block).
 const _ob = { x: 0, z: 0, top: 0 };
 function blocker(v, vx, vz) {
   const sp = Math.hypot(vx, vz);
   if (sp < 1) return null;
+  const px = v.pos.x, pz = v.pos.z;
   for (const ahead of [12, 30, 50]) {
-    const x = v.pos.x + (vx / sp) * ahead, z = v.pos.z + (vz / sp) * ahead;
-    for (const c of queryColliders(x, z, 9)) {
-      if (c.removed || c.y1 < v.pos.y - 8 || (c.type !== 'box' && c.r < 3)) continue;
+    const x = px + (vx / sp) * ahead, z = pz + (vz / sp) * ahead;
+    let best = null;
+    for (const c of queryColliders(x, z, 12)) {
+      if (c.removed || c.y1 < v.pos.y - 8 || (c.type !== 'box' && c.r < 3) || (best && c.y1 <= best.y1)) continue;
       const box = c.type === 'box';
       const d = box ? Math.hypot(Math.max(c.x0 - x, 0, x - c.x1), Math.max(c.z0 - z, 0, z - c.z1)) : Math.hypot(c.x - x, c.z - z) - c.r;
-      if (d > 9) continue;
-      _ob.x = box ? (c.x0 + c.x1) / 2 : c.x; _ob.z = box ? (c.z0 + c.z1) / 2 : c.z; _ob.top = c.y1;
-      return _ob;
+      if (d <= 12) best = c;
     }
+    if (!best) continue;
+    if (best.type === 'box') { _ob.x = clamp(px, best.x0, best.x1); _ob.z = clamp(pz, best.z0, best.z1); }
+    else { const l = Math.hypot(px - best.x, pz - best.z) || 1; _ob.x = best.x + ((px - best.x) / l) * best.r; _ob.z = best.z + ((pz - best.z) / l) * best.r; }
+    _ob.top = best.y1;
+    return _ob;
   }
   return null;
+}
+
+// The nearest point, within r of (x, z), of anything as high as the rotors of a machine at height y.
+const _wall = { x: 0, z: 0 };
+function nearestWall(x, z, y, r) {
+  let best = r;
+  for (const c of queryColliders(x, z, r)) {
+    if (c.removed || c.y1 < y + 1 || c.y0 > y + ROTOR_Y + 1 || (c.type !== 'box' && c.r < 0.5)) continue;
+    let px, pz;
+    if (c.type === 'box') { px = clamp(x, c.x0, c.x1); pz = clamp(z, c.z0, c.z1); }
+    else { const l = Math.hypot(x - c.x, z - c.z) || 1; px = c.x + ((x - c.x) / l) * Math.min(c.r, l); pz = c.z + ((z - c.z) / l) * Math.min(c.r, l); }
+    const d = Math.hypot(x - px, z - pz);
+    if (d < best) { best = d; _wall.x = px; _wall.z = pz; }
+  }
+  return best < r ? _wall : null;
 }
 
 // A police helicopter arriving from out of town towards the player.
