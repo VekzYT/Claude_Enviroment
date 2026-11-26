@@ -432,7 +432,7 @@ export class Player {
   startSlide() {
     const l = this.speed || 1;
     this.state = 'slide'; this.stateT = 0;
-    this.mv = { dx: this.vel.x / l, dz: this.vel.z / l, v: Math.min(9.6, this.speed * 1.12), hit: null };
+    this.mv = { dx: this.vel.x / l, dz: this.vel.z / l, v: Math.min(9.6, this.speed * 1.12), hit: null, rise: 0 };
     emit('sfx', 'whoosh', this.pos.x, this.pos.z);
   }
   // roll, sidestep and slide all run along the ground under their own speed
@@ -463,7 +463,9 @@ export class Player {
       }
       // jump straight out of the slide, keeping the speed
       if (Input.hit('Space') && this.onGround && this.stateT > 0.12) { this.state = 'foot'; this.stateT = 0; this.mv = null; this.physics(0, this.vel.x, this.vel.z, true, 0); return; }
-      if (mv.v < 2.8 || this.stateT > 1.15 || (!this.onGround && this.stateT > 0.2)) this.endMove();
+      // getting up takes a moment: the feet are drawn in under the body, then it rises
+      if (!mv.rise && (mv.v < 2.8 || this.stateT > 1.15)) mv.rise = this.stateT;
+      if ((mv.rise && this.stateT - mv.rise > 0.3) || (!this.onGround && this.stateT > 0.2)) this.endMove();
       return;
     }
     let v;

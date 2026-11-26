@@ -27,7 +27,8 @@ function crouch(o, d) {
   return a;
 }
 
-const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _y = new THREE.Vector3(0, 1, 0);
+const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _y = new THREE.Vector3(0, 1, 0), _x = new THREE.Vector3(1, 0, 0);
+const _q = new THREE.Quaternion();
 const _ik = { ap: 0, ar: 0, el: 0 };
 const _tL = new THREE.Vector3(), _tR = new THREE.Vector3();
 
@@ -241,12 +242,12 @@ export class PlayerAnim {
     const pl = this.pl, u = pl.stateT / pl.mv.dur;
     o[LOCO] = 0; o[SWL] = o[SWR] = 0;
     if (u < 0.8) {
-      // tucked into a ball: knees to the chest, arms wrapped round the shins, chin down
-      // the ball turns about its middle, which rests about half a metre up
-      o[DROP] = -0.5; o[PIVY] = 0.5; o[PIVZ] = 0.25;
-      o[SP] = 0.95; o[HP] = 0.6;
-      o[LTP] = o[RTP] = -1.95; o[LKN] = o[RKN] = 2.4; o[LFT] = o[RFT] = 0.2; o[LTR] = o[RTR] = 0.12;
-      o[LAP] = o[RAP] = -0.85; o[LEL] = o[REL] = -1.75; o[LAY] = o[RAY] = 0.35; o[LAR] = o[RAR] = 0.2;
+      // tucked into a tight ball turning about its middle: knees to the chest, arms round the
+      // shins, chin down and the head turned aside (apply() tips the ball over one shoulder)
+      o[DROP] = -0.47; o[PIVY] = 0.48; o[PIVZ] = 0.3;
+      o[SP] = 1.2; o[HP] = 0.8; o[HR] = 0.35; o[SR] = 0.12;
+      o[LTP] = o[RTP] = -2.0; o[LKN] = o[RKN] = 2.45; o[LFT] = o[RFT] = 0.2; o[LTR] = o[RTR] = 0.1;
+      o[LAP] = o[RAP] = -0.95; o[LEL] = o[REL] = -1.8; o[LAY] = o[RAY] = 0.35; o[LAR] = o[RAR] = 0.2;
       if (u < 0.12) { o[LAP] = o[RAP] = -1.35; o[LEL] = o[REL] = -0.3; }   // hands reaching for the ground
       return 24;
     }
@@ -268,16 +269,31 @@ export class PlayerAnim {
   }
 
   slidePose(o, t) {
+    const pl = this.pl, up = pl.mv.rise ? pl.stateT - pl.mv.rise : -1;
     o[LOCO] = 0; o[SWL] = o[SWR] = 0;
-    o[DROP] = -0.7; o[PIVY] = 0.3; o[PITCH] = -0.5;
-    o[SP] = 0.12; o[HP] = 0.42;
-    // lead leg out in front, the other folded under, one hand trailing on the ground
-    o[RTP] = -0.9; o[RKN] = 0.12; o[RFT] = -0.35; o[RTR] = 0.06;
-    o[LTP] = -0.18; o[LKN] = 2.05; o[LFT] = 0.35; o[LTR] = 0.3;
+    if (up >= 0) {
+      // getting up: both feet drawn in flat under the knees with the seat still down, then up
+      // through a crouch (so the feet stay on the ground all the way)
+      if (up < 0.13) {
+        o[DROP] = -0.7; o[SP] = 0.45; o[HP] = -0.1;
+        o[LTP] = o[RTP] = -2.05; o[LKN] = o[RKN] = 1.25; o[LFT] = o[RFT] = 0.75; o[LTR] = o[RTR] = 0.12;
+        o[LAP] = o[RAP] = -0.8; o[LEL] = o[REL] = -0.6;
+        return 20;
+      }
+      crouch(o, 0.4); o[LAP] = o[RAP] = -0.5; o[LEL] = o[REL] = -0.7;
+      return 16;
+    }
+    // sitting on the ground: the seat just clear of it, the body leaning back, chin up to see ahead
+    // (the hips go down a moment after the legs swing forward, so the feet never dig in)
+    o[DROP] = -0.7 * smoothstep(0.02, 0.16, pl.stateT); o[SP] = -0.42; o[SR] = 0.1; o[HP] = 0.38; o[HY] = -0.12;
+    // the lead leg straight out along the ground, heel down; the other bent with its foot flat
+    o[RTP] = -1.6; o[RKN] = 0.12; o[RFT] = 0.3; o[RTR] = 0.04;
+    o[LTP] = -2.05; o[LKN] = 1.25; o[LFT] = 0.75; o[LTR] = 0.3;
+    // one hand trailing on the ground behind the hip (see overlays), the other out for balance
     o[LAP] = 0.35; o[LAR] = 0.55; o[LEL] = -0.2;
-    o[RAP] = -0.95; o[RAR] = 0.35; o[REL] = -0.75;
+    o[RAP] = -0.85; o[RAR] = 0.45; o[REL] = -0.55;
     o[HR] = Math.sin(t * 20) * 0.015;
-    return 18;
+    return 26;
   }
 
   vaultPose(o) {
@@ -494,9 +510,9 @@ export class PlayerAnim {
       }
     }
     // slide: the trailing hand brushes the ground beside the hip
-    if (pl.state === 'slide') {
+    if (pl.state === 'slide' && !pl.mv.rise) {
       const s = Math.sin(pl.heading), c = Math.cos(pl.heading);
-      _tL.set(pl.pos.x + c * 0.42 - s * 0.15, pl.pos.y + 0.05, pl.pos.z - s * 0.42 - c * 0.15);
+      _tL.set(pl.pos.x + c * 0.4 - s * 0.22, pl.pos.y + 0.05, pl.pos.z - s * 0.4 - c * 0.22);
       this.ikL = smoothstep(0.05, 0.2, pl.stateT);
     }
   }
@@ -505,18 +521,24 @@ export class PlayerAnim {
   apply(F, t) {
     const pl = this.pl, P = pl.P, m = pl.model;
     const lie = clamp(F[LIE], 0, 1);
-    const spin = pl.state === 'roll' ? TAU * smoothstep(0.06, 0.8, pl.stateT / pl.mv.dur) : 0;
+    const su = pl.state === 'roll' ? smoothstep(0.06, 0.8, pl.stateT / pl.mv.dur) : 0;
     const env = pl.vehicle ? 0 : this.landT ** 1.6 * this.landAmp;
     this.scale = 1 - 0.07 * env;
     if (pl.vehicle) {
       m.rotation.set(F[PITCH], 0, F[BANK]);
     } else {
-      const pitch = F[PITCH] + spin - lie * 1.5;
-      m.rotation.set(pitch, pl.heading, F[BANK]);
-      // turn about the pivot (feet by default; the hips or the body's middle for rolls and slides)
+      m.rotation.set(F[PITCH] - lie * 1.5, pl.heading, F[BANK]);
+      if (su > 0) {
+        // a roll: the ball turns over about the side axis, its body twisted and tipped so that a
+        // shoulder and then the back take the ground, never the head
+        const w = Math.sin(Math.PI * su);
+        m.quaternion.setFromAxisAngle(_y, pl.heading).multiply(_q.setFromAxisAngle(_x, TAU * su + F[PITCH]));
+        m.quaternion.multiply(_q.setFromEuler(_e.set(0, 0.5 * w, F[BANK] - 0.55 * w, 'YXZ')));
+      }
+      // turn about the pivot (feet by default; the body's middle for rolls)
       const py = F[PIVY] * (1 - lie), pz = F[PIVZ];
       _w.set(0, py, pz).applyAxisAngle(_y, pl.heading);
-      _v.set(0, py * this.scale, pz).applyEuler(_e.set(pitch, pl.heading, F[BANK], 'YXZ'));
+      _v.set(0, py * this.scale, pz).applyQuaternion(m.quaternion);
       m.position.set(pl.pos.x + _w.x - _v.x, pl.pos.y + _w.y - _v.y + lie * 0.16 + (pl.swimming ? 0.08 : 0), pl.pos.z + _w.z - _v.z);
       m.scale.set(1 + 0.035 * env, this.scale, 1 + 0.035 * env);
     }
