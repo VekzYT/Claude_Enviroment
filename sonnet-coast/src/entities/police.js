@@ -509,7 +509,8 @@ export class Police {
   releaseHeli() {
     const h = this.heli;
     this.heli = null;
-    if (h && !h.removed) { h.keep = false; if (h.ai) h.ai.leaving = true; }
+    // it stays kept while it flies off: heliWorld.js takes it away once it is far out of town
+    if (h && !h.removed && h.ai) h.ai.leaving = true;
   }
   upkeepHeli(t) {
     const h = this.heli;

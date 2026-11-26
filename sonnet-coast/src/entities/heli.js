@@ -316,7 +316,7 @@ export class Heli extends Vehicle {
   }
   updateSearchlight(dt, t) {
     const L = this.light, pl = G.player;
-    const want = !this.destroyed && !this.downing && this.driver === 'cop' && G.env.night > 0.12 ? 1 : 0;
+    const want = !this.destroyed && !this.downing && this.driver === 'cop' && !(this.ai && this.ai.leaving) && G.env.night > 0.12 ? 1 : 0;
     L.on += (want - L.on) * Math.min(1, dt * 2);
     L.cone.visible = L.spot.visible = L.on > 0.02;
     if (!L.cone.visible) return;
@@ -333,10 +333,12 @@ export class Heli extends Vehicle {
     L.cone.position.set(ox, oy, oz);
     L.cone.scale.set(len * 0.11, len, len * 0.11);
     L.cone.quaternion.setFromUnitVectors(_dn, _d.set(A.x - ox, A.y - oy, A.z - oz).normalize());
-    L.cone.material.opacity = 0.13 * L.on;
+    // a long beam spreads thin: the pool is a circle round the player, never the whole street
+    const thin = clamp(1.5 - len / 90, 0.45, 1);
+    L.cone.material.opacity = 0.09 * L.on * thin;
     L.spot.position.set(A.x, surfaceBelow(A.x, A.z, A.y + 2) + 0.15, A.z);
-    L.spot.scale.setScalar(Math.max(6, len * 0.24));
-    L.spot.material.opacity = 0.75 * L.on;
+    L.spot.scale.setScalar(clamp(len * 0.16, 8, 13));
+    L.spot.material.opacity = 0.5 * L.on * thin;
   }
   dispose() {
     if (this.light) G.scene.remove(this.light.cone, this.light.spot);

@@ -247,8 +247,13 @@ class HeliWorld {
         if (!p.v && t > p.cool && Math.hypot(pp.x - p.x, pp.z - p.z) > 110 && !G.vehicles.some((o) => Math.hypot(o.pos.x - p.x, o.pos.z - p.z) < 8 && Math.abs(o.pos.y - p.y) < 4)) this.spawnAt(p);
       }
     }
-    // police helicopters that have flown off
-    for (let i = G.vehicles.length - 1; i >= 0; i--) { const v = G.vehicles[i]; if (v.cls === 'heli' && v.ai && v.ai.done) v.dispose(); }
+    // police helicopters that have flown off; one shot down on its way out is left to traffic.js's wreck clean-up
+    for (let i = G.vehicles.length - 1; i >= 0; i--) {
+      const v = G.vehicles[i];
+      if (v.cls !== 'heli' || !v.ai) continue;
+      if (v.ai.done) v.dispose();
+      else if (v.ai.leaving && v.destroyed) v.keep = false;
+    }
     this.updateCanopy(dt, t);
   }
 
