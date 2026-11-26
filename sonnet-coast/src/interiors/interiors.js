@@ -336,7 +336,9 @@ class Interiors {
     if (Math.hypot(pl.pos.x - R.origin.x, pl.pos.z - R.origin.z) > Math.max(R.W, R.D) + 20 || Math.abs(pl.pos.y - R.origin.y) > 30) { this.leaveRoom(); return; }
     if (!I.outdoorView) { this.light(); this.probeFar(); }
     if (I.update) I.update(dt, t);
-    for (const m of R.views || []) m.color.setScalar(1.05 - G.env.night * 0.8);
+    // the street through the windows: daylight, then a deep blue evening
+    const n = G.env.night;
+    for (const m of R.views || []) m.color.setRGB(1.05 - n * 0.9, 1.05 - n * 0.86, 1.05 - n * 0.7);
     this.blob.position.set(pl.pos.x, R.origin.y + 0.015, pl.pos.z);
     // what E does here: the nearest thing in reach, preferring what you face
     this.hot = null;

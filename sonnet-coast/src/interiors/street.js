@@ -142,5 +142,5 @@ class Street {
   nameOf(p) { const m = this.memo.get(p.id); return (m ? m.name : NAMES[p.id % NAMES.length]).toUpperCase(); }
 }
 
-export const StreetTalk = new Street();
+const StreetTalk = new Street();
 addPlugin({ update(dt) { StreetTalk.update(dt); } });

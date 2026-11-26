@@ -154,8 +154,6 @@ export function streetTex() {
 }
 
 // ---- geometry helpers ----------------------------------------------------------------------------
-const _c = new THREE.Color();
-function scaleColors(geo, k) { const c = geo.getAttribute('color'); for (let i = 0; i < c.array.length; i++) c.array[i] *= k; }
 // Contact shading baked into vertex colours: darker towards the floor and into the room's corners.
 function bakeAO(geo, W, D, H) {
   const p = geo.getAttribute('position'), c = geo.getAttribute('color'), n = geo.getAttribute('normal');
