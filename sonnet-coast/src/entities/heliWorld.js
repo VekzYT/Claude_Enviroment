@@ -172,6 +172,7 @@ class HeliWorld {
   }
   addMarker(pad, at, up) {
     const vis = G.missions.makeRing(at.x, at.z, 1.6, 0x9ad4e6, at.y);
+    vis.mesh.visible = false;   // until update() finds the player near (the title screen never runs it)
     this.markers.push({ pad, x: at.x, y: at.y, z: at.z, up, vis });
   }
 

@@ -337,13 +337,14 @@ export function buildHeliMesh(T, paintHex, livery) {
   body.add(tailRotor);
   const strobe = D.siren ? mesh(D.siren, M.lamps) : null;
   if (strobe) strobe.visible = false;
-  // the stand-in for a distance (heliWorld.js swaps between them)
+  // the stand-in for a distance (heliWorld.js swaps between them each frame in play); a machine
+  // starts on it, so the title screen, where that never runs, draws one mesh per helicopter
   const far = new THREE.Mesh(mergeGeometries([tagged(skin.clone(), 0), D.farRest]), farMaterial(paintMat));
-  far.visible = false;
+  body.visible = false;
   group.add(far);
   return {
     group, body, paintMat, baseColor: new THREE.Color(paintHex), casters: [paint, trim, blades],
-    rotor, blades, disc, discMat, tailRotor, tailBlades, tailDisc, head: null, tail: null, beacon, strobe, far,
+    rotor, blades, disc, discMat, tailRotor, tailBlades, tailDisc, head: null, tail: null, beacon, strobe, far, full: false,
     beaconMats: { on: M.beaconOn, off: M.beaconOff },
     wheels: [], wheelRest: null, rider: null, riderIdx: -1, under: null, glow: null, seat: SEAT,
   };
