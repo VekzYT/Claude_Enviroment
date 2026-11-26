@@ -64,6 +64,7 @@ export class Heli extends Vehicle {
     this.ditched = false; this.ditchT = 0;
     this.strikeT = 0;
     this.sees = false;        // police: the searchlight is on the player
+    this.strobeOn = false;    // police: strobes flashing (not sirenOn: road traffic gives way to that, and it wails)
     this.hideBlob = false;
     this.wash = 0;
     this.nitro = 0;           // the HUD's nitro bar reads it; helicopters have none
@@ -80,7 +81,7 @@ export class Heli extends Vehicle {
   explode(source = null) {
     if (this.destroyed) return;
     if (this.agl > 3 && !this.ditched) {
-      if (!this.downing) { this.downing = true; this.burning = true; this.health = 0; this.lastHitBy = source; this.sirenOn = false; emit('heliDown', this); }
+      if (!this.downing) { this.downing = true; this.burning = true; this.health = 0; this.lastHitBy = source; this.strobeOn = false; emit('heliDown', this); }
       return;
     }
     this.downing = false;
@@ -294,7 +295,7 @@ export class Heli extends Vehicle {
     const beat = (t * 1.1 + this.id * 0.37) % 1;
     const beacon = spool > 0.05 && !this.destroyed && beat < 0.1;
     m.beacon.material = beacon ? m.beaconMats.on : m.beaconMats.off;
-    if (m.strobe) m.strobe.visible = this.sirenOn && !this.destroyed && Math.floor(t * 6 + this.id) % 3 === 0;
+    if (m.strobe) m.strobe.visible = this.strobeOn && !this.destroyed && Math.floor(t * 6 + this.id) % 3 === 0;
     if (this.light) this.updateSearchlight(dt, t);
   }
 
@@ -369,7 +370,7 @@ export class HeliPilot {
     const dx = pp.x - v.pos.x, dz = pp.z - v.pos.z, hd = Math.hypot(dx, dz);
     if (this.leaving) {
       tx = v.pos.x - dx; tz = v.pos.z - dz; alt = v.pos.y + 30;
-      v.sirenOn = false;
+      v.strobeOn = false;
       if (hd > 520) this.done = true;   // heliWorld.js takes it away
     } else {
       const known = PS.seen || PS.unseenT < 3;
@@ -407,7 +408,7 @@ export class HeliPilot {
       this.seen = !this.leaving && !G.indoors && pl.alive && hd < 170 && d3 > 1 && rayBoxes(v.pos.x, v.pos.y, v.pos.z, dx / d3, dy / d3, dz / d3, d3 - 2) >= d3 - 2;
     }
     v.sees = this.seen;
-    v.sirenOn = !this.leaving;
+    v.strobeOn = !this.leaving;
     v.lightsOn = true;
     // a marksman in the door at four stars and up
     if (this.seen && PS.stars >= 4 && hd < 120) {
@@ -450,7 +451,7 @@ export function spawnPoliceHeli() {
   v.pos.y = Math.max(roofTop(x, z, 12) + 30, Math.max(groundHeight(x, z, 9999), WATER_Y) + 80);
   v.onGround = false; v.spool = 1; v.agl = 80;
   v.vel.set(Math.sin(h) * 30, 0, Math.cos(h) * 30);
-  v.driver = 'cop'; v.keep = true; v.sirenOn = true; v.lightsOn = true;
+  v.driver = 'cop'; v.keep = true; v.strobeOn = true; v.lightsOn = true;
   v.ai = new HeliPilot();
   v.syncMesh();
   return v;

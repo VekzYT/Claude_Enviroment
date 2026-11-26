@@ -43,7 +43,8 @@ function around(x0, z0, x1, z1) {
     for (const a of filled) a.length = 0;
     filled.length = 0;
     for (const v of G.vehicles) {
-      if (v.sunk) continue;
+      // a helicopter in the air is no car in the lane
+      if (v.sunk || (v.cls === 'heli' && v.agl > 3)) continue;
       const k = Math.floor(v.pos.x / CELL) * 1000 + Math.floor(v.pos.z / CELL);
       let a = cells.get(k);
       if (!a) cells.set(k, (a = []));

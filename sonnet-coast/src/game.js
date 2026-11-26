@@ -126,7 +126,7 @@ export class Game {
     on('enteredVehicle', (v) => {
       this.sfx('doorClose'); this.sfx('engineStart');
       if (G.radio) { G.hud.radioPopup(G.radio.nowPlaying); }
-      if (v.isPolice) G.hud.toast('H toggles the siren · G pings the scanner');
+      if (v.isPolice) G.hud.toast(`H toggles the ${v.cls === 'heli' ? 'strobes' : 'siren'} · G pings the scanner`);
     });
     on('leftVehicle', (v) => this.sfx('doorOpen', v.pos.x, v.pos.z));
     on('vehicleStolen', (v, kind) => { G.save.stats.jacked++; if (kind === 'jack') G.peds.scare(v.pos.x, v.pos.z, 18, 8); });
@@ -196,7 +196,8 @@ export class Game {
       if (Input.hit('KeyQ')) G.radio.prev();
     }
     if (v && Input.hit('KeyH')) {
-      if (v.isPolice) { v.sirenOn = !v.sirenOn; this.sfx('uiSelect'); }
+      if (v.isPolice && v.cls === 'heli') { v.strobeOn = !v.strobeOn; this.sfx('uiSelect'); }
+      else if (v.isPolice) { v.sirenOn = !v.sirenOn; this.sfx('uiSelect'); }
       else { this.sfx(v.T.mass > 2200 ? 'hornTruck' : 'horn'); G.peds.scare(v.pos.x + Math.sin(v.heading) * 8, v.pos.z + Math.cos(v.heading) * 8, 9, 3); }
     }
 
