@@ -33,6 +33,12 @@ export function removeCollider(c) {
     if (i >= 0) l.splice(i, 1);
   }
 }
+// Put a removed collider back where it was (rooms and props that come and go keep their own).
+export function restoreCollider(c) {
+  if (!c.removed) return;
+  c.removed = false;
+  for (const l of c.cells) l.push(c);
+}
 
 const tmp = [];
 let stamp = 0;
