@@ -112,6 +112,13 @@ class HeliWorld {
       for (const p of this.pads) G.hud.blips.push({ x: p.street ? p.street.x : p.x, z: p.street ? p.street.z : p.z, type: 'heli', name: p.name });
     };
     M.refreshBlips();
+    // the controls, the first couple of times
+    on('enteredVehicle', (v) => {
+      if (v.cls !== 'heli' || (G.save.heliTips ??= 0) >= 2) return;
+      G.save.heliTips++;
+      G.hud.toast(Input.touch.on ? 'UP and DOWN climb and descend · the stick flies · GET OUT high up opens a parachute'
+        : 'Space climb · Shift descend · W / S fly on or back off · A / D turn · F high up bails out with a parachute');
+    });
     on('playerDied', () => this.cancelFade());
     on('playerBusted', () => this.cancelFade());
   }
