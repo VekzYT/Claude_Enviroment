@@ -17,9 +17,10 @@ import { pick, rand, chance, hash2 } from '../util/rng.js';
 import { PED_LOOKS } from './pedlooks.js';
 
 const P = {}, Q = {};
-// Moving traffic appears 40-150 m out, likelier nearer, but no closer than 115 m in plain view, and goes
-// beyond 160 m (240 m while still in view): the streets around the player are the busy ones.
-const SPAWN_HIDDEN = 40, SPAWN_VIEW = 115, SPAWN_MAX = 150, DESPAWN = 160, DESPAWN_SEEN = 240, ABANDON = 370;
+// Moving traffic appears 40-150 m out, likelier nearer and mostly heading our way, but no closer than 115 m
+// in plain view. Out of sight it goes beyond 160 m (240 m while it is still coming towards the player), and
+// in sight only beyond 370 m: the streets around the player are the busy ones, and nothing vanishes on screen.
+const SPAWN_HIDDEN = 40, SPAWN_VIEW = 115, SPAWN_MAX = 150, DESPAWN = 160, DESPAWN_NEARING = 240, ABANDON = 370;
 const CITY_CARS = 70, OUT_CARS = 24, BUSES = 3, LOT_CARS = 36, KERB_CARS = 32;
 const SLOT_CELL = 60;   // parking slots are bucketed on this grid
 // what parks in a bay (nothing longer than the bay)
@@ -86,28 +87,37 @@ export class LaneDriver {
     this.stop = null; this.nextStopT = 0; this.lastStop = null;
     this.skip = false;
     this.stick = 1;
+    this.turn = 1;               // cosine of the turn onto the next edge (1 straight on)
+    this.lead = null;            // whatever we are keeping a gap to
+    this.forceV = null; this.forceT = 0;   // a car we edge past to break a stand-off
   }
   // distance left on this edge in the direction of travel
   remaining() { return this.dir > 0 ? this.edge.len - this.s : this.s; }
   endNode() { return this.dir > 0 ? this.edge.b : this.edge.a; }
   chooseNext() {
     // a planned route (jobs use this) takes priority over wandering
+    this.turn = 1;
     if (this.route && this.route.length) { this.next = this.route.shift(); return; }
     const node = this.endNode();
     let opts = node.edges.filter((e) => e !== this.edge && e.type !== 'dirt');
     if (this.only) { const f = opts.filter(this.only); if (f.length) opts = f; }
-    if (!opts.length) { this.next = { edge: this.edge, dir: -this.dir }; return; }
+    if (!opts.length) { this.next = { edge: this.edge, dir: -this.dir }; this.turn = -1; return; }
     // prefer carrying straight on
     const inPt = edgePoint(this.edge, this.dir > 0 ? this.edge.len - 1 : 1, 0, P);
     const hx = inPt.dx * this.dir, hz = inPt.dz * this.dir;
+    // ambient drivers (stick > 1) tend to stay on the kind of road they are on, so the boulevards stay busy,
+    // and once well away from the player they lean towards turns that bring them back
+    const pp = G.player.vehicle ? G.player.vehicle.pos : G.player.pos;
+    let px = pp.x - node.x, pz = pp.z - node.z;
+    const pd = Math.hypot(px, pz), back = this.stick > 1 && pd > 90 ? 2.5 / pd : 0;
+    px *= back; pz *= back;
     let best = null, bw = -1;
     for (const e of opts) {
       const d = e.a === node ? 1 : -1;
       const q = edgePoint(e, d > 0 ? 2 : e.len - 2, 0, P);
       const dot = q.dx * d * hx + q.dz * d * hz;
-      // ambient drivers (stick > 1) tend to stay on the kind of road they are on, so the boulevards stay busy
-      const w = (dot > 0.7 ? 3 : dot > -0.3 ? 1.3 : 0.15) * (e.type === this.edge.type ? this.stick : 1) * Math.random();
-      if (w > bw) { bw = w; best = { edge: e, dir: d }; }
+      const w = (dot > 0.7 ? 3 : dot > -0.3 ? 1.3 : 0.15) * (e.type === this.edge.type ? this.stick : 1) * (1 + Math.max(0, q.dx * d * px + q.dz * d * pz)) * Math.random();
+      if (w > bw) { bw = w; best = { edge: e, dir: d }; this.turn = dot; }
     }
     this.next = best;
   }
@@ -158,31 +168,37 @@ export class LaneDriver {
     // target point: a little way ahead in our lane, or the start of the next edge's lane
     const look = clamp(v.speed * 0.9 + 5, 7, 22);
     let tx, tz;
+    // our own lane on the next edge (the inner one where its kerb lane is parked up)
+    const n = this.next, nl = n.edge.spec.lanes;
+    const nLane = kerbParked(n.edge, n.dir) ? 0 : Math.min(this.home, nl.length - 1);
     if (rem > trim + look * 0.5) {
       const p = edgePoint(edge, this.s + this.dir * look, this.off * this.dir, P);
       tx = p.x; tz = p.z;
     } else {
-      const n = this.next, nl = n.edge.spec.lanes;
       const t2 = junctionTrim(node, n.edge) + 4;
-      const p = edgePoint(n.edge, n.dir > 0 ? t2 : n.edge.len - t2, nl[Math.min(this.lane, nl.length - 1)] * n.dir, P);
+      const p = edgePoint(n.edge, n.dir > 0 ? t2 : n.edge.len - t2, nl[nLane] * n.dir, P);
       tx = p.x; tz = p.z;
-      if (rem < 1.5 || Math.hypot(v.pos.x - node.x, v.pos.z - node.z) < Math.max(3, trim * 0.6)) {
-        // hand over to the next edge, back in our own lane (the inner one where the kerb lane is parked up)
+      // hand over at the node, or on reaching the aim point first (a tight corner), or it would circle it
+      const ax = tx - v.pos.x, az = tz - v.pos.z;
+      if (rem < 1.5 || Math.hypot(v.pos.x - node.x, v.pos.z - node.z) < Math.max(3, trim * 0.6) || ax * ax + az * az < 16 || ax * fx + az * fz < 0) {
         this.edge = n.edge; this.dir = n.dir; this.s = n.dir > 0 ? 0.5 : n.edge.len - 0.5;
         this.next = null; this.stop = null;
-        this.lane = Math.min(this.home, nl.length - 1);
-        if (kerbParked(n.edge, n.dir)) this.lane = 0;
+        this.lane = nLane;
       }
     }
 
-    // signals: stop at the line unless we are already committed
-    if (node.grid && edge.grid && !panicking) {
+    // slow down for a turn, so the car comes round it in its own lane instead of swinging wide
+    if (amb && this.turn < 0.8 && !panicking) want = Math.min(want, 5.5 + 5 * Math.max(0, this.turn) + Math.max(0, rem - trim - 3) * 0.55);
+
+    // signals: stop at the line unless we are already committed; traffic also waits there while the
+    // way out is backed up, rather than stopping in the junction and locking the cross traffic in
+    if (node.grid && edge.grid && !panicking && this.edge === edge) {
       const stopAt = trim + 6.5;
       const dStop = rem - stopAt;
       if (dStop > -2) {
         const sig = signalState(node, edge.axis, t);
         const brakeDist = (v.speed * v.speed) / (2 * v.T.brake * 0.55) + 3;
-        if (sig === 'r' || (sig === 'a' && dStop > brakeDist * 0.7)) {
+        if (sig === 'r' || (sig === 'a' && dStop > brakeDist * 0.7) || (amb && dStop < brakeDist + 6 && this.exitBlocked(v, node, n, nLane))) {
           if (dStop < brakeDist + 6) want = Math.min(want, Math.max(0, dStop) * 0.8);
           if (dStop < 1.2) want = 0;
         }
@@ -193,7 +209,7 @@ export class LaneDriver {
     let gap = 999, lead = null, why = null;
     const ex = v.pos.x + fx * 34, ez = v.pos.z + fz * 34;
     for (const o of around(Math.min(v.pos.x, ex) - 4, Math.min(v.pos.z, ez) - 4, Math.max(v.pos.x, ex) + 4, Math.max(v.pos.z, ez) + 4)) {
-      if (o === v) continue;
+      if (o === v || (o === this.forceV && this.forceT > t)) continue;
       const dx = o.pos.x - v.pos.x, dz = o.pos.z - v.pos.z;
       const f = dx * fx + dz * fz;
       if (f < 0 || f > 34) continue;
@@ -210,6 +226,7 @@ export class LaneDriver {
       if (f > 0 && f < 16 && Math.abs(dx * -fz + dz * fx) < 1.8) { const g = f - v.T.len / 2 - 0.6; if (g < gap) { gap = g; why = 'player'; } }
     }
     if (G.peds && !panicking && v.lite !== 7) { const g = G.peds.gapAhead(v, fx, fz); if (g < gap) { gap = g; why = 'ped'; } }
+    this.lead = lead;
     if (amb && !panicking) want = this.react(v, t, want, fx, fz);
     if (gap < 999) {
       const safe = 2.2 + v.speed * 0.7;
@@ -232,12 +249,32 @@ export class LaneDriver {
       // lean on the horn at the player, a parked-up wreck or someone dawdling in the road
       const rude = why || (lead && (lead.driver === 'player' || !lead.driver));
       if (this.blockedT > (why === 'ped' ? 4 : 2.5) && rude && t > this.honkT) { this.honkT = t + rand(2.5, 5); honk(v, t); }
-      // give up waiting behind a wreck: squeeze round it
-      if (this.blockedT > 9 && lead && (lead.destroyed || !lead.driver)) { this.lane = this.lane ? 0 : Math.min(1, lanes.length - 1); this.blockedT = 4; }
+      // give up waiting behind a wreck or the player standing about: squeeze round
+      if (this.blockedT > 9 && (why === 'player' || (lead && (lead.destroyed || !lead.driver)))) { this.lane = this.lane ? 0 : Math.min(1, lanes.length - 1); this.blockedT = 4; }
+      // two cars each waiting for the other (nose to nose after a turn, or across a junction): the older
+      // one edges past on its kerb side while the other holds
+      if (amb && this.blockedT > 3 && lead && lead.driver === 'npc' && lead.speed < 0.6 && v.id < lead.id && lead.ai &&
+          (lead.ai.lead === v || (this.blockedT > 6 && Math.abs(Math.sin(lead.heading) * fx + Math.cos(lead.heading) * fz) < 0.5))) {
+        this.forceV = lead; this.forceT = this.dodgeT = t + 3; this.dodge = 1.6;
+      }
     } else this.blockedT = 0;
 
     if (want <= 0.05) stopVehicle(v);
     else driveToward(v, tx, tz, want, dt);
+  }
+
+  // Is something standing just beyond the junction, where we would come out?
+  exitBlocked(v, node, n, lane) {
+    const t2 = junctionTrim(node, n.edge) + 7;
+    const p = edgePoint(n.edge, n.dir > 0 ? t2 : n.edge.len - t2, n.edge.spec.lanes[lane] * n.dir, Q);
+    const ux = p.dx * n.dir, uz = p.dz * n.dir;
+    for (const o of around(p.x - 8, p.z - 8, p.x + 8, p.z + 8)) {
+      if (o === v || o.speed > 2) continue;
+      // in our lane out of the junction (not the oncoming queue at its own stop line beside it)
+      const dx = o.pos.x - p.x, dz = o.pos.z - p.z, f = dx * ux + dz * uz;
+      if (f > -4 - o.T.len / 2 && f < 4 + o.T.len / 2 && Math.abs(dx * -uz + dz * ux) < 1.2 + o.T.wid / 2) return true;
+    }
+    return false;
   }
 
   // The player driving at us: brake, swerve away from where they will pass and sound the horn.
@@ -448,7 +485,8 @@ export class Traffic {
       if (d < SPAWN_HIDDEN || d > SPAWN_MAX || Math.random() > 1.3 - d / SPAWN_MAX) continue;
       if (d < SPAWN_VIEW && this.inView(P.x, P.y, P.z, 6)) continue;
       if (P.bridge && chance(0.5)) continue;
-      const dir = chance(0.5) ? 1 : -1;
+      const toward = (pp.x - P.x) * P.dx + (pp.z - P.z) * P.dz > 0 ? 1 : -1;
+      const dir = chance(0.75) ? toward : -toward;
       let type;
       if (kind) type = kind;
       else if (e.type === 'dirt') type = pick(['truck', 'buggy']);
@@ -517,7 +555,8 @@ export class Traffic {
         const stuck = ai && ai.stillT > 30;
         // and during a race, the trails are cleared for the rally (and nobody is wiser)
         const trail = racing && ai && ai.edge.type === 'dirt';
-        if (d > DESPAWN_SEEN || (stuck && d > 90) || ((d > DESPAWN || stuck || trail) && !this.inView(v.pos.x, v.pos.y, v.pos.z, v.radius))) { v.dispose(); continue; }
+        const nearing = (pp.x - v.pos.x) * v.vel.x + (pp.z - v.pos.z) * v.vel.z > 0;
+        if (d > ABANDON || ((d > (nearing ? DESPAWN_NEARING : DESPAWN) || stuck || trail) && !this.inView(v.pos.x, v.pos.y, v.pos.z, v.radius))) { v.dispose(); continue; }
         moving++;
         if (v.bus) buses++;
         continue;
@@ -571,7 +610,7 @@ export class Traffic {
       }
     }
     // fixed spawns
-    for (const f of this.fixed) {
+    if (!G.indoors) for (const f of this.fixed) {
       if (f.v && (f.v.removed || f.v.destroyed)) { f.v = null; f.cool = t + 40; }
       if (f.v) continue;
       const d = Math.hypot(f.x - pp.x, f.z - pp.z);
