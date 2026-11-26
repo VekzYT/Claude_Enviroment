@@ -46,6 +46,12 @@ body.touch #heli { right: auto; left: 50%; bottom: auto; top: 18px; margin-left:
 #t-hradio { width: 44px; height: 44px; top: 154px; left: calc(12px + var(--sl)); }
 #t-hradio svg { width: 20px; height: 20px; }
 #t-hradio small { font-size: 6px; }
+/* the weapon buttons stay while flying, moved clear of UP / DOWN */
+body.touch.in-heli #t-fire { width: 56px; height: 56px; right: calc(108px + var(--sr)); bottom: calc(84px + var(--sb)); }
+body.touch.in-heli #t-fire svg { width: 26px; height: 26px; }
+body.touch.in-heli #t-fire small, body.touch.in-heli #t-wpn small { display: none; }
+body.touch.in-heli #t-wpn { width: 42px; height: 42px; right: calc(116px + var(--sr)); bottom: calc(150px + var(--sb)); }
+body.touch.in-heli #t-use { width: 52px; height: 52px; right: calc(176px + var(--sr)); bottom: calc(16px + var(--sb)); }
 `;
 
 const DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
