@@ -13,7 +13,7 @@ addTouchButtons([
 ]);
 setTouchContext((pl) => (pl && pl.vehicle ? (pl.vehicle.cls === 'heli' ? 'h' : 'c') : 'f'));
 addControls(
-  [['Space / Shift', 'Helicopter: climb / descend'], ['W S · A D', 'Helicopter: nose down to fly on, up to back off · turn'], ['F in the air', 'Bail out (the parachute opens above 25 m; A / D steer it)']],
+  [['Space / Shift', 'Helicopter: climb / descend'], ['W S · A D', 'Helicopter: nose down to fly on, up to back off · turn'], ['F in the air', 'Bail out (the parachute opens above 11 m; A / D steer it)']],
   [['gas', 'Helicopter: climb'], ['brake', 'Helicopter: descend (the stick pitches and turns)']],
 );
 

@@ -214,11 +214,11 @@ export class Player {
     emit('leftVehicle', v);
     if (air) {
       // jump clear of the door (and of the machine as it falls); a high bail-out opens the
-      // parachute after a moment of free fall
+      // parachute after a moment of free fall, a low one at once
       this.onGround = false;
       this.vel.x += Math.cos(v.heading) * 3; this.vel.z -= Math.sin(v.heading) * 3;
       this.clearOf = v; this.clearT = G.time + 3;
-      if (v.agl > 18) { this.state = 'parachute'; this.stateT = 0; }
+      if (v.agl > 11) { this.state = 'parachute'; this.stateT = clamp((24 - v.agl) / 12, 0, 1) * 0.45; }
     } else if (!forced && speed > 9) {
       this.hurt((speed - 9) * 1.6, 'bail');
       if (this.alive) this.knockDown(v.vel.x * 0.8, 2.5, v.vel.z * 0.8, 1.2 + speed * 0.03);

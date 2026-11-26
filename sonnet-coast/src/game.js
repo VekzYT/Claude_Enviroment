@@ -107,7 +107,8 @@ export class Game {
       if (pl.vehicle === v) { pl.hurt(85, 'explosion'); if (pl.alive) pl.knockDown(rand(-3, 3), 7, rand(-3, 3), 2); }
       else if (d < R2 && !pl.vehicle && Math.abs(pl.pos.y - v.pos.y) < R2) {
         pl.hurt((1 - d / R2) * 90, 'explosion');
-        if (pl.alive) pl.knockDown(((pl.pos.x - v.pos.x) / (d + 0.5)) * 8, 6, ((pl.pos.z - v.pos.z) / (d + 0.5)) * 8, 1.8);
+        // under a canopy the blast hurts but the parachute holds
+        if (pl.alive && pl.state !== 'parachute') pl.knockDown(((pl.pos.x - v.pos.x) / (d + 0.5)) * 8, 6, ((pl.pos.z - v.pos.z) / (d + 0.5)) * 8, 1.8);
       }
     });
     on('driverEjected', (v, kind) => {
