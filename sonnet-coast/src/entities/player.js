@@ -1,123 +1,26 @@
-// The operative: on-foot movement, getting in and out of vehicles, health, and a
-// procedurally animated model with swappable outfits.
+// The operative: on-foot movement and parkour (dodge roll, sidestep, slide, vault, ledge climb,
+// wall kick), getting in and out of vehicles, health, and the animated model (playerLook.js builds
+// and dresses it, playerAnim.js poses it, playerMoves.js reads the world for it).
 import * as THREE from 'three';
 import { G, emit } from '../state.js';
 import { Input } from '../input.js';
-import { groundHeight, terrainHeight } from '../world/roads.js';
-import { resolveCircle, queryColliders } from '../world/colliders.js';
+import { groundHeight, surfaceAt } from '../world/roads.js';
+import { resolveCircle } from '../world/colliders.js';
 import { WATER_Y, POI } from '../world/layout.js';
-import { clamp, wrapAngle, lerp } from '../util/math.js';
-import { rand, pick } from '../util/rng.js';
-import { PAL } from '../world/palette.js';
-import { PED_LOOKS } from './pedlooks.js';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { ellipseLoft, limbGeo, torsoGeo, hipsGeo, headGeo, hairGeo, capGeo, handGeo, shoeGeo } from './bodyGeo.js';
+import { clamp, wrapAngle, lerp, smoothstep } from '../util/math.js';
+import { OUTFITS, DEFAULT_OUTFIT, fullOutfit, buildModel, dressModel, RIG } from './playerLook.js';
+import { PlayerAnim } from './playerAnim.js';
+import { pushOut, supportAt, planVault, planClimb, wallAhead } from './playerMoves.js';
 
-export const OUTFITS = {
-  jacket: [['Terracotta Bomber', 0xc8643b], ['Slate Tactical', 0x3d3f45], ['Cream Windbreaker', 0xeee6d6], ['Midnight Shell', 0x14161c], ['Teal Tech', 0x1f8f88], ['Signal Coral', 0xff7a59]],
-  pants: [['Graphite Cargo', 0x25272c], ['Sand Utility', 0xb8a27c], ['Slate Denim', 0x44506a], ['Night Ops', 0x101114]],
-  accent: [['Cyan', PAL.neonCyan], ['Coral', PAL.neonCoral], ['Magenta', PAL.neonMagenta], ['Lime', PAL.neonLime], ['Amber', PAL.neonAmber]],
-  head: [['Bare'], ['Courier Cap'], ['Field Helmet'], ['Hood']],
-  vest: [['No vest'], ['Tactical Vest']],
-  pack: [['No pack'], ['Field Pack']],
-};
-export const DEFAULT_OUTFIT = { jacket: 0, pants: 0, accent: 0, head: 1, vest: 1, pack: 1 };
+export { OUTFITS, DEFAULT_OUTFIT };
 
 const out = { x: 0, z: 0, broken: [] };
+const sup = { vehicle: null };
 const GRAV = 24;
-
-function buildModel() {
-  const root = new THREE.Group();
-  const mats = {
-    jacket: new THREE.MeshStandardMaterial({ color: 0xc8643b, roughness: 0.72 }),
-    pants: new THREE.MeshStandardMaterial({ color: 0x25272c, roughness: 0.85 }),
-    skin: new THREE.MeshStandardMaterial({ color: 0xd9a47c, roughness: 0.55, vertexColors: true }),
-    dark: new THREE.MeshStandardMaterial({ color: 0x17181c, roughness: 0.55, metalness: 0.2 }),
-    gear: new THREE.MeshStandardMaterial({ color: 0x33363d, roughness: 0.7 }),
-    hair: new THREE.MeshStandardMaterial({ color: 0x2a1c14, roughness: 0.6 }),
-    boot: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }),
-    accent: new THREE.MeshBasicMaterial({ color: new THREE.Color(PAL.neonCyan).multiplyScalar(1.4), toneMapped: false }),
-  };
-  const mesh = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; return m; };
-  const rb = (w, h, d, mat, x = 0, y = 0, z = 0, r = 0.03) => mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2.01, h / 2.01, d / 2.01)), mat, x, y, z);
-  const P = {};
-  P.hips = new THREE.Group(); P.hips.position.y = 0.86; root.add(P.hips);
-  P.hips.add(mesh(hipsGeo(1.02), mats.pants, 0, 0.1, 0));
-  P.hips.add(mesh(ellipseLoft([[0, 0.178, 0.116], [0.035, 0.18, 0.118], [0.07, 0.176, 0.116]], 16, 0.86), mats.dark, 0, 0.06, 0));   // belt
-  P.hips.add(rb(0.07, 0.05, 0.02, mats.gear, 0, 0.095, 0.118, 0.008));
-  P.torso = new THREE.Group(); P.torso.position.y = 0.1; P.hips.add(P.torso);
-  P.torso.add(mesh(torsoGeo(0.56, 1.08), mats.jacket));
-  P.torso.add(mesh(ellipseLoft([[0, 0.086, 0.082, -0.004], [0.05, 0.084, 0.078, -0.006], [0.085, 0.07, 0.066, -0.006]], 12), mats.jacket, 0, 0.56, 0));   // collar
-  P.torso.add(mesh(limbGeo(0.09, 0.055, 0.052, 10, 1), mats.skin, 0, 0.71, -0.004));                                                                    // neck
-  P.torso.add(rb(0.022, 0.4, 0.012, mats.accent, 0, 0.3, 0.127, 0.005));                                                                               // zip line
-  P.vest = new THREE.Group();
-  P.vest.add(mesh(ellipseLoft([[0.04, 0.182, 0.122], [0.14, 0.2, 0.134, 0.004], [0.3, 0.236, 0.142, 0.008], [0.44, 0.232, 0.136, 0.006], [0.5, 0.2, 0.12, 0.002]], 16, 0.8), mats.gear));
-  for (const sx of [-1, 1]) P.vest.add(rb(0.12, 0.12, 0.05, mats.dark, sx * 0.1, 0.16, 0.14, 0.02), rb(0.05, 0.3, 0.03, mats.dark, sx * 0.16, 0.42, 0.11, 0.012));
-  P.torso.add(P.vest);
-  P.pack = new THREE.Group();
-  P.pack.add(rb(0.32, 0.4, 0.15, mats.gear, 0, 0.3, -0.2, 0.06), rb(0.24, 0.14, 0.06, mats.dark, 0, 0.2, -0.29, 0.025), rb(0.03, 0.26, 0.012, mats.accent, 0, 0.36, -0.278, 0.005));
-  P.torso.add(P.pack);
-  P.head = new THREE.Group(); P.head.position.y = 0.78; P.torso.add(P.head);
-  P.head.add(mesh(headGeo(0.118), mats.skin));
-  // slim wrap-around glasses in the accent colour
-  const visor = new THREE.Mesh(new THREE.CylinderGeometry(0.117, 0.117, 0.034, 16, 1, true, -1.25, 2.5), mats.accent);
-  visor.position.set(0, 0.012, 0.004);
-  P.head.add(visor);
-  P.hair = mesh(hairGeo(0, 0.118), mats.hair);
-  P.cap = new THREE.Group(); P.cap.add(mesh(capGeo(0.118), mats.jacket));
-  P.helmet = new THREE.Group();
-  const shell = mesh(new THREE.SphereGeometry(0.15, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), mats.gear, 0, 0.012, -0.006);
-  shell.scale.set(0.98, 1.06, 1.08);
-  P.helmet.add(shell, rb(0.3, 0.035, 0.05, mats.dark, 0, 0.02, 0.13, 0.015), rb(0.04, 0.1, 0.06, mats.dark, 0.15, -0.04, 0, 0.015), rb(0.04, 0.1, 0.06, mats.dark, -0.15, -0.04, 0, 0.015));
-  P.hood = mesh(new THREE.SphereGeometry(0.152, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.72), mats.jacket, 0, 0.0, -0.03);
-  P.hood.scale.set(1, 1.08, 1.1);
-  P.head.add(P.hair, P.cap, P.helmet, P.hood);
-  // arms: shoulder -> elbow -> hand
-  const arm = (x) => {
-    const g = new THREE.Group(); g.position.set(x, 0.47, 0);
-    g.add(mesh(new THREE.SphereGeometry(0.078, 10, 8), mats.jacket, 0, 0.0, 0));       // shoulder
-    g.add(mesh(limbGeo(0.28, 0.066, 0.056), mats.jacket));
-    const fore = new THREE.Group(); fore.position.y = -0.28; g.add(fore);
-    fore.add(mesh(limbGeo(0.25, 0.055, 0.044), mats.jacket));
-    fore.add(mesh(ellipseLoft([[-0.02, 0.05, 0.048], [0.02, 0.05, 0.048]], 10), mats.dark, 0, -0.235, 0));   // cuff
-    fore.add(mesh(handGeo(0.045), mats.skin, 0, -0.315, 0.004));
-    return { g, fore };
-  };
-  const aL = arm(0.262), aR = arm(-0.262);
-  P.armL = aL.g; P.armR = aR.g; P.foreL = aL.fore; P.foreR = aR.fore;
-  P.torso.add(P.armL, P.armR);
-  // legs: hip -> knee -> boot
-  const leg = (x) => {
-    const g = new THREE.Group(); g.position.set(x, -0.06, 0);
-    g.add(mesh(limbGeo(0.37, 0.094, 0.07), mats.pants));
-    const shin = new THREE.Group(); shin.position.y = -0.37; g.add(shin);
-    shin.add(mesh(limbGeo(0.34, 0.068, 0.052), mats.pants));
-    shin.add(mesh(shoeGeo(0.27, 0.104, 0x1b1c20), mats.boot, 0, -0.345, 0));
-    return { g, shin };
-  };
-  const lL = leg(0.1), lR = leg(-0.1);
-  P.legL = lL.g; P.legR = lR.g; P.shinL = lL.shin; P.shinR = lR.shin;
-  P.hips.add(P.legL, P.legR);
-  // held items (right hand)
-  const hand = new THREE.Group(); hand.position.set(0, -0.33, 0.05); P.foreR.add(hand);
-  const pistol = new THREE.Group();
-  pistol.add(rb(0.05, 0.085, 0.27, mats.dark, 0, 0, 0.12, 0.014), rb(0.045, 0.15, 0.065, mats.dark, 0, -0.1, 0.02, 0.014), rb(0.054, 0.02, 0.16, mats.accent, 0, 0.046, 0.14, 0.008), rb(0.02, 0.02, 0.03, mats.gear, 0, 0.05, 0.02, 0.006));
-  pistol.rotation.x = Math.PI / 2;
-  const baton = new THREE.Group();
-  const stick = mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.62, 10), mats.dark, 0, 0, 0.26); stick.rotation.x = Math.PI / 2;
-  const tip = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 10), mats.accent, 0, 0, 0.5); tip.rotation.x = Math.PI / 2;
-  baton.add(stick, tip);
-  baton.rotation.x = Math.PI / 2;
-  const emp = mesh(new THREE.IcosahedronGeometry(0.085, 2), mats.gear, 0, 0, 0.06);
-  emp.add(new THREE.Mesh(new THREE.TorusGeometry(0.087, 0.012, 6, 20), mats.accent));
-  const hack = new THREE.Group();
-  hack.add(rb(0.19, 0.022, 0.29, mats.dark, 0, 0, 0.14, 0.01), rb(0.16, 0.006, 0.22, mats.accent, 0, 0.014, 0.16, 0.002));
-  hack.rotation.x = Math.PI / 2 - 0.5;
-  P.items = { pistol, baton, emp, hack };
-  for (const k of Object.keys(P.items)) { P.items[k].visible = false; hand.add(P.items[k]); }
-  P.muzzle = new THREE.Object3D(); P.muzzle.position.set(0, -0.3, 0); hand.add(P.muzzle);
-  return { root, P, mats };
-}
+// what a dodge makes you untouchable by
+const DODGEABLE = new Set(['shot', 'punch', 'melee', 'gator']);
+const MOVES = new Set(['roll', 'dodge', 'slide', 'vault', 'climb']);
+const DUST = { asphalt: [0.5, 0.49, 0.47], concrete: [0.62, 0.6, 0.56], sand: [0.82, 0.74, 0.58], dirt: [0.55, 0.45, 0.32], grass: [0.42, 0.46, 0.3], mud: [0.36, 0.3, 0.22] };
 
 export class Player {
   constructor() {
@@ -126,33 +29,39 @@ export class Player {
     this.heading = Math.PI / 2;
     this.onGround = true;
     this.vehicle = null;
-    this.state = 'foot';       // foot | entering | ragdoll | dead | busted
+    // foot | entering | ragdoll | dead | busted, and the moves: roll | dodge | slide | vault | climb
+    this.state = 'foot';
     this.stateT = 0;
+    this.mv = null;            // the current move's plan
     this.health = 100; this.maxHealth = 100; this.armor = 0;
     this.lastHurt = -99;
     this.swimming = false;
     this.aiming = false;
-    this.speed = 0; this.phase = 0;
+    this.sprinting = false;
+    this.speed = 0;
     this.punchT = 0; this.recoil = 0;
     this.enterTarget = null; this.enterDur = 0;
     this.invuln = 0;
-    this.outfit = { ...DEFAULT_OUTFIT };
+    this.dodgeT = 0;           // untouchable by shots and blows while > 0
+    this.kickT = 0; this.wallKicked = false;
+    this.rollQueued = 0;       // C pressed in the air: break the fall with a roll
+    this.landSeq = 0; this.landImpact = 0;
+    this.standOn = null;       // vehicle whose roof we stand on
+    this.camDip = 0;
+    this.dustT = 0;
+    this.scan = 0;
+    this.outfit = fullOutfit(DEFAULT_OUTFIT);
     const m = buildModel();
     this.model = m.root; this.P = m.P; this.mats = m.mats;
-    this.model.rotation.order = 'YXZ';
     G.scene.add(this.model);
+    this.anim = new PlayerAnim(this);
     this.applyOutfit();
     this.heldItem = null;
   }
 
   applyOutfit(o = this.outfit) {
-    this.outfit = { ...DEFAULT_OUTFIT, ...o };
-    const O = this.outfit, M = this.mats, P = this.P;
-    M.jacket.color.set(OUTFITS.jacket[O.jacket % OUTFITS.jacket.length][1]);
-    M.pants.color.set(OUTFITS.pants[O.pants % OUTFITS.pants.length][1]);
-    M.accent.color.set(OUTFITS.accent[O.accent % OUTFITS.accent.length][1]).multiplyScalar(1.4);
-    P.hair.visible = O.head === 0 || O.head === 1; P.cap.visible = O.head === 1; P.helmet.visible = O.head === 2; P.hood.visible = O.head === 3;
-    P.vest.visible = !!O.vest; P.pack.visible = !!O.pack;
+    this.outfit = fullOutfit(o);
+    dressModel(this.P, this.mats, this.outfit);
   }
   setHeld(name) {
     this.heldItem = name;
@@ -169,6 +78,7 @@ export class Player {
   // ---- damage ----------------------------------------------------------------
   hurt(amount, source = null) {
     if (!this.alive || this.invuln > 0 || amount <= 0) return;
+    if (this.dodgeT > 0 && DODGEABLE.has(source)) return;
     if (this.vehicle && source !== 'crash' && source !== 'explosion' && source !== 'drown') amount *= 0.45;
     if (this.armor > 0) {
       const a = Math.min(this.armor, amount * 0.8);
@@ -200,12 +110,20 @@ export class Player {
     this.onGround = false;
   }
   respawn(x, z, heading = 0) {
-    this.pos.set(x, groundHeight(x, z, 9999), z);
-    this.vel.set(0, 0, 0);
-    this.heading = heading;
+    this.teleport(x, groundHeight(x, z, 9999), z, heading);
     this.health = this.maxHealth; this.state = 'foot'; this.stateT = 0;
     this.invuln = 3;
     this.model.visible = true;
+  }
+  // The way to move the player on foot from outside (respawns, doors into interiors...): ends any
+  // move in progress, which would otherwise keep placing the body along its own plan.
+  teleport(x, y, z, heading = this.heading) {
+    if (MOVES.has(this.state)) this.endMove();
+    this.mv = null;
+    this.pos.set(x, y, z);
+    this.vel.set(0, 0, 0); this.speed = 0;
+    this.heading = heading;
+    this.standOn = null; this.onGround = true;
   }
 
   // ---- vehicles ------------------------------------------------------------
@@ -254,10 +172,16 @@ export class Player {
   }
   seat() {
     const v = this.vehicle;
+    this.mv = null; this.standOn = null;
     if (v.T.open) {
       v.m.body.add(this.model);
-      this.model.position.set(v.m.seat[0], v.m.seat[1] - 0.86 + 0.18, v.m.seat[2]);
+      // hip joints just above the cushion, a little forward of its middle (towards the bars or the
+      // wheel); a boat is driven standing at the helm
+      const S = v.m.seat;
+      if (v.cls === 'boat') this.model.position.set(S[0], S[1] - 0.93, S[2] + 0.28);
+      else this.model.position.set(S[0], S[1] + 0.12 - (RIG.HIP_Y + RIG.THIGH_Y), S[2] + (v.T.bike || v.cls === 'hover' ? 0.1 : 0.12));
       this.model.rotation.set(0, 0, 0);
+      this.model.scale.set(1, 1, 1);
       this.model.visible = true;
     } else this.model.visible = false;
   }
@@ -295,13 +219,19 @@ export class Player {
     this.stateT += dt;
     if (this.invuln > 0) this.invuln -= dt;
     if (this.punchT > 0) this.punchT -= dt;
+    this.dodgeT = Math.max(0, this.dodgeT - dt);
+    this.kickT = Math.max(0, this.kickT - dt);
+    this.rollQueued = Math.max(0, this.rollQueued - dt);
     this.recoil = Math.max(0, this.recoil - dt * 6);
     // slow regeneration up to half health
     if (this.alive && this.health < 50 && t - this.lastHurt > 7) this.health = Math.min(50, this.health + dt * 2.5);
 
     if (this.vehicle) {
       this.driveInput(dt, t);
-      if (this.vehicle) this.animateSeated(dt, t); else this.animate(dt, t);
+      // the body only shows on open vehicles (bikes, buggies, boats); otherwise only its heading is
+      // kept current, so stepping out does not read as a sudden turn
+      if (!this.vehicle || this.vehicle.T.open) this.anim.update(dt, t);
+      else this.anim.lastH = this.heading;
       return;
     }
 
@@ -320,65 +250,117 @@ export class Player {
         break;
       }
       case 'ragdoll':
-        this.physics(dt, 0, 0, false);
+        this.physics(dt, 0, 0, false, 0);
         this.stateT -= dt * 2; // counts down
         if (this.stateT <= 0 && this.onGround) { this.state = 'foot'; this.stateT = 0; }
         break;
       case 'dead': case 'busted':
-        this.physics(dt, 0, 0, false);
+        this.physics(dt, 0, 0, false, 0);
         break;
+      case 'roll': case 'dodge': case 'slide': this.groundMove(dt); break;
+      case 'vault': this.vaultUpdate(); break;
+      case 'climb': this.climbUpdate(dt); break;
       default:
         this.footInput(dt, t);
     }
-    this.animate(dt, t);
+    if (this.vehicle) return;
+    this.anim.update(dt, t);
   }
 
-  footInput(dt, t) {
+  // The direction the movement keys (or stick) point in the world, and how far they are pushed.
+  moveDir(o) {
     const cam = G.cam;
     const mx = Input.axis('KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight');
     const mz = Input.axis('KeyS', 'KeyW', 'ArrowDown', 'ArrowUp');
-    const sprint = Input.any('ShiftLeft', 'ShiftRight');
+    o.mag = Math.min(1, Math.hypot(mx, mz));
+    if (o.mag < 0.01) { o.x = 0; o.z = 0; return o; }
+    const s = Math.sin(cam.yaw), c = Math.cos(cam.yaw);
+    // camera forward (s,c); camera right (-c, s)
+    let wx = s * mz + -c * mx, wz = c * mz + s * mx;
+    const l = Math.hypot(wx, wz); wx /= l; wz /= l;
+    o.x = wx; o.z = wz;
+    return o;
+  }
+
+  footInput(dt, t) {
+    const cam = G.cam, d = this.moveDir(_dir);
+    const sprintKey = Input.any('ShiftLeft', 'ShiftRight');
     this.aiming = Input.mouse.right && !this.swimming;
-    let wx = 0, wz = 0, want = 0;
-    if (mx || mz) {
-      const s = Math.sin(cam.yaw), c = Math.cos(cam.yaw);
-      // camera forward (s,c); camera right (-c, s)
-      wx = s * mz + -c * mx; wz = c * mz + s * mx;
-      const l = Math.hypot(wx, wz); wx /= l; wz /= l;
-      want = this.swimming ? 2.7 : this.aiming ? 2.6 : sprint ? 7.8 : 4.6;
+    let want = 0;
+    if (d.mag > 0.01) {
+      want = this.swimming ? 2.7 : this.aiming ? 2.6 : sprintKey ? 7.8 : 4.6;
+      // a gentle push of the touch stick walks
+      want *= clamp((d.mag - 0.1) / 0.55, 0.35, 1);
     }
+    this.sprinting = sprintKey && want > 5 && this.onGround && !this.swimming;
     if (this.aiming || G.weapons?.facingCamera) {
       this.heading += wrapAngle(cam.yaw - this.heading) * Math.min(1, dt * 16);
     } else if (want > 0) {
-      this.heading += wrapAngle(Math.atan2(wx, wz) - this.heading) * Math.min(1, dt * 11);
+      this.heading += wrapAngle(Math.atan2(d.x, d.z) - this.heading) * Math.min(1, dt * (this.sprinting ? 8 : 11));
     }
-    const jump = Input.hit('Space') && this.onGround && !this.swimming;
-    this.physics(dt, wx * want, wz * want, jump);
+    const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
+    // C: roll (a sidestep while aiming), or a slide out of a sprint; in the air it readies a break-fall
+    if (Input.hit('KeyC') && !this.swimming) {
+      if (!this.onGround) this.rollQueued = 0.6;
+      else if (this.speed > 5.2 && (sprintKey || this.speed > 6.5)) return this.startSlide();
+      else return this.startRoll(d.mag > 0.01 ? d.x : this.aiming ? -fx : fx, d.mag > 0.01 ? d.z : this.aiming ? -fz : fz);
+    }
+    let jump = false;
+    if (Input.hit('Space')) {
+      // Space: climb a ledge or vault what is in front, else jump; in the air, kick off a wall
+      const ax = d.mag > 0.01 && !this.aiming ? d.x : fx, az = d.mag > 0.01 && !this.aiming ? d.z : fz;
+      if (this.swimming) {
+        const p = planClimb(this, fx, fz, null, false, 0.3, 2.6, 1.0);
+        if (p) return this.startClimb(p);
+      } else if (this.onGround) {
+        const p = planClimb(this, ax, az) || planVault(this, ax, az, 1.15);
+        if (p) return p.kind === 'vault' ? this.startVault(p) : this.startClimb(p);
+        jump = true;
+      } else if (!this.wallKicked && this.vel.x * fx + this.vel.z * fz > 1) {
+        const w = wallAhead(this, fx, fz);
+        if (w) this.wallKick(w);
+      }
+    }
+    // holding Space in the air grabs a ledge within reach
+    if (!this.onGround && !this.swimming && Input.key('Space') && this.vel.y < 3) {
+      const p = planClimb(this, fx, fz, null, false, -0.2, 1.9, 0.7);
+      if (p) return this.startClimb(p);
+    }
+    // sprinting into something low vaults it (looked for 20 times a second: well inside the reach)
+    this.scan = (this.scan + 1) % 3;
+    if (this.sprinting && this.speed > 5 && d.mag > 0.5 && !this.scan) {
+      const p = planVault(this, fx, fz, 0.45 + this.speed * 0.08);
+      if (p && p.kind === 'vault') return this.startVault(p);
+    }
+    this.physics(dt, d.x * want, d.z * want, jump);
     if (Input.hit('KeyF') || (Input.hit('KeyE') && !G.interact.active)) this.tryEnter();
   }
 
-  physics(dt, tvx, tvz, jump) {
-    const control = this.state === 'foot';
-    if (control) {
-      const k = Math.min(1, dt * (this.onGround ? 11 : 2.5));
+  // grip: how quickly the velocity follows the wanted one on the ground (0 = coasting). low: a
+  // body near the ground (sliding) that passes under things.
+  physics(dt, tvx, tvz, jump, grip = 11, low = false) {
+    if (grip > 0) {
+      const k = Math.min(1, dt * (this.onGround ? grip : 2.5));
       this.vel.x += (tvx - this.vel.x) * k; this.vel.z += (tvz - this.vel.z) * k;
     } else if (this.onGround) {
       const f = Math.max(0, 1 - dt * 3.5);
       this.vel.x *= f; this.vel.z *= f;
     }
-    if (jump) { this.vel.y = 7.2; this.onGround = false; emit('playerJump'); }
+    if (jump) { this.vel.y = 7.2; this.onGround = false; this.standOn = null; emit('playerJump'); }
     this.vel.y -= GRAV * dt;
+    // riding on a car roof: carried along with it
+    if (this.standOn && this.onGround) { this.pos.x += this.standOn.vel.x * dt; this.pos.z += this.standOn.vel.z * dt; }
     this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt; this.pos.y += this.vel.y * dt;
 
-    // static geometry
-    const hit = resolveCircle(this.pos.x, this.pos.z, 0.36, this.pos.y + 0.3, out, 1.4);
-    if (hit) { this.pos.x = out.x; this.pos.z = out.z; }
+    // static geometry (the tops of low things can be stood on, see playerMoves)
+    if (pushOut(this.pos.x, this.pos.z, 0.36, this.pos.y, low ? 0.8 : 1.7, out)) { this.pos.x = out.x; this.pos.z = out.z; }
     // vehicles are solid; fast ones hurt
     for (const v of G.vehicles) {
+      if (v === this.standOn) continue;
       const dx = this.pos.x - v.pos.x, dz = this.pos.z - v.pos.z;
       const rr = v.radius + 0.5;
       if (dx * dx + dz * dz > rr * rr) continue;
-      if (this.pos.y > v.pos.y + v.T.hgt + 0.1 || this.pos.y + 1.7 < v.pos.y) continue;
+      if (this.pos.y > v.pos.y + v.T.hgt - 0.35 || this.pos.y + 1.7 < v.pos.y) continue;
       const s = Math.sin(v.heading), c = Math.cos(v.heading);
       for (let q = 0; q < 3; q++) {
         const cx = v.pos.x + s * v.cOff[q], cz = v.pos.z + c * v.cOff[q];
@@ -398,23 +380,181 @@ export class Player {
       }
     }
 
-    // ground and water
-    const g = groundHeight(this.pos.x, this.pos.z, this.pos.y + 0.7);
+    // ground (or a prop, roof or car top) and water
+    const g = supportAt(this.pos.x, this.pos.z, this.pos.y, sup);
     const floatY = WATER_Y - 1.15;
     const deep = g < floatY - 0.15;
     if (deep && this.pos.y <= floatY + 0.05) {
       if (!this.swimming) emit('splash', this.pos.x, this.pos.z);
       this.swimming = true;
-      this.pos.y = floatY; this.vel.y = 0; this.onGround = true;
+      this.pos.y = floatY; this.vel.y = 0; this.onGround = true; this.standOn = null;
     } else {
       this.swimming = false;
       if (this.pos.y <= g) {
-        if (!this.onGround && this.vel.y < -15) this.hurt((-this.vel.y - 15) * 6, 'fall');
-        if (!this.onGround && this.vel.y < -5) emit('playerLand');
-        this.pos.y = g; this.vel.y = 0; this.onGround = true;
-      } else if (this.pos.y - g > 0.25) this.onGround = false;
+        if (!this.onGround) this.land(-this.vel.y);
+        this.pos.y = g; this.vel.y = 0; this.onGround = true; this.wallKicked = false;
+        this.standOn = sup.vehicle;
+      } else if (this.pos.y - g > 0.25) { this.onGround = false; this.standOn = null; }
     }
     this.speed = Math.hypot(this.vel.x, this.vel.z);
+  }
+
+  land(impact) {
+    // a roll readied in the air (or a fast landing from a height) breaks the fall
+    const roll = this.state === 'foot' && impact > 8 && (this.rollQueued > 0 || (impact > 12 && this.speed > 4.5));
+    if (impact > 15) this.hurt((impact - 15) * (this.rollQueued > 0 ? 2 : 6), 'fall');
+    if (impact > 3.5) { this.landSeq++; this.landImpact = impact; }
+    if (impact > 5) { emit('playerLand'); if (impact > 9) this.dust(5); }
+    if (roll && this.alive && this.state === 'foot') {
+      const l = this.speed || 1;
+      this.startRoll(this.speed > 0.5 ? this.vel.x / l : Math.sin(this.heading), this.speed > 0.5 ? this.vel.z / l : Math.cos(this.heading));
+      this.landSeq--;   // the roll is the landing
+    }
+    this.rollQueued = 0;
+  }
+  dust(n) {
+    if (!G.fx) return;
+    const c = DUST[surfaceAt(this.pos.x, this.pos.z, this.pos.y)] || DUST.concrete;
+    for (let i = 0; i < n; i++) G.fx.dust(this.pos.x, this.pos.y + 0.1, this.pos.z, c[0], c[1], c[2], 1.1);
+  }
+
+  // ---- moves ---------------------------------------------------------------------------------------
+  startRoll(dx, dz) {
+    const aim = this.aiming || G.weapons?.facingCamera;
+    this.state = aim ? 'dodge' : 'roll'; this.stateT = 0;
+    const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
+    // a sidestep keeps facing the target; how much of it is to the side or back, for the pose
+    this.mv = { dx, dz, dur: aim ? 0.36 : 0.62, v0: Math.max(this.speed, aim ? 7.5 : 6.6), side: dx * fz - dz * fx, fwd: dx * fx + dz * fz };
+    this.dodgeT = aim ? 0.34 : 0.5;
+    emit('sfx', 'whoosh', this.pos.x, this.pos.z);
+    this.dust(3);
+  }
+  startSlide() {
+    const l = this.speed || 1;
+    this.state = 'slide'; this.stateT = 0;
+    this.mv = { dx: this.vel.x / l, dz: this.vel.z / l, v: Math.min(9.6, this.speed * 1.12), hit: null, rise: 0 };
+    emit('sfx', 'whoosh', this.pos.x, this.pos.z);
+  }
+  // roll, sidestep and slide all run along the ground under their own speed
+  groundMove(dt) {
+    const mv = this.mv, st = this.state;
+    const u = Math.min(1, this.stateT / (mv.dur || 1));
+    if (st === 'slide') {
+      // a little steering, friction, and anyone in the way gets swept off their feet
+      const d = this.moveDir(_dir);
+      if (d.mag > 0.3) {
+        const turn = clamp(wrapAngle(Math.atan2(d.x, d.z) - Math.atan2(mv.dx, mv.dz)), -1.4 * dt, 1.4 * dt);
+        const c = Math.cos(turn), s = Math.sin(turn), x = mv.dx;
+        mv.dx = x * c + mv.dz * s; mv.dz = mv.dz * c - x * s;
+      }
+      mv.v = Math.max(0, mv.v - dt * 5.6);
+      this.heading += wrapAngle(Math.atan2(mv.dx, mv.dz) - this.heading) * Math.min(1, dt * 12);
+      this.physics(dt, mv.dx * mv.v, mv.dz * mv.v, false, 30, true);
+      this.dustT -= dt;
+      if (this.dustT <= 0 && this.onGround) { this.dustT = 0.06; this.dust(1); }
+      if (G.peds && mv.v > 4) {
+        const p = G.peds.nearest(this.pos.x + mv.dx * 0.6, this.pos.z + mv.dz * 0.6, 0.8, (q) => q !== mv.hit && q.state !== 'down' && Math.abs(q.pos.y - this.pos.y) < 1);
+        if (p) {
+          mv.hit = p;
+          G.peds.knock(p, mv.dx * 3, 3, mv.dz * 3, 12, 'player');
+          emit('sfx', 'punch', p.pos.x, p.pos.z);
+          emit('crime', p.role === 'cop' ? 'assaultCop' : 'assault', p.pos.x, p.pos.z, p);
+        }
+      }
+      // jump straight out of the slide, keeping the speed
+      if (Input.hit('Space') && this.onGround && this.stateT > 0.12) { this.state = 'foot'; this.stateT = 0; this.mv = null; this.physics(0, this.vel.x, this.vel.z, true, 0); return; }
+      // getting up takes a moment: the feet are drawn in under the body, then it rises
+      if (!mv.rise && (mv.v < 2.8 || this.stateT > 1.15)) mv.rise = this.stateT;
+      if ((mv.rise && this.stateT - mv.rise > 0.3) || (!this.onGround && this.stateT > 0.2)) this.endMove();
+      return;
+    }
+    let v;
+    if (st === 'roll') {
+      v = lerp(mv.v0, 3.4, u);
+      this.heading += wrapAngle(Math.atan2(mv.dx, mv.dz) - this.heading) * Math.min(1, dt * 22);
+    } else {
+      v = 1 + (mv.v0 - 1) * (1 - u) ** 1.4;
+      this.heading += wrapAngle(G.cam.yaw - this.heading) * Math.min(1, dt * 16);
+    }
+    this.physics(dt, mv.dx * v, mv.dz * v, false, 30);
+    if (u >= 1) this.endMove();
+  }
+  endMove() {
+    this.state = 'foot'; this.stateT = 0; this.mv = null;
+  }
+
+  startVault(p) {
+    this.state = 'vault'; this.stateT = 0; this.mv = p;
+    this.heading = Math.atan2(p.dx, p.dz);
+    this.vel.set(p.dx * p.exitSpeed, 0, p.dz * p.exitSpeed);
+    this.onGround = false; this.standOn = null;
+    emit('sfx', 'whoosh', this.pos.x, this.pos.z);
+  }
+  vaultUpdate() {
+    const p = this.mv, u = Math.min(1, this.stateT / p.dur);
+    const cl = p.top + 0.07;
+    let y;
+    if (u < p.uIn) y = p.sy + (cl - p.sy) * smoothstep(0, p.uIn, u);
+    else if (u < p.uOut) y = cl + Math.sin(((u - p.uIn) / (p.uOut - p.uIn)) * Math.PI) * 0.06;
+    else y = cl + (p.ey - cl) * ((u - p.uOut) / (1 - p.uOut)) ** 2;
+    this.pos.set(lerp(p.sx, p.ex, u), y, lerp(p.sz, p.ez, u));
+    this.speed = p.exitSpeed;
+    if (u >= p.uOut && p.ey < p.sy - 1.2) {
+      // vaulting a rail with a drop behind: let go and fall
+      this.endMove(); this.onGround = false; this.vel.set(p.dx * p.exitSpeed * 0.8, 0, p.dz * p.exitSpeed * 0.8);
+      return;
+    }
+    if (u >= 1) {
+      this.endMove();
+      this.pos.y = p.ey; this.onGround = true;
+      this.landSeq++; this.landImpact = 5.5;
+      if (p.veh) emit('sfx', 'thud', this.pos.x, this.pos.z);
+    }
+  }
+
+  startClimb(p) {
+    this.state = 'climb'; this.stateT = 0; this.mv = p;
+    this.heading = p.heading;
+    this.vel.set(0, 0, 0); this.speed = 0;
+    this.onGround = false; this.standOn = null; this.swimming = false;
+    p.grabbed = false;
+    // a low mantle starts with the hands already on top
+    if (p.kind === 'mantle') { p.hx = p.sx; p.hz = p.sz; }
+    p.hangY = Math.max(p.sy, p.top - 1.95);
+    p.pullY = Math.max(p.sy, p.top - 1.1);
+  }
+  climbUpdate(dt) {
+    const p = this.mv, u = this.climbU();
+    let x = p.hx, z = p.hz, y;
+    if (u < 0.22) { const k = smoothstep(0, 0.22, u); x = lerp(p.sx, p.hx, k); z = lerp(p.sz, p.hz, k); y = lerp(p.sy, p.hangY, 1 - (1 - k) ** 2); }
+    else if (u < 0.6) y = lerp(p.hangY, p.pullY, smoothstep(0.26, 0.6, u));
+    else y = lerp(p.pullY, p.top, smoothstep(0.6, 0.78, u));
+    if (u > 0.66) { const k = smoothstep(0.66, 0.9, u); x = lerp(p.hx, p.tx, k); z = lerp(p.hz, p.tz, k); }
+    if (!p.grabbed && u > 0.2) { p.grabbed = true; emit('sfx', 'thud', x, z); }
+    this.pos.set(x, y, z);
+    this.speed = 0;
+    if (this.stateT >= p.dur) {
+      this.endMove();
+      this.pos.set(p.tx, p.ty, p.tz); this.onGround = p.ty >= p.top - 0.01;
+      // over a wall: keep going and drop down the far side
+      if (p.over) this.vel.set(Math.sin(this.heading) * 2.5, 0, Math.cos(this.heading) * 2.5);
+      supportAt(this.pos.x, this.pos.z, this.pos.y, sup);
+      this.standOn = sup.vehicle;
+    }
+  }
+  // progress through the climb; a low mantle skips the hang and the pull
+  climbU() {
+    const p = this.mv, u = Math.min(1, this.stateT / p.dur);
+    return p.kind === 'mantle' ? 0.55 + 0.45 * u : u;
+  }
+
+  wallKick(w) {
+    const nl = Math.hypot(w.nx, w.nz) || 1, nx = w.nx / nl, nz = w.nz / nl;
+    const along = this.vel.x * -nz + this.vel.z * nx;
+    this.vel.set(nx * 4.6 - nz * along * 0.6, 7.4, nz * 4.6 + nx * along * 0.6);
+    this.heading = Math.atan2(this.vel.x, this.vel.z);
+    this.kickT = 0.32; this.wallKicked = true;
+    emit('playerJump');
   }
 
   driveInput(dt, t) {
@@ -430,63 +570,5 @@ export class Player {
     if (Input.hit('KeyF') || (Input.hit('KeyE') && !G.interact.active)) this.leaveVehicle();
     else if (v.sunk || v.destroyed) this.leaveVehicle(true);
   }
-
-  // ---- animation ---------------------------------------------------------------
-  animate(dt, t) {
-    const P = this.P, m = this.model;
-    m.position.copy(this.pos);
-    const moving = clamp(this.speed / 4.6, 0, 1.6);
-    this.phase += this.speed * dt * 2.3;
-    const sw = Math.sin(this.phase) * 0.8 * Math.min(1, moving);
-    let lean = this.speed > 6 ? 0.2 : this.speed > 1 ? 0.06 : 0;
-    let lie = 0;
-    if (this.state === 'ragdoll' || this.state === 'dead') lie = -1.5;
-    if (this.state === 'busted') { lean = 0.0; }
-    const cur = m.rotation.x;
-    m.rotation.set(cur + ((this.swimming ? 1.1 : lie || lean) - cur) * Math.min(1, dt * 9), this.heading, 0);
-    m.position.y += lie ? 0.18 : this.swimming ? 0.55 : Math.abs(Math.cos(this.phase)) * 0.035 * Math.min(1, moving);
-    let aL = sw, aR = -sw, lL = -sw, lR = sw, aLz = 0, aRz = 0;
-    if (!this.onGround && !this.swimming && this.state === 'foot') { lL = 0.5; lR = -0.25; aL = -0.5; aR = -0.6; }
-    if (this.swimming) { aL = -2.4 + Math.sin(t * 5) * 0.7; aR = -2.4 - Math.sin(t * 5) * 0.7; lL = Math.sin(t * 6) * 0.35; lR = -lL; }
-    if (this.state === 'busted') { aL = -3.0; aR = -3.0; aLz = -0.25; aRz = 0.25; }
-    if (this.state === 'entering') { aR = -1.2; aL = -0.9; }
-    const held = this.heldItem;
-    if (this.state === 'foot' && !this.swimming) {
-      if (this.aiming || (G.weapons && G.weapons.facingCamera)) {
-        const pitch = clamp(G.cam.pitch, -0.9, 0.7);
-        aR = -1.5 + pitch + this.recoil * -0.25;
-        if (held === 'pistol' || held === 'hack') { aL = -1.35 + pitch; aLz = -0.45; }
-      } else if (held) aR = aR * 0.4 - 0.25;
-      if (this.punchT > 0) { const k = Math.sin((1 - this.punchT / 0.3) * Math.PI); aR = -1.5 * k - 0.3; P.torso.rotation.y = -k * 0.5; } else P.torso.rotation.y *= 0.8;
-    }
-    const k = Math.min(1, dt * 16);
-    P.armL.rotation.x += (aL - P.armL.rotation.x) * k; P.armR.rotation.x += (aR - P.armR.rotation.x) * k;
-    P.armL.rotation.z += (aLz - P.armL.rotation.z) * k; P.armR.rotation.z += (aRz - P.armR.rotation.z) * k;
-    P.legL.rotation.x += (lL - P.legL.rotation.x) * k; P.legR.rotation.x += (lR - P.legR.rotation.x) * k;
-    P.head.rotation.x = this.aiming ? clamp(G.cam.pitch, -0.5, 0.5) * 0.6 : 0;
-    // knees fold as each leg swings through; elbows carry a little bend that deepens on a run
-    const stride = Math.min(1, moving), cs = Math.cos(this.phase);
-    let kL = Math.max(0, cs) * 1.0 * stride, kR = Math.max(0, -cs) * 1.0 * stride;
-    let eL = -0.16 - 0.5 * stride * (this.speed > 6 ? 1.6 : 0.6), eR = eL;
-    if (!this.onGround && !this.swimming && this.state === 'foot') { kL = 0.9; kR = 0.5; }
-    if (this.swimming) { kL = 0.3 + Math.max(0, Math.sin(t * 6)) * 0.5; kR = 0.3 + Math.max(0, -Math.sin(t * 6)) * 0.5; eL = eR = -0.3; }
-    if (this.state === 'busted') { eL = eR = -1.2; }
-    if (this.state === 'foot' && !this.swimming && (this.aiming || (G.weapons && G.weapons.facingCamera))) { eR = -0.06; if (held === 'pistol' || held === 'hack') eL = -0.5; }
-    else if (held && this.state === 'foot') eR = -0.5;
-    if (this.punchT > 0) eR = -0.2;
-    P.shinL.rotation.x += (kL - P.shinL.rotation.x) * k; P.shinR.rotation.x += (kR - P.shinR.rotation.x) * k;
-    P.foreL.rotation.x += (eL - P.foreL.rotation.x) * k; P.foreR.rotation.x += (eR - P.foreR.rotation.x) * k;
-  }
-  animateSeated(dt, t) {
-    const v = this.vehicle, P = this.P;
-    if (!v.T.open) return;
-    const bike = v.cls === 'hover';
-    P.legL.rotation.x = bike ? -0.9 : -1.45; P.legR.rotation.x = bike ? -0.9 : -1.45;
-    P.armL.rotation.x = -1.1 + v.steer * 0.25; P.armR.rotation.x = -1.1 - v.steer * 0.25;
-    P.armL.rotation.z = P.armR.rotation.z = 0;
-    P.shinL.rotation.x = P.shinR.rotation.x = bike ? 1.25 : 1.35;
-    P.foreL.rotation.x = P.foreR.rotation.x = -0.55;
-    P.torso.rotation.y = 0;
-    this.model.rotation.set(bike ? 0.28 : 0.05, 0, 0);
-  }
 }
+const _dir = { x: 0, z: 0, mag: 0 };

@@ -10,6 +10,7 @@ import './drive/drift.js';
 // people
 
 // player
+import './entities/playerControls.js';
 
 // helicopter
 
