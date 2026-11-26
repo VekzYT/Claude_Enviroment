@@ -173,7 +173,7 @@ export const CLUB = {
             text: m.n === 1 ? 'You look like somebody with rhythm. Want to take the decks? Hit the pads on the beat, keep the floor moving, I pay you in tokens.'
               : best ? `Back for more? Your best set scored ${best.toLocaleString()}. Beat it.` : 'The decks are still warm. Ready?',
             choices: [
-              { label: 'Take the decks', note: 'mini-game · pays Tokens', then: () => { Rhythm.start(rooms, room, () => dancers); return null; } },
+              { label: 'Take the decks', note: Rhythm.feeWait() ? `encore · paid again in ${Math.ceil(Rhythm.feeWait() / 60)} min` : 'mini-game · pays Tokens', then: () => { Rhythm.start(rooms, room, () => dancers); return null; } },
               { label: 'Play something for me', then: () => ({ who: 'DJ VECTOR', role: 'Resident DJ', color: '#2fd6c6', text: pick(['This one is off CONSTITUTION 106.1. Four on the floor, fully aligned.', 'You want requests? Request accepted. Request ignored. That is how it works here.']) }) },
               { label: 'Later', then: () => null },
             ] };
@@ -194,13 +194,12 @@ export const CLUB = {
     }
     const djSpot = { x: 0.5, z: -7.0 };
     return {
-      room, people, entry: { x: -6.5, z: D / 2 - 1.1, h: Math.PI },
+      room, people, entry: { x: -6.5, z: D / 2 - 2.2, h: Math.PI },
       spots: [{ x: room.door.x, z: room.door.z + 0.4, r: 1.2, label: 'Leave', use: () => rooms.go(null) }],
       ambience: { sky: 0x9a7ab0, ground: 0x3a2430, hemi: 0.32, env: 0.45, exposure: 1.12, bloom: [0.82, 0.55] },
       music: { station: 4, volume: 0.9 },
       djSpot, stage: STAGE, rhythm: Rhythm,
       onEnter: (n) => {
-        Rhythm.paidThisVisit = false;
         dancers.length = 0;
         for (const p of people) if (p.pose === 'dance' && p.p) dancers.push(p.p);
         if (n === 1) G.hud.toast('Latent Space Bar — Nadia serves drinks, DJ Vector lets you take the decks');

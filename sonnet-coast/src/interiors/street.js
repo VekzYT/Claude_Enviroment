@@ -38,7 +38,18 @@ function kindOf(p) {
 }
 
 class Street {
-  constructor() { this.memo = new Map(); this.cool = 0; this.bumpT = 0; this.near = null; }
+  constructor() { this.memo = new Map(); this.cool = 0; this.bumpT = 0; this.near = null; this.faced = new Map(); this.chatting = null; }
+
+  // Turn someone to face the player for a while. The way they faced before (a kerb waiter faces
+  // the road, a bench sitter the view) comes back once they are done.
+  face(p, seconds) {
+    if (!this.faced.has(p)) this.faced.set(p, p.faceH);
+    p.talkT = seconds;
+    p.faceH = Math.atan2(G.player.pos.x - p.pos.x, G.player.pos.z - p.pos.z);
+  }
+  unface() {
+    for (const [p, h] of this.faced) if (p.removed || p.talkT <= 0) { if (!p.removed) p.faceH = h; this.faced.delete(p); }
+  }
 
   // someone you could talk to: close, in front of you, on their feet (or sitting) and calm
   candidate() {
@@ -56,14 +67,20 @@ class Street {
     const K = KINDS[m.kind], who = m.name.toUpperCase();
     pl.heading = Math.atan2(p.pos.x - pl.pos.x, p.pos.z - pl.pos.z);
     // joggers answer over their shoulder and keep going
-    if (m.kind !== 'jogger') { p.talkT = 3.2; p.faceH = Math.atan2(pl.pos.x - p.pos.x, pl.pos.z - p.pos.z); }
+    if (m.kind !== 'jogger') this.face(p, 3.2);
     G.hud.clearSpeech();
     G.hud.say(ME, pick(HELLO), 1.4);
     // a few people have more to say, and ask you something back
     const deep = m.n === 1 && m.kind !== 'jogger' && m.kind !== 'busy' && chance(0.3);
     if (deep) {
       const node = this.chat(p, m, who, K);
-      if (node) { G.hud.clearSpeech(); p.talkT = 600; Dialogue.start(node, { npc: p, onClose: () => { p.talkT = 0.8; p.faceH = null; } }); return; }
+      if (node) {
+        G.hud.clearSpeech();
+        this.face(p, 600);
+        this.chatting = p;
+        Dialogue.start(node, { npc: p, onClose: () => { p.talkT = 0.8; this.chatting = null; } });
+        return;
+      }
     }
     G.hud.say(who, m.n > 1 && chance(0.6) ? pick(AGAIN) : pick(K.lines));
   }
@@ -104,6 +121,9 @@ class Street {
 
   update(dt) {
     this.near = null;
+    this.unface();
+    // a conversation in the street ends the moment the Safety Flag goes up
+    if (this.chatting && G.police.stars > 0) Dialogue.close();
     if (G.indoors || G.mode !== 'play') return;
     const pl = G.player;
     this.cool -= dt; this.bumpT -= dt;
@@ -123,15 +143,15 @@ class Street {
       const b = G.peds.nearest(pl.pos.x, pl.pos.z, 0.62, (p) => p.role === 'civ' && p.state === 'walk' && Math.abs(p.pos.y - pl.pos.y) < 1);
       if (b) {
         this.bumpT = 2.5;
-        b.talkT = 1.1; b.faceH = Math.atan2(pl.pos.x - b.pos.x, pl.pos.z - b.pos.z);
+        this.face(b, 1.1);
         // a good shove from a sprint pushes them aside
         if (pl.speed > 6) { const d = Math.hypot(b.pos.x - pl.pos.x, b.pos.z - pl.pos.z) || 1; b.pos.x += ((b.pos.x - pl.pos.x) / d) * 0.35; b.pos.z += ((b.pos.z - pl.pos.z) / d) * 0.35; }
         G.hud.say(this.nameOf(b), pick(BUMP), 1.5);
         emit('sfx', 'thud', b.pos.x, b.pos.z);
       }
     }
-    // a car right beside you still gets E (F always does); a parked one a few steps away does not
-    if (pl.aiming || G.interact.active || G.hud.promptNext || pl.nearestVehicle(1.6)) return;
+    // E gets into a car in reach before it talks to anyone (F always does); flagged, nobody wants to chat
+    if (pl.aiming || G.interact.active || G.hud.promptNext || G.police.stars > 0 || pl.nearestVehicle()) return;
     const p = this.candidate();
     if (!p) return;
     this.near = p;

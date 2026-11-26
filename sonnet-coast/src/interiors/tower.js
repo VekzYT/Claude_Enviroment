@@ -7,7 +7,7 @@ import { G } from '../state.js';
 import { Room, terrazzoTex, woodTex, labelTex, sofa, roundTable, plant } from './kit.js';
 import { look, jobTip, weightRumour } from './people.js';
 import { blocks } from '../world/cityplan.js';
-import { allColliders, removeCollider, addCircle, addBox } from '../world/colliders.js';
+import { allColliders, removeCollider, restoreCollider, addBox } from '../world/colliders.js';
 import { Batch } from '../world/geom.js';
 import { CITY } from '../world/layout.js';
 import { pick } from '../util/rng.js';
@@ -198,7 +198,7 @@ export const LOBBY = {
     const m = new THREE.Mesh(b.merged(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.15 }));
     m.castShadow = true; m.receiveShadow = true;
     scene.add(m);
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.5), new THREE.MeshBasicMaterial({ map: labelTex('tower-door', 512, 72, '#f3f1ec', [{ t: 'CLAUDE TOWER · LOBBY · SKY DECK', size: 30, color: '#2b2622', y: 38, spacing: 4 }]) }));
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.5), new THREE.MeshBasicMaterial({ map: labelTex('tower-door', 1024, 144, '#f3f1ec', [{ t: 'CLAUDE TOWER · SKY DECK', size: 50, color: '#2b2622', y: 52, spacing: 8 }]) }));
     const [sx, sz] = at(0, 2.97);
     sign.position.set(sx, GY + 3.38, sz); sign.rotation.y = ry;
     scene.add(sign);
@@ -225,7 +225,7 @@ export const LOBBY = {
       { id: 'w3', name: 'Staff', look: STAFF(157, 0x6b7a3c), x: -1, z: 1, h: 0, brain: walker([[-8.8, 0.2], [0.8, 2.2], [4.4, -5.4], [-2.6, 4.2]]) },
     ];
     return {
-      room, people, entry: { x: 0, z: D / 2 - 1.2, h: Math.PI },
+      room, people, entry: { x: 0, z: D / 2 - 2.6, h: Math.PI },
       spots: [
         { x: room.door.x, z: room.door.z + 0.4, r: 1.6, label: 'Leave', use: () => rooms.go(null) },
         { x: -W / 2 + 1.2, z: 0, r: 2.4, label: 'Call a lift', use: () => rooms.talkTo(liftMenu(rooms, 'lobby')) },
@@ -259,7 +259,7 @@ export const SKYDECK = {
       // the deck is inside the tower's own collision drum: set it aside while we are up here
       tower(on) {
         if (on) { cols = allColliders.filter((c) => c.building === T && !c.removed); for (const c of cols) removeCollider(c); }
-        else { for (const c of cols) addCircle(c.x, c.z, c.r, c.y0, c.y1, { building: T }); cols = []; }
+        else { for (const c of cols) restoreCollider(c); cols = []; }
       },
       onEnter: (n) => { if (n === 1) G.hud.toast('The Sky Deck — 230 m above Sonnet Coast'); },
     };

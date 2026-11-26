@@ -161,7 +161,7 @@ export const CAFE = {
     ];
     const dayLamp = room.lamps.length - 1;
     return {
-      room, people, entry: { x: 4.6, z: D / 2 - 1.1, h: Math.PI },
+      room, people, entry: { x: 4.6, z: D / 2 - 2.2, h: Math.PI },
       spots: [{ x: room.door.x, z: room.door.z + 0.4, r: 1.2, label: 'Leave', use: () => rooms.go(null) }],
       ambience: { sky: 0xffe6cc, ground: 0x6a4a34, hemi: 0.42, env: 0.65, exposure: 1.0, bloom: [0.95, 0.28] },
       music: { station: 3, volume: 0.45 },

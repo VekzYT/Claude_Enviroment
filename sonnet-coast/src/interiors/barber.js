@@ -109,9 +109,11 @@ export const BARBER = {
     const restyle = () => {
       const pl = G.player, o = room.origin;
       pl.teleport(o.x - 2.2, o.y, o.z - 1.55, 0);
+      pl.anim.update(0, G.time);   // the body follows at once: the world stands still under a menu
       const was = { ...pl.outfit };
       G.mode = 'menu';
       G.cam.yaw = pl.heading + Math.PI * 0.88; G.cam.pitch = 0.08; G.cam.idle = 0; G.cam.update(0.016, G.time);
+      rooms.keepCamera();
       const rows = KEYS.map((k) => `<div class="row"><label>${k[0].toUpperCase() + k.slice(1)}</label><div class="picker" data-k="${k}"><button data-d="-1">‹</button><span></span><button data-d="1">›</button></div></div>`).join('');
       const d = G.menus.mount(`<div class="panel"><h2>FINE-TUNE BARBER</h2><p>Rafa squints at you in the mirror. ${price(COST)} for each change. You have <b style="color:var(--amber)" id="bt"></b>.</p>
         ${rows}<button class="btn primary" id="ok">PAY &amp; KEEP <small id="bc"></small></button><button class="btn" id="no">NEVER MIND</button></div>`, 'clear');
@@ -154,7 +156,7 @@ export const BARBER = {
         talk: () => ({ who: 'OTTO', role: 'Waiting', color: '#9fb39a', text: pick(['I have been waiting so long my hair grew another centimetre. Efficient, really.', 'Have you tried the hot towel? It is like a reset for your face.']) }) },
     ];
     return {
-      room, people, entry: { x: 3.3, z: D / 2 - 1.1, h: Math.PI },
+      room, people, entry: { x: 3.3, z: D / 2 - 2.3, h: Math.PI },
       spots: [{ x: room.door.x, z: room.door.z + 0.4, r: 1.2, label: 'Leave', use: () => rooms.go(null) }],
       ambience: { sky: 0xeef2f0, ground: 0x4a4440, hemi: 0.5, env: 0.7, exposure: 1.0, bloom: [0.95, 0.25] },
       music: { station: 2, volume: 0.4 },

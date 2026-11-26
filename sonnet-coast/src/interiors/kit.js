@@ -112,7 +112,9 @@ export function labelTex(key, w, h, bg, lines) {
       g.font = `${L.weight || 800} ${L.size}px ${UI_FONT}`;
       g.fillStyle = L.color; g.textAlign = L.align || 'center'; g.textBaseline = 'middle';
       if (L.spacing) g.letterSpacing = `${L.spacing}px`;
-      g.fillText(L.t, L.x ?? w / 2, L.y);
+      // a line too long for the label is squeezed to fit rather than cut off at the edges
+      const room = w * 0.94;
+      g.fillText(L.t, L.x ?? w / 2, L.y, g.measureText(L.t).width > room ? room : undefined);
       g.letterSpacing = '0px';
     }
   }, { repeat: false });
@@ -364,7 +366,7 @@ export function plant(r, x, z, h = 1.3, kind = 'bush', pot = 0xd8cfc0) {
     r.cyl('matte', 0.035, 0.05, h * 0.55, x, top, z, 0x5a4632, 7);
     for (let i = 0; i < 7; i++) {
       const a = i * 2.4, rr = 0.25 + (i % 3) * 0.1;
-      r.sphere('leaf', 0.32 + (i % 2) * 0.08, x + Math.cos(a) * rr, top + h * (0.55 + (i % 4) * 0.1), z + Math.sin(a) * rr, greens[i % 4], 1, 0.8, 1, 1);
+      r.sphere('leaf', 0.32 + (i % 2) * 0.08, x + Math.cos(a) * rr, top + h * (0.55 + (i % 4) * 0.1), z + Math.sin(a) * rr, greens[i % 4], 1, 0.8, 1, 2);
     }
   } else {
     for (let i = 0; i < 6; i++) {

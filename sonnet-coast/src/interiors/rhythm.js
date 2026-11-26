@@ -20,6 +20,8 @@ const CSS = `
 #rhythm .judge { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-size: 30px; font-weight: 900; letter-spacing: .1em; opacity: 0; transition: opacity .2s; pointer-events: none; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
 #rhythm .judge.on { opacity: 1; transition: none; }
 #rhythm .hint { margin-top: 8px; text-align: center; font-size: 12px; letter-spacing: .12em; color: rgba(240,232,216,.6); text-transform: uppercase; }
+#rhythm .stop { position: absolute; right: 0; top: -2px; transform: translateY(-100%); background: rgba(12,11,14,.6); border: 1px solid rgba(240,232,216,.25); color: var(--ivory); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 800; letter-spacing: .16em; cursor: pointer; }
+#rhythm .stop:hover { border-color: var(--terracotta); }
 @media (max-height: 640px) { #rhythm { zoom: 0.78; } }
 @media (max-height: 430px) { #rhythm { zoom: 0.62; } }
 body.rhythm .hud-bl, body.rhythm .hud-bc { visibility: hidden; }
@@ -34,17 +36,18 @@ const LANES = [
   { keys: ['KeyD', 'ArrowRight'], label: '→', c: '#ff5f8a' },
 ];
 const BARS = 12, AHEAD = 2.2;           // song length in bars, and how many beats ahead notes show
+const FEE_EVERY = 240;                  // seconds between paid sets (encores in between are for the love of it)
 const PERFECT = 0.075, GOOD = 0.15;     // seconds either side of the beat
 const _p = new THREE.Vector3();
 
 class RhythmGame {
-  constructor() { this.on = false; this.pending = null; this.hype = 0; this.el = null; }
+  constructor() { this.on = false; this.pending = null; this.hype = 0; this.el = null; this.paidAt = -Infinity; }
 
   build() {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     const el = document.createElement('div');
     el.id = 'rhythm';
-    el.innerHTML = `<div class="top"><span class="combo"></span><b class="score">0</b></div>
+    el.innerHTML = `<button class="stop">STOP</button><div class="top"><span class="combo"></span><b class="score">0</b></div>
       <div class="lanes">${LANES.map((L, i) => `<div class="lane" data-i="${i}" style="--c:${L.c}"><div class="pad">${L.label}</div></div>`).join('')}<div class="judge"></div></div>
       <div class="hint"></div>`;
     document.getElementById('ui').appendChild(el);
@@ -54,6 +57,8 @@ class RhythmGame {
     // pads take taps and clicks straight away, timed at the moment of the touch
     this.lanes.forEach((ln, i) => ln.addEventListener('pointerdown', (e) => { e.preventDefault(); this.hit(i); }));
     this.judgeEl = el.querySelector('.judge');
+    // the way out on a phone, where there is no Esc
+    el.querySelector('.stop').addEventListener('click', (e) => { e.stopPropagation(); this.stop(true); });
   }
 
   // Asked from a conversation: begins on the next frame, once the conversation has closed.
@@ -107,6 +112,9 @@ class RhythmGame {
     this.shot = 0;
     emit('sfx', 'missionStart');
   }
+
+  // seconds until the club pays for a set again
+  feeWait() { return Math.max(0, this.paidAt + FEE_EVERY - G.time); }
 
   beatNow() { return this.clock.b0 + ((this.clock.ctx ? this.clock.ctx.currentTime : G.time) - this.clock.t0) * this.bpm / 60; }
 
@@ -201,17 +209,17 @@ class RhythmGame {
     const S = G.save.interiors.best;
     const acc = this.hits / this.notes.length;
     const grade = acc > 0.95 ? 'S' : acc > 0.85 ? 'A' : acc > 0.7 ? 'B' : acc > 0.5 ? 'C' : 'D';
-    // the first good set of a visit pays in full, encores pay half
-    const full = !this.paidThisVisit;
+    // the club pays for a set every few minutes; an encore in between is played for the crowd
+    const fee = !this.feeWait();
     const payK = Math.min(1, this.score / this.max);
-    const pay = Math.round((payK * payK * 420 + (this.best >= 30 ? 60 : 0)) * (full ? 1 : 0.5) / 5) * 5;
-    this.paidThisVisit = true;
+    const pay = fee ? Math.round((payK * payK * 420 + (this.best >= 30 ? 60 : 0)) / 5) * 5 : 0;
+    if (pay > 0) this.paidAt = G.time;
     S.danceN = (S.danceN || 0) + 1;
     const record = this.score > (S.dance || 0);
     if (record) S.dance = this.score;
     if (pay > 0) addTokens(pay, 'DJ set');
     writeSave();
-    G.hud.banner(`SET COMPLETE · ${grade}`, `${this.score.toLocaleString()} points · best combo ${this.best}${record ? ' · new record' : ''}`, grade === 'S' || grade === 'A' ? 'cool' : '', 4);
+    G.hud.banner(`SET COMPLETE · ${grade}`, `${this.score.toLocaleString()} points · best combo ${this.best}${record ? ' · new record' : ''}${fee ? '' : ' · encore, no fee'}`, grade === 'S' || grade === 'A' ? 'cool' : '', 4);
     emit('sfx', acc > 0.5 ? 'missionPass' : 'missionFail');
   }
 }

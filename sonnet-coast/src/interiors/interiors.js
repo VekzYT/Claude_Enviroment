@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { G, on, emit, addPlugin } from '../state.js';
 import { Input } from '../input.js';
-import { addBox, removeCollider, queryColliders } from '../world/colliders.js';
+import { addBox, removeCollider, restoreCollider, queryColliders } from '../world/colliders.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { platforms, groundHeight } from '../world/roads.js';
 import { SHOP_ROWS, makeBlobTexture, makeCanvas, canvasToTexture, UI_FONT } from '../world/textures.js';
@@ -18,6 +18,7 @@ import { addControls } from '../ui/menus.js';
 import { Dialogue } from '../ui/dialogue.js';
 import { Radio } from '../audio/radio.js';
 import { setLamps, clearLamps, updateLamp } from './light.js';
+import { Rhythm } from './rhythm.js';
 import { CAFE } from './cafe.js';
 import { CLUB } from './club.js';
 import { BARBER } from './barber.js';
@@ -82,7 +83,8 @@ class Interiors {
     this.blob.visible = false; this.blob.renderOrder = 2;
     G.scene.add(this.blob);
     on('crime', (type) => { if (this.cur && !this.fade && type !== 'theft') this.eject(type === 'gunfire' || type === 'assault' ? 'Security walked you out' : 'You were asked to leave'); });
-    on('playerDied', () => { if (this.cur) Dialogue.close(); });
+    on('playerDied', () => this.interrupted());
+    on('playerBusted', () => this.interrupted());
     addControls([['E', 'Talk to people nearby, use doors and counters']], []);
   }
 
@@ -147,9 +149,27 @@ class Interiors {
   // Fade out, move, fade in. to = place id, or null for the street.
   go(to, spot = null) {
     if (this.fade) return;
+    // gameplay input is off through the fade, so nothing (a car door, a punch) can happen on the way
+    Dialogue.close();
+    if (G.mode === 'play') { G.mode = 'talk'; this.fade = { t: FADE, to, spot, mode: true }; }
+    else this.fade = { t: FADE, to, spot };
     G.menus.fadeTo(true);
     emit('sfx', 'doorOpen');
-    this.fade = { t: FADE, to, spot };
+  }
+  endFade() {
+    const f = this.fade;
+    this.fade = null;
+    if (f && f.mode && G.mode === 'talk') G.mode = 'play';
+    return f;
+  }
+  // flatlined or contained: whatever was going on in here (or on the street) stops
+  interrupted() {
+    Dialogue.close();
+    Rhythm.stop(true);
+    if (this.fade) { this.endFade(); G.menus.fadeTo(false); }
+    this.drunk = 0;
+    const g = G.game.R.grade;
+    if (g) g.uniforms.uCA.value = 0.6;
   }
   eject(msg) {
     if (!this.cur) return;
@@ -161,7 +181,13 @@ class Interiors {
   }
 
   arrive(to, spot) {
-    const from = this.cur;
+    const from = this.cur, pl = G.player;
+    // whatever happened during the fade can still call the visit off
+    if (to !== null && !from && (!pl.alive || pl.vehicle || pl.state !== 'foot' || G.police.stars > 0)) {
+      if (pl.alive && G.police.stars > 0) G.hud.toast('The door stays shut while you are flagged — lose the Safety Flag first', '#ffb347');
+      G.menus.fadeTo(false);
+      return;
+    }
     if (from) this.leaveRoom();
     if (to === null && spot && spot.heli) {
       // the lift to the roof: the helicopter service takes it from here
@@ -187,7 +213,7 @@ class Interiors {
     const I = P.inst, e = spot || I.entry;
     const w = I.room.world(e.x, e.z);
     G.player.teleport(w.x, I.room.origin.y, w.z, e.h);
-    G.cam.yaw = e.h; G.cam.pitch = 0.16; G.cam.first = true; G.cam.zoom = Math.min(G.cam.zoom, 1);
+    G.cam.yaw = e.h; G.cam.pitch = 0.16; G.cam.first = true;
     this.refreshProbe();
     G.menus.fadeTo(false);
     emit('sfx', 'doorClose');
@@ -201,7 +227,10 @@ class Interiors {
     this.cur = P;
     G.indoors = { id: P.def.id, name: P.def.name };
     R.group.visible = true;
-    for (const b of R.boxes) this.colliders.push(addBox(o.x + b[0], o.z + b[1], o.x + b[2], o.z + b[3], o.y + b[4], o.y + b[5], { interior: P.def.id }));
+    // each room keeps its own colliders between visits
+    if (!I.cols) I.cols = R.boxes.map((b) => addBox(o.x + b[0], o.z + b[1], o.x + b[2], o.z + b[3], o.y + b[4], o.y + b[5], { interior: P.def.id }));
+    else for (const c of I.cols) restoreCollider(c);
+    this.colliders = I.cols;
     this.platform = { x0: o.x - R.W / 2 - 1, z0: o.z - R.D / 2 - 1, x1: o.x + R.W / 2 + 1, z1: o.z + R.D / 2 + 1, y: o.y };
     platforms.push(this.platform);
     setLamps(R.lamps.map((L) => ({ ...L, x: o.x + L.x, y: o.y + L.y, z: o.z + L.z })));
@@ -213,6 +242,10 @@ class Interiors {
     const cam = G.camera;
     if (!I.outdoorView) { cam.far = INDOOR_FAR; cam.updateProjectionMatrix(); G.renderer.shadowMap.autoUpdate = false; }
     if (I.music) this.playMusic(I.music);
+    // the street outside is muffled by the walls
+    G.audio?.setIndoor(true);
+    // the view starts close in (a wide view would only see walls); the street view comes back on the way out
+    this.prev.zoom = G.cam.zoom; G.cam.zoom = Math.min(G.cam.zoom, 1);
     document.body.classList.add('indoors');
     if (this.card) {
       this.card.querySelector('i').textContent = P.def.icon || '⌂';
@@ -226,7 +259,7 @@ class Interiors {
     if (I.onLeave) I.onLeave();
     P.inst.room.group.visible = false;
     for (const c of this.colliders) removeCollider(c);
-    this.colliders.length = 0;
+    this.colliders = [];
     const k = platforms.indexOf(this.platform);
     if (k >= 0) platforms.splice(k, 1);
     this.platform = null;
@@ -237,6 +270,8 @@ class Interiors {
     G.police.suppressed = !!this.prev.suppressed;
     G.camera.far = G.game.R.q ? G.game.R.q.far : 2000; G.camera.updateProjectionMatrix();
     G.renderer.shadowMap.autoUpdate = true;
+    G.audio?.setIndoor(false);
+    G.cam.zoom = this.prev.zoom ?? G.cam.zoom;
     this.cur = null; G.indoors = null;
     this.stopMusic();
     this.probeFar();
@@ -327,7 +362,7 @@ class Interiors {
     S.interiors ??= { visits: {}, met: {}, best: {} };
     if (this.fade) {
       this.fade.t -= dt;
-      if (this.fade.t <= 0) { const f = this.fade; this.fade = null; this.arrive(f.to, f.spot); }
+      if (this.fade.t <= 0) { const f = this.endFade(); this.arrive(f.to, f.spot); }
       return;
     }
     if (!this.cur) return;
@@ -408,6 +443,20 @@ class Interiors {
       if (!this.drunk && g) g.uniforms.uCA.value = 0.6;
     }
     if (this.cur && this.cur.inst.lateUpdate) this.cur.inst.lateUpdate(dt, t);
+    if (this.cur) this.keepCamera();
+  }
+  // The camera stays inside the room: the follow camera keeps a minimum distance from the player
+  // and a conversation keeps part of its framing, either of which can put it past a wall.
+  keepCamera() {
+    const R = this.cur.inst.room, o = R.origin, c = G.camera.position, m = 0.22;
+    if (R.opts.round) {
+      const dx = c.x - o.x, dz = c.z - o.z, d = Math.hypot(dx, dz), lim = R.W / 2 - m;
+      if (d > lim) { c.x = o.x + (dx / d) * lim; c.z = o.z + (dz / d) * lim; }
+    } else {
+      c.x = Math.min(o.x + R.W / 2 - m, Math.max(o.x - R.W / 2 + m, c.x));
+      c.z = Math.min(o.z + R.D / 2 - m, Math.max(o.z - R.D / 2 + m, c.z));
+    }
+    c.y = Math.min(o.y + R.H - m, Math.max(o.y + 0.15, c.y));
   }
   drink(seconds, amp) { this.drunk = Math.min(150, this.drunk + seconds); this.drunkAmp = Math.min(1.6, Math.max(this.drunkAmp * (this.drunk > seconds ? 1 : 0), 0) + amp); }
 }
