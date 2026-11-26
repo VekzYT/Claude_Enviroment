@@ -3,6 +3,7 @@
 // them and back down, respawning, map blips, the parachute canopy, rotor sound for machines nearby,
 // and the police helicopter's clean-up. Other streams can use G.heliPads and G.heliTeleport(id).
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { G, addPlugin, on } from '../state.js';
 import { Input } from '../input.js';
 import { Heli } from './heli.js';
@@ -20,6 +21,7 @@ const DECK = 1.0;            // the pad deck stands this far above the building'
 const RESPAWN = 75;          // seconds before an empty pad gets a new machine
 const MAX_TOWERS = 5;        // towers with a machine on the roof (besides the police and the clinic)
 const LOD_NEAR = 100, LOD_FAR = 700;
+const PAD_TOP = 0.12;         // height of a ground-level pad's deck
 BLIP_STYLES.heli = { color: '#9ad4e6', glyph: 'H' };
 
 // The deck of a rooftop pad: where city.js draws it and how far the roof reaches around it.
@@ -78,32 +80,19 @@ function padMesh(x, y, z) {
   const g = new THREE.Group();
   const parts = [];
   const add = (geo, hex, py) => { geo = geo.toNonIndexed(); geo.translate(0, py, 0); const c = new THREE.Color(hex), n = geo.getAttribute('position').count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); geo.deleteAttribute('uv'); parts.push(geo); };
-  add(new THREE.CylinderGeometry(8.2, 8.5, 0.18, 40), 0x8e9094, -0.1);
-  add(new THREE.CylinderGeometry(7.4, 7.4, 0.02, 40), 0x4a4c52, 0.0);
-  add(new THREE.RingGeometry(5.6, 6.0, 40).rotateX(-Math.PI / 2), 0xe8e2d4, 0.025);
-  for (const [w, d, px] of [[0.7, 4.6, -1.5], [0.7, 4.6, 1.5], [2.3, 0.7, 0]]) { const b = new THREE.BoxGeometry(w, 0.02, d); b.translate(px, 0, 0); add(b, 0xf2f3f4, 0.03); }
-  const deck = new THREE.Mesh(mergeAll(parts), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.05, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  add(new THREE.CylinderGeometry(8.2, 8.5, 0.3, 40), 0x8e9094, PAD_TOP - 0.16);
+  add(new THREE.CylinderGeometry(7.4, 7.4, 0.02, 40), 0x4a4c52, PAD_TOP);
+  add(new THREE.RingGeometry(5.6, 6.0, 40).rotateX(-Math.PI / 2), 0xe8e2d4, PAD_TOP + 0.015);
+  for (const [w, d, px] of [[0.7, 4.6, -1.5], [0.7, 4.6, 1.5], [2.3, 0.7, 0]]) { const b = new THREE.BoxGeometry(w, 0.02, d); b.translate(px, 0, 0); add(b, 0xf2f3f4, PAD_TOP + 0.02); }
+  const deck = new THREE.Mesh(mergeGeometries(parts), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.05, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
   deck.receiveShadow = true;
   const lamps = [];
-  for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2, s = new THREE.SphereGeometry(0.14, 8, 5); s.translate(Math.cos(a) * 7.8, 0.06, Math.sin(a) * 7.8); lamps.push(s); }
-  const glow = new THREE.Mesh(mergeAll(lamps.map((s) => { s.deleteAttribute('uv'); return s; })), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffe0a8).multiplyScalar(1.6), toneMapped: false }));
+  for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2, s = new THREE.SphereGeometry(0.14, 8, 5); s.translate(Math.cos(a) * 7.8, PAD_TOP + 0.04, Math.sin(a) * 7.8); lamps.push(s); }
+  const glow = new THREE.Mesh(mergeGeometries(lamps.map((s) => { s.deleteAttribute('uv'); return s; })), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffe0a8).multiplyScalar(1.6), toneMapped: false }));
   g.add(deck, glow);
   g.position.set(x, y, z);
   return g;
 }
-function mergeAll(list) {
-  let n = 0;
-  for (const g of list) n += g.getAttribute('position').count;
-  const out = new THREE.BufferGeometry();
-  for (const key of Object.keys(list[0].attributes)) {
-    const sz = list[0].getAttribute(key).itemSize, arr = new Float32Array(n * sz);
-    let o = 0;
-    for (const g of list) { arr.set(g.getAttribute(key).array, o); o += g.getAttribute(key).array.length; }
-    out.setAttribute(key, new THREE.BufferAttribute(arr, sz));
-  }
-  return out;
-}
-
 class HeliWorld {
   constructor() {
     this.pads = [];
@@ -153,8 +142,8 @@ class HeliWorld {
       const pad = {
         id: b.kind === 'police' ? 'police' : b.kind === 'clinic' ? 'clinic' : `tower${++n}`, name, x: d.x, y: deckY, z: d.z, heading, onRoof: true,
         type: b.kind === 'police' ? 'policeHeli' : b.kind === 'clinic' ? 'medHeli' : 'heli', locked: true,
-        street: { x: st.x, z: st.z, y: groundHeight(st.x, st.z, 99), h: Math.atan2(-st.nx, -st.nz) }, down,
-        v: null, cool: 0,
+        street: { x: st.x, z: st.z, y: groundHeight(st.x, st.z, 99), nx: st.nx, nz: st.nz }, down,
+        v: null, cool: 0, wreckAt: null,
       };
       this.pads.push(pad);
       this.addMarker(pad, pad.street, true);
@@ -165,9 +154,12 @@ class HeliWorld {
     for (const [id, name, at, reach] of ground) {
       const s = openSpot(at.x, at.z, reach);
       if (!s) continue;
-      const pad = { id, name, x: s.x, y: s.y, z: s.z, heading: Math.atan2(at.x - s.x, at.z - s.z) || 0, onRoof: false, type: 'heli', locked: false, v: null, cool: 0 };
+      const pad = { id, name, x: s.x, y: s.y, z: s.z, heading: Math.atan2(at.x - s.x, at.z - s.z) || 0, onRoof: false, type: 'heli', locked: false, v: null, cool: 0, wreckAt: null };
       this.pads.push(pad);
       pad.mesh = padMesh(s.x, s.y, s.z);
+      // a low deck, above the park paths and port paving it is laid over
+      addCircle(s.x, s.z, 8.3, s.y - 1, s.y + PAD_TOP, { deck: true });
+      pad.y = s.y + PAD_TOP + 0.01;
       G.scene.add(pad.mesh);
     }
   }
@@ -202,8 +194,9 @@ class HeliWorld {
       else if (pad.down) { x = pad.x + (pad.down.x - pad.x) * 0.5; z = pad.z + (pad.down.z - pad.z) * 0.5; }
       pl.teleport(x, y + 0.02, z, h);
     } else {
+      // out of the door, a step past the marker, facing the street
       const s = pad.street;
-      if (s) pl.teleport(s.x + Math.sin(s.h) * 1.6, s.y, s.z + Math.cos(s.h) * 1.6, s.h);
+      if (s) pl.teleport(s.x + s.nx * 1.8, s.y, s.z + s.nz * 1.8, Math.atan2(s.nx, s.nz));
     }
     G.cam.yaw = pl.heading; G.cam.first = true;
   }
@@ -239,9 +232,10 @@ class HeliWorld {
       this.checkT = 1;
       for (const p of this.pads) {
         const v = p.v;
-        if (v && (v.removed || v.sunk || (v !== pl.vehicle && Math.hypot(v.pos.x - p.x, v.pos.z - p.z) > 25) || (v.destroyed && v.wreckT > 30))) {
+        if (v && v.destroyed && p.wreckAt === null) p.wreckAt = t;
+        if (v && (v.removed || v.sunk || (v !== pl.vehicle && Math.hypot(v.pos.x - p.x, v.pos.z - p.z) > 25) || (v.destroyed && t - p.wreckAt > 30))) {
           if (!v.removed) v.keep = false;
-          p.v = null; p.cool = t + RESPAWN;
+          p.v = null; p.cool = t + RESPAWN; p.wreckAt = null;
         }
         if (!p.v && t > p.cool && Math.hypot(pp.x - p.x, pp.z - p.z) > 110 && !G.vehicles.some((o) => Math.hypot(o.pos.x - p.x, o.pos.z - p.z) < 8 && Math.abs(o.pos.y - p.y) < 4)) this.spawnAt(p);
       }

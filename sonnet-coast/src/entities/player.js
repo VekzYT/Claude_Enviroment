@@ -444,7 +444,7 @@ export class Player {
     if (this.onGround || this.swimming) {
       this.state = 'foot'; this.stateT = 0;
       this.vel.x *= 0.4; this.vel.z *= 0.4;
-      emit('chuteLanded');
+      emit('playerLand');
     }
   }
 

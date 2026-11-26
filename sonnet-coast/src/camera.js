@@ -41,7 +41,7 @@ export class GameCamera {
     let dist, height, side = 0, fovT = 62;
     if (v && v.cls === 'heli') {
       // high and well back, swinging round to look the way the machine is flying
-      dist = (10.5 + clamp(v.speed / 60, 0, 1) * 4) * this.zoom;
+      dist = (9 + clamp(v.speed / 60, 0, 1) * 4) * this.zoom;
       height = 3.4;
       _t.set(v.pos.x, v.pos.y + height, v.pos.z);
       this.slide = 0;
