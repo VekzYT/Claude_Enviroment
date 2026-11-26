@@ -6,14 +6,14 @@ import * as THREE from 'three';
 import { G } from '../state.js';
 import { clamp, wrapAngle, smoothstep, lerp } from '../util/math.js';
 import { rand, chance } from '../util/rng.js';
-import { RIG } from './playerLook.js';
+import { RIG, setFists } from './playerLook.js';
 
 const DROP = 0, PITCH = 1, BANK = 2, PIVY = 3, PIVZ = 4, SP = 5, SY = 6, SR = 7, HP = 8, HY = 9, HR = 10, HIPY = 11, HIPR = 12, SWAY = 13,
   LAP = 14, LAR = 15, LAY = 16, LEL = 17, RAP = 18, RAR = 19, RAY = 20, REL = 21,
   LTP = 22, LTR = 23, LKN = 24, LFT = 25, RTP = 26, RTR = 27, RKN = 28, RFT = 29, LOCO = 30, LIE = 31, SWL = 32, SWR = 33;
 const NJ = 34;
 const REST = new Float32Array(NJ);
-REST[SP] = 0.02; REST[HP] = 0.03; REST[LAR] = REST[RAR] = 0.1; REST[LEL] = REST[REL] = -0.2;
+REST[SP] = 0.02; REST[HP] = 0.03; REST[LAR] = REST[RAR] = 0.14; REST[LEL] = REST[REL] = -0.2;
 REST[LTR] = REST[RTR] = 0.025; REST[LKN] = REST[RKN] = 0.04; REST[LOCO] = 1; REST[SWL] = REST[SWR] = 1;
 const { TH_LEN, SH_LEN, UA_LEN, FA_LEN } = RIG;
 const LEG = TH_LEN + SH_LEN, ARM2 = FA_LEN + 0.045;
@@ -556,6 +556,10 @@ export class PlayerAnim {
       F[LAP] = lerp(F[LAP], _ik.ap, w); F[LAR] = lerp(F[LAR], _ik.ar, w); F[LAY] = lerp(F[LAY], 0, w); F[LEL] = lerp(F[LEL], _ik.el, w);
     }
     P.uaL.rotation.set(F[LAP], -F[LAY], F[LAR]); P.faL.rotation.x = F[LEL];
+    // fists to fight with and to hold on to things (a wheel, bars, a ledge, a door, a gun)
+    const fight = !pl.heldItem && !pl.vehicle && (this.guardT > 0 || pl.punchT > 0);
+    const grab = !!pl.vehicle || pl.state === 'climb' || pl.state === 'entering';
+    setFists(P, fight || this.support > 0 || (grab && this.ikL > 0.3), fight || !!pl.heldItem || (grab && this.ikR > 0.3));
     pl.camDip = 0.22 * env;
   }
 }

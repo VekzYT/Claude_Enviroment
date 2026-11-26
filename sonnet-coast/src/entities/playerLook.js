@@ -7,8 +7,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { DETAIL_LAYER } from '../state.js';
-import { ellipseLoft, place } from './bodyGeo.js';
-import { makePedMaterials, torsoKit, pelvisKit, headKit, upperArmKit, forearmKit, thighKit, shinKit, footKit, tag, A, B, C, D, FIXED, HR, HEAD, TORSO, PELVIS, UARM, FARM, THIGH, SHIN, FOOT, LIMB } from './pedKit.js';
+import { ellipseLoft, limbGeo, place } from './bodyGeo.js';
+import { makePedMaterials, torsoKit, pelvisKit, headKit, upperArmKit, thighKit, shinKit, footKit, tag, A, B, C, D, FIXED, HR, HEAD, TORSO, PELVIS, UARM, FARM, THIGH, SHIN, FOOT, LIMB } from './pedKit.js';
 import { HAIR, STRIDE, HEAD_STRIDE } from './pedlooks.js';
 
 // [label, ...values]. Indices are what the save stores, so only ever append to these lists.
@@ -151,6 +151,7 @@ function strap(pts, w, t) {
   return g;
 }
 const rbox = (w, h, d, r, x, y, z, rx = 0, ry = 0, rz = 0) => place(new RoundedBoxGeometry(w, h, d, 2, r), x, y, z, rx, ry, rz);
+const sph = (r, w, h, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => place(new THREE.SphereGeometry(r, w, h), x, y, z, rx, ry, rz, sx, sy, sz);
 // the inside of a shell: same surface, facing in
 function inward(g) {
   const ix = g.index.array;
@@ -161,17 +162,22 @@ function inward(g) {
 }
 
 // Torso gear: bits, and colour slots A = carrier, B = dark webbing, C = jacket, D = accent.
-const TG = { SHELL: 0, VEST: 1, PACKTRIM: 2, HEM: 3 };
+const TG = { SHELL: 0, VEST: 1, PACKTRIM: 2, HEM: 3, ZIP: 4, SLOPE: 5 };
 function torsoGear() {
   const parts = [];
+  // a zip: a narrow seam a shade darker than the jacket
+  parts.push(tag(strip(-0.075, 0.47, FRONT - 0.011, FRONT + 0.011, 0.0088, 1, 6), C, TG.ZIP, 0.45, 0x6e6e6e));
   // tech shell: a two-tone yoke over the shoulders edged with accent piping, a tall funnel collar,
   // accent side seams and a chest tab, and a bound hem
-  parts.push(tag(band(0.335, 0.47, 0.006), C, TG.SHELL, 0.55, 0x9c9c9c));
+  parts.push(tag(band(0.335, 0.47, 0.006), C, TG.SHELL, 0.55, 0xb4b4b4));
   parts.push(tag(band(0.329, 0.341, 0.0085, 0.0085, 0.86, 22, 1), D, TG.SHELL, 0.4));
   for (const a of [0, Math.PI]) parts.push(tag(strip(-0.04, 0.33, a - 0.035, a + 0.035, 0.0075, 1, 4), D, TG.SHELL, 0.4));
   parts.push(tag(strip(0.255, 0.29, FRONT - 0.52, FRONT - 0.3, 0.008, 2, 1), D, TG.SHELL, 0.4));
   parts.push(tag(place(ellipseLoft([[0, 0.084, 0.08, 0.002], [0.04, 0.08, 0.076], [0.09, 0.074, 0.07, -0.004]], 18), 0, 0.455, -0.004), C, TG.SHELL, 0.55));
+  parts.push(tag(rbox(0.02, 0.088, 0.008, 0.003, 0, 0.5, 0.072, -0.17), C, TG.SHELL, 0.45, 0x6e6e6e));   // the zip, up the collar
   parts.push(tag(band(-0.08, -0.045, 0.007, 0.007, 0.86, 22, 1), C, TG.HEM, 0.6, 0x8a8a8a));
+  // the slope of the shoulders, from the neck over the top of the arm, so they read round, not square
+  for (const s of [-1, 1]) parts.push(tag(sph(1, 20, 12, s * 0.178, 0.405, -0.008, 0.085, 0.05, 0.074, 0, 0, s * -0.42), C, TG.SLOPE, 0.85));
   // light plate carrier: closed body with thicker plates front and back, shoulder straps, pouches
   parts.push(tag(band(0.05, 0.355, 0.012, 0.034, 0.72, 22, 3), A, TG.VEST, 0.75));
   for (const s of [-1, 1]) {
@@ -202,15 +208,50 @@ function headGear() {
   for (const [ph, th] of [[Math.PI / 2, 0.4], [Math.PI * 1.5, 0.58]]) parts.push(tag(place(new THREE.SphereGeometry(R * 1.012, 3, 10, ph - 0.09, 0.18, 0.02, Math.PI * th), 0, 0.022, -0.01, -0.12, 0, 0, 0.95, 1.0, 1.07), D, HG.HELMET, 0.4));
   parts.push(tag(place(new THREE.SphereGeometry(R * 1.035, 24, 6, Math.PI / 2 - 1.15, 2.3, Math.PI * 0.43, Math.PI * 0.17), 0, 0.022, -0.01, -0.12, 0, 0, 0.95, 1.0, 1.07), D, HG.HELMET, 0.08, 0x555555));
   for (const s of [-1, 1]) parts.push(tag(place(new THREE.CylinderGeometry(0.036, 0.036, 0.03, 16), s * R * 0.91, -0.012, -0.004, 0, 0, Math.PI / 2), B, HG.HELMET, 0.5));
-  // raised hood: outer shell in the jacket colour, a darker lining showing round the face
-  const hood = (rr) => place(new THREE.SphereGeometry(rr, 24, 14, Math.PI / 2 + 0.95, Math.PI * 2 - 1.9, 0, Math.PI * 0.8), 0, -0.004, -0.024, -0.1, 0, 0, 1.0, 1.06, 1.12);
-  parts.push(tag(hood(r * 1.42), C, HG.HOOD, 0.9));
-  parts.push(tag(inward(hood(r * 1.36)), C, HG.HOOD, 0.95, 0x6a6a6a));
+  // raised hood: close round the head and down onto the collar, its opening framing the face, the
+  // outer shell in the jacket colour and a darker lining showing round the face
+  const hood = (rr) => place(new THREE.SphereGeometry(rr, 26, 16, Math.PI / 2 + 0.8, Math.PI * 2 - 1.6, 0, Math.PI * 0.84), 0, -0.018, -0.012, -0.1, 0, 0, 1.0, 1.16, 1.04);
+  parts.push(tag(hood(r * 1.25), C, HG.HOOD, 0.9));
+  parts.push(tag(inward(hood(r * 1.19)), C, HG.HOOD, 0.95, 0x6a6a6a));
   // wrap-around visor glasses: tinted lens and a dark top bar
   const lens = new THREE.CylinderGeometry(r * 1.0, r * 0.98, r * 0.34, 28, 1, true, -1.15, 2.3);
   parts.push(tag(place(lens, 0, r * 0.11, 0.004, 0, 0, 0, 1.0, 1, 1.13), D, HG.VISOR, 0.06, 0x606060));
   parts.push(tag(place(new THREE.CylinderGeometry(r * 1.015, r * 1.015, r * 0.07, 28, 1, true, -1.15, 2.3), 0, r * 0.27, 0.004, 0, 0, 0, 1.0, 1, 1.13), FIXED, HG.VISOR, 0.3, 0x15161a));
   return mergeGeometries(parts, false);
+}
+// The forearm with the operative's own hands (side +1 = left): a relaxed hand with curled fingers,
+// and a fist for fighting and for gripping things (one shows at a time, see setFists). Slots:
+// A = sleeve, B = cuff, C = skin or glove. The palm faces the body, the thumb forwards (+z).
+const FA = { CUFF: FARM.CUFF, RELAX: 1, FIST: 2, WATCH: FARM.WATCH };
+function tube(pts, r, seg = 7) {
+  const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z))), seg, r, 7, false);
+  const [x, y, z] = pts[pts.length - 1];
+  return mergeGeometries([g, place(new THREE.SphereGeometry(r, 7, 5), x, y, z)], false);
+}
+function forearm(side) {
+  const L = FA_LEN, w = -L, s = side, parts = [tag(limbGeo(L, 0.046, 0.036, 14), A, -1, 0.8)];
+  // cuff and watch: rings round the wrist (the limb is about 0.038 across there)
+  parts.push(tag(ellipseLoft([[w + 0.02, 0.044, 0.041], [w + 0.065, 0.045, 0.042]], 16), B, FA.CUFF, 0.85));
+  parts.push(tag(ellipseLoft([[w + 0.03, 0.047, 0.044], [w + 0.05, 0.047, 0.044]], 14), FIXED, FA.WATCH, 0.3, 0x2a2b2e));
+  // relaxed: palm, four fingers curling in towards the palm, the thumb resting along the index
+  parts.push(tag(sph(0.04, 14, 10, 0, w - 0.04, 0.002, 0.58, 1.05, 1.0), C, FA.RELAX, 0.5));
+  for (const [z, len, r] of [[0.026, 0.044, 0.0092], [0.009, 0.05, 0.0096], [-0.009, 0.046, 0.0092], [-0.025, 0.036, 0.0084]]) {
+    const y0 = w - 0.074;
+    parts.push(tag(tube([[s * 0.002, y0, z], [-s * 0.006, y0 - len * 0.55, z * 1.02], [-s * 0.024, y0 - len * 0.86, z * 1.03]], r), C, FA.RELAX, 0.5));
+  }
+  parts.push(tag(tube([[-s * 0.006, w - 0.03, 0.03], [-s * 0.014, w - 0.058, 0.046], [-s * 0.02, w - 0.08, 0.044]], 0.0105), C, FA.RELAX, 0.5));
+  // fist: fingers rolled into the palm, knuckles in a row, the thumb wrapped over the front
+  parts.push(tag(rbox(0.054, 0.074, 0.084, 0.022, -s * 0.004, w - 0.046, 0.0), C, FA.FIST, 0.5));
+  for (const z of [0.027, 0.009, -0.009, -0.026]) parts.push(tag(sph(0.0115, 8, 6, s * 0.006, w - 0.078, z, 1, 0.9, 1), C, FA.FIST, 0.5));
+  parts.push(tag(tube([[-s * 0.012, w - 0.024, 0.036], [-s * 0.03, w - 0.05, 0.034], [-s * 0.032, w - 0.07, 0.012]], 0.011), C, FA.FIST, 0.5));
+  return { base: mergeGeometries(parts, false), extras: [] };
+}
+// The upper arm with a rounded shoulder cap that carries the slope of the shoulders over into the
+// sleeve (the crowd's arm meets the torso at a corner, which reads as blocky this close).
+function upperArm(side) {
+  const k = upperArmKit();
+  const cap = tag(sph(0.066, 18, 12, -side * 0.008, -0.035, -0.006, 1, 1.25, 1), A, -1, 0.85);
+  return { base: mergeGeometries([k.base, cap], false), extras: k.extras };
 }
 // Cargo pockets on the outside of a thigh (side +1 = left).
 function thighGear(side) {
@@ -254,7 +295,9 @@ function kitMesh(geo, mat, stride) {
   if (stride > 14) geo.setAttribute('iHair', new THREE.InterleavedBufferAttribute(ib, 4, 14));
   const m = new THREE.InstancedMesh(geo, mat.mat, 1);
   m.customDepthMaterial = mat.depth;
-  m.castShadow = true; m.frustumCulled = false;
+  // the shader moves vertices (hair, morphs, hidden variants), so cull on a sphere that holds any of it
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 0.9);
+  m.castShadow = true;
   m.layers.set(DETAIL_LAYER);
   m.userData.rec = data; m.userData.ib = ib;
   return m;
@@ -299,9 +342,9 @@ export function buildModel() {
   gear('headGear', skull, headGear());
   for (const [s, k] of [[1, 'L'], [-1, 'R']]) {
     const ua = bone(P.torso, s * RIG.SHOULDER_X, RIG.SHOULDER_Y, -0.008, 'ZXY');
-    part('uarm' + k, ua, upperArmKit());
+    part('uarm' + k, ua, upperArm(s));
     const fa = bone(ua, 0, -UA_LEN, 0);
-    part('farm' + k, fa, forearmKit());
+    part('farm' + k, fa, forearm(s));
     const th = bone(P.pelvis, s * RIG.HIP_X, RIG.THIGH_Y, 0, 'ZXY');
     part('thigh' + k, th, thighKit(false));
     gear('thighGear' + k, th, thighGear(s));
@@ -319,6 +362,8 @@ export function buildModel() {
   root.traverse((o) => { if (o.isMesh) o.layers.set(DETAIL_LAYER); });
   return { root, P, mats: flat };
 }
+
+const SEAT = 0.7;
 
 // ---- dressing ----------------------------------------------------------------------------------
 const lin = (hex, out, o) => {
@@ -340,6 +385,16 @@ function setPart(p, a, b, c, d, mask, extra = 0) {
   for (const m of p.userData.meshes) setRec(m, a, b, c, d, mask, extra);
 }
 
+// Close or open a hand: fists for fighting and for holding on to things.
+function fist(p, f) {
+  if (p.userData.fist === f) return;
+  p.userData.fist = f;
+  const m = p.userData.meshes[0];
+  m.userData.rec[12] = p.userData.base | (1 << (f ? FA.FIST : FA.RELAX));
+  m.userData.ib.needsUpdate = true;
+}
+export function setFists(P, l, r) { fist(P.parts.farmL, l); fist(P.parts.farmR, r); }
+
 // Paint the model for an outfit (all keys present, see fullOutfit).
 export function dressModel(P, flat, o) {
   const pick = (k) => OUTFITS[k][o[k]];
@@ -354,17 +409,17 @@ export function dressModel(P, flat, o) {
   // torso
   let tb = 0, tB = shade(jacket, 0.7);
   switch (jStyle) {
-    case 'Tech Shell': tb = bits(T.ZIP); break;
-    case 'Bomber': tb = bits(T.RIB, T.ZIP); tB = shade(jacket, 0.6); break;
-    case 'Hoodie': tb = bits(!hoodUp && T.HOOD, T.POCKET, T.STRINGS); tB = shade(jacket, 0.82); break;
+    case 'Bomber': tb = bits(T.RIB); tB = shade(jacket, 0.6); break;
+    case 'Hoodie': tb = bits(!hoodUp && T.HOOD, T.POCKET, !hoodUp && T.STRINGS); tB = shade(jacket, 0.82); break;
     case 'Open Overshirt': tb = bits(T.OPEN, T.COLLAR); tB = shirt; break;
-    case 'Track Top': tb = bits(T.ZIP, T.COLLAR, T.STRIPE); tB = acc; break;
+    case 'Track Top': tb = bits(T.COLLAR, T.STRIPE); tB = acc; break;
     case 'Graphic Tee': tb = bits(T.CREW, T.PRINT); tB = acc; break;
   }
   if (o.pack === 1) tb |= bits(T.PACK);
   if (o.pack === 2) tb |= bits(T.CROSS);
   setPart(Pp.torso, jacket, tB, skin, bag, tb, fem);
-  setRec(Pp.torsoGear, 0x3a3d44, 0x24262b, jacket, acc, bits(jStyle === 'Tech Shell' && TG.SHELL, jStyle === 'Tech Shell' && TG.HEM, o.vest === 1 && TG.VEST, o.pack === 1 && TG.PACKTRIM), fem);
+  const zip = jStyle === 'Tech Shell' || jStyle === 'Bomber' || jStyle === 'Track Top';
+  setRec(Pp.torsoGear, 0x3a3d44, 0x24262b, jacket, acc, bits(TG.SLOPE, jStyle === 'Tech Shell' && TG.SHELL, jStyle === 'Tech Shell' && TG.HEM, zip && TG.ZIP, o.vest === 1 && TG.VEST, o.pack === 1 && TG.PACKTRIM), fem);
   // pelvis
   const shorts = tStyle === 'Shorts';
   setPart(Pp.pelvis, trou, 0x1d1e21, jacket, 0, bits((tStyle === 'Cargo' || tStyle === 'Jeans' || tStyle === 'Chinos') && jStyle !== 'Hoodie' && PELVIS.BELT, jStyle === 'Open Overshirt' && PELVIS.HEM), fem);
@@ -373,7 +428,9 @@ export function dressModel(P, flat, o) {
   const cuff = jStyle === 'Bomber' || jStyle === 'Hoodie' || jStyle === 'Track Top' || jStyle === 'Tech Shell';
   for (const k of ['L', 'R']) {
     setPart(Pp['uarm' + k], jacket, lower, skin, skin, bits(tee && UARM.SLEEVE));
-    setPart(Pp['farm' + k], lower, jStyle === 'Track Top' ? acc : shade(jacket, 0.72), glove, bag, bits(cuff && FARM.CUFF, k === 'L' && FARM.WATCH));
+    const fa = Pp['farm' + k];
+    fa.userData.base = bits(cuff && FA.CUFF, k === 'L' && FA.WATCH); fa.userData.fist = false;
+    setPart(fa, lower, jStyle === 'Track Top' ? acc : shade(jacket, 0.72), glove, bag, fa.userData.base | bits(FA.RELAX));
     setPart(Pp['thigh' + k], trou, shorts ? skin : trou, skin, skin, bits(shorts && THIGH.SHORTS));
     setRec(Pp['thighGear' + k], trou, trou, trou, trou, tStyle === 'Cargo' ? 1 : 0);
     const boot = shoeKind === 'boot';
@@ -397,9 +454,12 @@ export function dressModel(P, flat, o) {
   setRec(Pp.headGear, 0xe9e5dc, 0x1c1d21, jacket, acc, bits(helmet && HG.HELMET, hoodUp && HG.HOOD, shades === 2 && !helmet && HG.VISOR));
   flat.accent.color.set(acc); flat.accent.emissive.set(acc);
   // a touch more bulk than the crowd: a fuller jacket, sleeves over the arms, roomier trousers
-  const build = fem ? 0.97 : 1.06, sleeve = tee ? 1.03 : 1.12, leg = tStyle === 'Cargo' || tStyle === 'Joggers' ? 1.08 : shorts ? 1 : 1.03;
-  Pp.torso.scale.set(build, 1, fem ? 1 : 1.04); Pp.torsoGear.scale.copy(Pp.torso.scale);
-  Pp.pelvis.scale.set(1.03, 1, 1.03);
+  // (the hips stay a centimetre inside the jacket's waist on either build, or trousers show through)
+  const build = fem ? 1 : 1.06, sleeve = tee ? 1.02 : 1.05, leg = tStyle === 'Cargo' || tStyle === 'Joggers' ? 1.08 : shorts ? 1 : 1.03;
+  Pp.torso.scale.set(build, 1, fem ? 1.01 : 1.04); Pp.torsoGear.scale.copy(Pp.torso.scale);
+  // the crowd's seat hangs well below the hip joints; shortened about the belt line it sits between the thighs
+  if (fem) Pp.pelvis.scale.set(0.96, SEAT, 0.95); else Pp.pelvis.scale.set(1.03, SEAT, 1);
+  Pp.pelvis.position.y = -0.1 * (1 - SEAT);
   for (const k of ['L', 'R']) {
     Pp['uarm' + k].scale.set(sleeve, 1, sleeve); Pp['farm' + k].scale.set(sleeve * 0.97, 1, sleeve * 0.97);
     for (const n of ['thigh', 'thighGear', 'shin']) Pp[n + k].scale.set(leg, 1, leg);
