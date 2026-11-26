@@ -15,6 +15,7 @@ import './entities/playerControls.js';
 // helicopter
 
 // interiors
+import './interiors/interiors.js';
 
 // world
 
